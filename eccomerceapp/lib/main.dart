@@ -1,3 +1,4 @@
+import 'package:eccomerceapp/services/api_service.dart';
 import 'package:flutter/material.dart';
 import 'RegisterPage.dart';
 import 'Dashboard.dart';
@@ -19,7 +20,7 @@ class _HomepageState extends State<Homepage> {
   final passwordController = TextEditingController();
 
   bool isPasswordHidden = true;
-  String? userType = "Customer";
+  String? userType;
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -103,20 +104,19 @@ class _HomepageState extends State<Homepage> {
                                   controller: emailController,          
                                   decoration: InputDecoration(
                                     prefixIcon: Icon(Icons.person,color: Colors.orange[600]),
-                                    hintText: "Email or Phone number",
+                                    hintText: "Email",
                                     hintStyle:
                                         TextStyle(color: Colors.grey),
                                     border: InputBorder.none,
                                   ),
                                   validator: (value) {
                                     if(value == null || value.isEmpty){
-                                      return "Email or Phone Number is Required";
+                                      return "Email Required";
                                     }
-                                    bool isEmail = value.contains("@") && value.contains(".");
-                                    bool isPhone = value.length == 10 && int.tryParse(value) != null;
+                                    
 
-                                    if(!isEmail && isPhone){
-                                      return "Enter valid Email or 10 Digit Phone Number";
+                                    if(!value.contains("@")){
+                                      return "Invalid Email";
                                     }
                                     return null;
                                   },
@@ -233,14 +233,26 @@ class _HomepageState extends State<Homepage> {
                         ),
                         SizedBox(height: 40),
                         GestureDetector(
-                          onTap: () {
-                            if(! _formKey.currentState!.validate()){
-                              return;
+                          onTap: () async{
+                            if(_formKey.currentState!.validate()){
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Logging in...')),
+                              );
+                              final result = await ApiService.userLogin(
+                                email: emailController.text, 
+                                password: passwordController.text,
+                              );
+                              if (result['success']){
+                                Navigator.pushReplacement(
+                                  context,
+                                  MaterialPageRoute(builder: (context) => DashboardPage()),
+                                );
+                              } else{
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text(result['message'])),
+                                );
+                              }
                             }
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (context) => DashboardPage())
-                            );
                           },
                           child:
                           Container(

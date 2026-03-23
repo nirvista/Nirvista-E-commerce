@@ -1,3 +1,4 @@
+import 'package:eccomerceapp/services/api_service.dart';
 import 'package:flutter/material.dart';
 import 'main.dart';
 class RegisterPage extends StatefulWidget {
@@ -18,7 +19,7 @@ class _RegisterPageState extends State<RegisterPage> {
   final confirmController = TextEditingController();
   bool isPasswordHidden = true;
   bool isConfirmHidden = true;
-  String? userType = "Customer";
+  String? userType;
   bool isChecked = false;
   @override
   Widget build(BuildContext context) {
@@ -383,9 +384,58 @@ class _RegisterPageState extends State<RegisterPage> {
                         ),
                         SizedBox(height: 40),
                         GestureDetector(
-                          onTap: () {
-                            if(! _formKey.currentState!.validate()){
+                          onTap: () async {
+                            if(!isChecked){
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  behavior: SnackBarBehavior.floating,
+                                  backgroundColor: Colors.redAccent,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  margin: EdgeInsets.all(20),
+                                  content: Row(
+                                    children: [
+                                      Icon(Icons.error, color: Colors.white),
+                                      SizedBox(width: 10),
+                                      Expanded(
+                                        child: Text("Please accept Terms & Privacy Policy", 
+                                          style: TextStyle(fontWeight: FontWeight.bold),)
+                                      ),
+                                    ],
+                                  ),
+                                  duration: Duration(seconds: 5),
+                                ),
+                              );
                               return;
+                            }
+                            if(_formKey.currentState!.validate()){
+                              if(passwordController.text != confirmController.text){
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Passwords do not match')),
+                                );
+                                return;
+                              }
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Creating account...')),
+                              );
+                              final result = await ApiService.userSignup(
+                                name: nameController.text, 
+                                email: emailController.text, 
+                                password: passwordController.text,
+                                phone: phoneController.text, 
+                                userType: userType ?? 'Customer',
+                              );
+                              if (result['success']){
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Account Created! Please Login')),
+                                );
+                                Navigator.pop(context);
+                              } else{
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text(result['message'])),
+                                );
+                              }
                             }
                             if(!isChecked){
                               ScaffoldMessenger.of(context).showSnackBar(
