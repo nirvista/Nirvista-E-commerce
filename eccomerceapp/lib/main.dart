@@ -1,121 +1,286 @@
+import 'package:eccomerceapp/services/api_service.dart';
 import 'package:flutter/material.dart';
+import 'RegisterPage.dart';
+import 'Dashboard.dart';
+void main() => runApp(MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: Homepage(),
+    ));
 
-void main() {
-  runApp(const MyApp());
+class Homepage extends StatefulWidget {
+  const Homepage({super.key});
+  @override
+  State<Homepage> createState() => _HomepageState();
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class _HomepageState extends State<Homepage> {
+  final _formKey = GlobalKey<FormState>();
+  final emailController = TextEditingController();
+  final phoneController = TextEditingController();
+  final passwordController = TextEditingController();
 
-  // This widget is the root of your application.
+  bool isPasswordHidden = true;
+  String? userType;
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: .fromSeed(seedColor: Colors.deepPurple),
-      ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
-    );
-  }
-}
-
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
-
-  @override
-  State<MyHomePage> createState() => _MyHomePageState();
-}
-
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
-
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
     return Scaffold(
-      appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
+    extendBodyBehindAppBar: true,
+    appBar: AppBar(
+    backgroundColor: const Color.fromRGBO(0, 0, 0, 0),
+    elevation: 0,
+    leading: Padding(
+      padding: EdgeInsets.all(8),
+      child: CircleAvatar(
+        radius: 30,
+        backgroundImage: AssetImage("assets/images/nirvista_logo.jpg"),
       ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
+    ),
+  ),
+      body: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              Colors.orange[600]!,
+              Colors.orange[400]!,
+              Colors.orange[300]!,
+            ],
+          ),
+        ),
         child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: .center,
-          children: [
-            const Text('You have pushed the button this many times:'),
+          children: <Widget>[
+            SizedBox(height: 70),
             Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
+              "Login",
+              style: TextStyle(
+                  fontSize: 40,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white),
+            ),
+            SizedBox(height: 40),
+            Text(
+              "Welcome",
+              style: TextStyle(fontSize: 20, color: Colors.white),
+            ),
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(60),
+                    topRight: Radius.circular(60),
+                  ),
+                ),
+                child: Padding(
+                  padding: EdgeInsets.all(30),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      children: <Widget>[
+                        SizedBox(height: 40),
+                        Container(
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(10),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Color.fromRGBO(225, 95, 27, .3),
+                                  blurRadius: 20,
+                                  offset: Offset(0, 10),
+                                )
+                              ]),
+                          child: Form(
+                            key: _formKey,
+                            child: Column(
+                              children: <Widget>[
+                              Container(
+                                padding: EdgeInsets.all(20),
+                                decoration: BoxDecoration(
+                                  border: Border(
+                                      bottom: BorderSide(
+                                          color: Colors.grey[300]!)),
+                                ),
+                                child: TextFormField(
+                                  controller: emailController,          
+                                  decoration: InputDecoration(
+                                    prefixIcon: Icon(Icons.person,color: Colors.orange[600]),
+                                    hintText: "Email",
+                                    hintStyle:
+                                        TextStyle(color: Colors.grey),
+                                    border: InputBorder.none,
+                                  ),
+                                  validator: (value) {
+                                    if(value == null || value.isEmpty){
+                                      return "Email Required";
+                                    }
+                                    
+
+                                    if(!value.contains("@")){
+                                      return "Invalid Email";
+                                    }
+                                    return null;
+                                  },
+                                ),
+                              ),
+                              Container(
+                                padding: EdgeInsets.all(20),
+                                child: TextFormField(
+                                  controller: passwordController,
+                                  obscureText: isPasswordHidden,
+                                  decoration: InputDecoration(
+                                    prefixIcon: Icon(Icons.lock_clock_rounded,color: Colors.orange[600]),
+                                    hintText: "Password",
+                                    hintStyle:
+                                        TextStyle(color: Colors.grey),
+                                    border: InputBorder.none,
+                                    suffixIcon: IconButton(
+                                      icon: Icon(
+                                        isPasswordHidden
+                                            ? Icons.visibility
+                                            : Icons.visibility_off,
+                                        color: Colors.grey,
+                                      ),
+                                      onPressed: () {
+                                        setState(() {
+                                          isPasswordHidden =
+                                              !isPasswordHidden;
+                                        });
+                                      },
+                                    ),
+                                  ),
+                                  validator:(value) {
+                                    if(value == null || value.isEmpty){
+                                      return "Password Required";
+                                    }
+                                    return null;
+                                  },
+                                ),
+                              )
+                            ],
+                          ),
+                          ),
+                        ),
+                        SizedBox(height: 40),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            GestureDetector(
+                              onTap: () {},
+                              child: Text(
+                                "Forgot Password?",
+                                style: TextStyle(color: Colors.grey,decoration: TextDecoration.underline),
+
+                              ),
+                            ),
+                            GestureDetector(
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (context) => RegisterPage())
+                                );
+                              },
+                              child: Text(
+                                "Register Now",
+                                style: TextStyle(color: Colors.grey,decoration: TextDecoration.underline),
+                              ),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 20,),
+                        Text(
+                          "Register as",
+                          style: TextStyle(color: Colors.grey),
+                        ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [                       
+                            SizedBox(height: 20),
+                            Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Radio<String>(
+                                value: "Customer",
+                                groupValue: userType,
+                                onChanged: (String? value) {
+                                  setState(() {
+                                    userType = value!;
+                                  });
+                                },
+                              ),
+                              Text("Customer"),
+                            ],
+                          ),
+                        
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Radio<String>(
+                                value: "Vendor",
+                                groupValue: userType,
+                                onChanged: (String? value) {
+                                  setState(() {
+                                    userType = value!;
+                                  });
+                                },
+                              ),
+                              Text("Vendor"),
+                            ],
+                          ),
+                          
+                         
+                          
+                          ],
+                        ),
+                        SizedBox(height: 40),
+                        GestureDetector(
+                          onTap: () async{
+                            if(_formKey.currentState!.validate()){
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Logging in...')),
+                              );
+                              final result = await ApiService.userLogin(
+                                email: emailController.text, 
+                                password: passwordController.text,
+                              );
+                              if (result['success']){
+                                Navigator.pushReplacement(
+                                  context,
+                                  MaterialPageRoute(builder: (context) => DashboardPage()),
+                                );
+                              } else{
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text(result['message'])),
+                                );
+                              }
+                            }
+                          },
+                          child:
+                          Container(
+
+                          height: 50,
+                          margin: EdgeInsets.symmetric(horizontal: 50),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(50),
+                            color: Colors.orange[600],
+                          ),
+                          child: Center(
+                            child: Text(
+                              "Login",
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
             ),
           ],
         ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
       ),
     );
   }
