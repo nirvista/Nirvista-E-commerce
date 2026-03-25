@@ -33,8 +33,8 @@ export const addToCart = async (req, res) => {
     }
 }
 
-// Remove item from cart
-export const removeFromCart = async (req, res) => {
+// Reduce item quantity in cart
+export const reduceItemQuantity = async (req, res) => {
     try {
         const { userId, productId } = req.body;
         if (!userId || !productId) {
@@ -58,6 +58,40 @@ export const removeFromCart = async (req, res) => {
             cartItem.quantity -= 1;
             await cartItem.save();
             return res.status(200).json({ message: "Product quantity decreased in cart" });
+        } else {
+            await cartItem.destroy();
+            return res.status(200).json({ message: "Product removed from cart" });
+        }
+    } catch (error) {
+        serverError(res, error);
+    }
+};
+
+// Increase item quantity in cart
+export const increaseItemQuantity = async (req, res) => {
+    try {
+        const { userId, productId } = req.body;
+        if (!userId || !productId) {
+            return res.status(400).json({ message: "userId and productId are required" });
+        }
+
+        // Find the user's cart
+        const cart = await Cart.findOne({ where: { userId } });
+        if (!cart) {
+            return res.status(404).json({ message: "Cart not found for this user" });
+        }
+
+        // Find the cart item
+        const cartItem = await CartItem.findOne({ where: { cartId: cart.id, productId } });
+        if (!cartItem) {
+            return res.status(404).json({ message: "Product not found in cart" });
+        }
+
+        // Increment quantity or remove item
+        if (cartItem.quantity >= 1) {
+            cartItem.quantity += 1;
+            await cartItem.save();
+            return res.status(200).json({ message: "Product quantity increased in cart" });
         } else {
             await cartItem.destroy();
             return res.status(200).json({ message: "Product removed from cart" });
@@ -144,6 +178,33 @@ export const getCartByUserId = async (req, res) => {
             userId: cart.userId,
             items
         });
+    } catch (error) {
+        serverError(res, error);
+    }
+};
+
+//Delete entire cart
+export const deleteCart = async (req, res) => {
+    try {
+        // Accept userId from query, params, or body
+        const userId = req.query.userId || req.params.userId || req.body.userId;
+        if (!userId) {
+            return res.status(400).json({ message: "userId is required" });
+        }
+
+        // Find the user's cart
+        const cart = await Cart.findOne({ where: { userId } });
+        if (!cart) {
+            return res.status(404).json({ message: "Cart not found for this user" });
+        }
+
+        // Delete all items in the cart
+        await CartItem.destroy({ where: { cartId: cart.id } });
+
+        // Delete the cart
+        await cart.destroy();
+
+        return res.status(200).json({ message: "Cart deleted successfully" });
     } catch (error) {
         serverError(res, error);
     }
