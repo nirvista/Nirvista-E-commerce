@@ -7,7 +7,7 @@ const router  = express.Router();
 
 router.post("/", verifyToken, authorizeRoles("admin"), createProduct);
 
-router.get("/:id", verifyToken, authorizeRoles("admin"), getProductById);
+router.get("/:id", getProductById);
 
 router.get("/", getAllProducts);
 

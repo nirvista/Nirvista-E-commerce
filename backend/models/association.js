@@ -1,7 +1,8 @@
 import Cart from './cartModel.js';
 import CartItem from './cartItemModel.js';
 import Product from './productModel.js';
-
+import User from './userModel.js';
+import UserAddress from './userAddresses.js';
 
 // Define associations
 Cart.hasMany(CartItem, { foreignKey: 'cartId', as: 'items' });
@@ -9,4 +10,7 @@ CartItem.belongsTo(Cart, { foreignKey: 'cartId' });
 
 CartItem.belongsTo(Product, { foreignKey: 'productId', as: 'product' });
 
-export { Cart, CartItem, Product };
+User.hasMany(UserAddress, { foreignKey: 'userId', onDelete: 'CASCADE' });
+UserAddress.belongsTo(User, { foreignKey: 'userId', onDelete: 'CASCADE' });
+
+export { Cart, CartItem, Product, User, UserAddress };

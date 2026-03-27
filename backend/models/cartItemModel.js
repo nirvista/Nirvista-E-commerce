@@ -3,7 +3,7 @@ import sequelize from "../config/db.js";
 
 const CartItem = sequelize.define("CartItem", {
     cartId: {
-        type: DataTypes.INTEGER,
+        type: DataTypes.UUID,
         allowNull: false,
         references: {
             model: 'Carts',
@@ -11,7 +11,7 @@ const CartItem = sequelize.define("CartItem", {
         }
     },
     productId: {
-        type: DataTypes.INTEGER,
+        type: DataTypes.UUID,
         allowNull: false,
         references: {
             model: 'Products',
