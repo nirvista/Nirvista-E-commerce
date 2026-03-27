@@ -1,7 +1,9 @@
+import sequelize from "../config/db.js";
 import User from "../models/userModel.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { created, badRequest, notFound, serverError } from "../utils/responseMessages.js";
+import UserAddress from "../models/userAddresses.js";
 
 export const userSignup = async (req, res) => {
     try {
@@ -144,3 +146,93 @@ export const adminLogin = async (req, res) => {
         serverError(res, "Server error");
     }
 }
+
+export const getCurrentUserProfile = async (req, res) => {
+    try {
+        // Get token from Authorization header
+        const authHeader = req.headers.authorization;
+        if (!authHeader || !authHeader.startsWith("Bearer ")) {
+            return res.status(401).json({ success: false, message: "No token provided" });
+        }
+        const token = authHeader.split(" ")[1];
+
+        // Verify token
+        let decoded;
+        try {
+            decoded = jwt.verify(token, process.env.JWT_SECRET);
+        } catch (err) {
+            return res.status(401).json({ success: false, message: "Invalid token" });
+        }
+
+        // Fetch user by ID
+        const user = await User.findByPk(decoded.id, {
+            attributes: { exclude: ['password'] },
+            include: [
+                {
+                    model: UserAddress,
+                    as: 'UserAddresses'
+                }
+            ]
+        });
+        if (!user) {
+            return notFound(res, "User not found");
+        }
+
+        res.status(200).json({ success: true, data: user, message: "User profile fetched successfully" });
+    } catch (error) {
+        serverError(res, "Server error");
+    }
+};
+
+export const updateUserProfile = async (req, res) => {
+    const t = await sequelize.transaction();
+    try {
+        // Get token from Authorization header
+        const authHeader = req.headers.authorization;
+        if (!authHeader || !authHeader.startsWith("Bearer ")) {
+            return res.status(401).json({ success: false, message: "No token provided" });
+        }
+        const token = authHeader.split(" ")[1];
+        let decoded;
+        try {
+            decoded = jwt.verify(token, process.env.JWT_SECRET);
+        } catch (err) {
+            return res.status(401).json({ success: false, message: "Invalid token" });
+        }
+
+        const user = await User.findByPk(decoded.id, { transaction: t });
+        if (!user) {
+            await t.rollback();
+            return notFound(res, "User not found");
+        }
+
+        // Update basic details
+        const { name, email, phone, currentPassword, newPassword } = req.body;
+        if (name) user.name = name;
+        if (email) user.email = email;
+        if (phone) user.phone = phone;
+
+        // Change password logic
+        if (currentPassword && newPassword) {
+            const isMatch = await bcrypt.compare(currentPassword, user.password);
+            if (!isMatch) {
+                await t.rollback();
+                return badRequest(res, "Current password is incorrect");
+            }
+            user.password = await bcrypt.hash(newPassword, 10);
+        }
+
+        await user.save({ transaction: t });
+        await t.commit();
+
+        // Fetch updated user with addresses
+        const updatedUser = await User.findByPk(user.id, {
+            attributes: { exclude: ['password'] },
+        });
+
+        res.status(200).json({ success: true, data: updatedUser, message: "Profile updated successfully" });
+    } catch (error) {
+        await t.rollback();
+        serverError(res, "Server error");
+    }
+};
