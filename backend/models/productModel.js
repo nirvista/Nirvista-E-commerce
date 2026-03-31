@@ -14,20 +14,19 @@ const Product = sequelize.define("Product", {
     description: {
         type: DataTypes.TEXT,
     },
-    price: {
-        type: DataTypes.FLOAT,
-        allowNull: false,
-    },
     category: {
         type: DataTypes.STRING,
         allowNull: false,
     },
-    imageURL: {
+    brand: {
+        type: DataTypes.STRING,
+        allowNull: false,
+    },
+    material: {
         type: DataTypes.STRING,
     },
-    stock: {
-        type: DataTypes.INTEGER,
-        allowNull: false,
+    rating: {
+        type: DataTypes.FLOAT,
         defaultValue: 0,
     }
 },{
