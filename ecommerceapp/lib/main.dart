@@ -51,6 +51,8 @@ import 'base/get/storage_controller.dart';
 import 'base/get/store_binding.dart';
 import 'base/my_custom_scroll_behavior.dart';
 import 'generated/l10n.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
 Future<void> init() async {
   Get.lazyPut(() => HomeController());
   Get.lazyPut(() => ProductDataController());
@@ -69,6 +71,7 @@ Future<void> init() async {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await dotenv.load(fileName: ".env");
   await init();
 
   await GetStorage.init();
@@ -95,6 +98,17 @@ void configLoading(BuildContext context) {
     ..userInteractions = true
     ..dismissOnTap = false;
 }
+
+// Update your main.dart to use GetMaterialApp with home: BaseScaffold()
+// Create a global navigation controller
+class GlobalNavController extends GetxController {
+  final RxInt currentIndex = 0.obs;
+  
+  void changeIndex(int index) {
+    currentIndex.value = index;
+  }
+}
+
 
 class MyApp extends StatelessWidget {
   const MyApp({Key? key}) : super(key: key);

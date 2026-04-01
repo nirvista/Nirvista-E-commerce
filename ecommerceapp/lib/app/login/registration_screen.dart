@@ -8,6 +8,7 @@ import '../../base/constant.dart';
 import '../../base/fetch_pixels.dart';
 import '../../base/get/route_key.dart';
 import '../../base/widget_utils.dart';
+import '../../services/loginregisterapi.dart';
 
 class RegistrationScreen extends StatefulWidget {
   const RegistrationScreen({Key? key}) : super(key: key);
@@ -24,12 +25,15 @@ class _RegistrationScreen extends State<RegistrationScreen> {
   }
 
   RxBool showPass = false.obs;
+  RxBool isLoading = false.obs;
 
   TextEditingController emailController = TextEditingController();
   TextEditingController numberController = TextEditingController();
   TextEditingController nameController = TextEditingController();
   TextEditingController passController = TextEditingController();
   TextEditingController pass2Controller = TextEditingController();
+  String? userType;
+  bool isChecked = false;
 
   @override
   Widget build(BuildContext context) {
@@ -65,6 +69,19 @@ class _RegistrationScreen extends State<RegistrationScreen> {
                     return null;
                   } else {
                     return 'Please enter email address';
+                  }
+                }),
+                20.h.verticalSpace,
+            getCustomFont("Phone Number", 16, getFontColor(context), 1,
+                fontWeight: FontWeight.w400)
+                .marginSymmetric(horizontal: horSpace),
+            8.h.verticalSpace,
+            getDefaultTextFiled(context, "Enter Phone Number", numberController,
+                getFontColor(context), (value) {}, validator: (phone) {
+                  if (phone!.isNotEmpty) {
+                    return null;
+                  } else {
+                    return 'Please enter phone number';
                   }
                 }),
             20.h.verticalSpace,
@@ -116,16 +133,179 @@ class _RegistrationScreen extends State<RegistrationScreen> {
               );
             }, showPass),
             20.h.verticalSpace,
-            getButtonFigma(
+             SizedBox(height: 20,),
+                       getCustomFont("Select User Type", 16, getFontColor(context), 1,
+                fontWeight: FontWeight.w400),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [                       
+                            Radio<String>(
+                              value: "customer",
+                              groupValue: userType,
+                              onChanged: (String? value) {
+                                setState(() {
+                                  userType = value!;
+                                });
+                              },
+                            ),
+                            getCustomFont("Customer", 14, getFontColor(context), 1,
+        fontWeight: FontWeight.w400),
+                        
+                            Radio<String>(
+                              value: "vendor",
+                              groupValue: userType,
+                              onChanged: (String? value) {
+                                setState(() {
+                                  userType = value!;
+                                });
+                              },
+                            ),
+                            getCustomFont("Vendor", 14, getFontColor(context), 1,
+                                fontWeight: FontWeight.w400),
+
+                            
+                          ],
+                        ),
+                         SizedBox(height: 10,),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Checkbox(value: isChecked, onChanged: (value){
+                              setState(() {
+                                isChecked = value!;
+                              });
+                            }),
+                            getCustomFont("I Accept the Terms & Privacy Policy", 14, getFontColor(context), 1,
+                                fontWeight: FontWeight.w400,textAlign: TextAlign.center),
+                            // Flexible(child:Text("I Accept the Terms & Privacy Policy",textAlign: TextAlign.center,))         
+                          ],
+                        ),
+            SizedBox(height: 40),
+            ObxValue((loading) {
+              return getButtonFigma(
                 context,
                 getAccentColor(context),
                 true,
-                "Sign Up",
+                isLoading.value ? "Creating Account..." : "Sign Up",
                 Colors.white,
-                    () {
-                  Constant.sendToNext(context, verificationScreenRoute);
+                isLoading.value ? () {} : () async {
+                  // Validation
+                  if (!isChecked) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        behavior: SnackBarBehavior.floating,
+                        backgroundColor: Colors.redAccent,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        margin: EdgeInsets.all(20),
+                        content: Row(
+                          children: [
+                            Icon(Icons.error, color: Colors.white),
+                            SizedBox(width: 10),
+                            Expanded(
+                              child: Text("Please accept Terms & Privacy Policy", 
+                                style: TextStyle(fontWeight: FontWeight.bold),)
+                            ),
+                          ],
+                        ),
+                        duration: Duration(seconds: 5),
+                      ),
+                    );
+                    return;
+                  }
+                  
+                  if (nameController.text.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text("Please enter your full name"))
+                    );
+                    return;
+                  }
+                  
+                  if (emailController.text.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text("Please enter email address"))
+                    );
+                    return;
+                  }
+                  
+                  if (numberController.text.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text("Please enter phone number"))
+                    );
+                    return;
+                  }
+                  
+                  if (passController.text.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text("Please enter password"))
+                    );
+                    return;
+                  }
+                  
+                  if (pass2Controller.text.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text("Please confirm password"))
+                    );
+                    return;
+                  }
+                  
+                  if (passController.text != pass2Controller.text) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text("Passwords do not match"),
+                        backgroundColor: Colors.red,
+                      )
+                    );
+                    return;
+                  }
+                  
+                  if (userType == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text("Please select a user type"))
+                    );
+                    return;
+                  }
+                  
+                  isLoading.value = true;
+                  
+                  try {
+                    final result = await ApiService.userSignup(
+                      name: nameController.text.trim(),
+                      email: emailController.text.trim(),
+                      password: passController.text,
+                      confirmPassword: pass2Controller.text,
+                      phone: numberController.text.trim(),
+                      userRole: userType!,
+                    );
+                    
+                    if (result['success']) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text("Account created successfully!"))
+                      );
+                      Constant.sendToNext(context, verificationScreenRoute);
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(result['message'] ?? 'Signup failed'),
+                          backgroundColor: Colors.red,
+                        )
+                      );
+                    }
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text("Error: ${e.toString()}"),
+                        backgroundColor: Colors.red,
+                      )
+                    );
+                  } finally {
+                    isLoading.value = false;
+                  }
                 },
-                EdgeInsets.symmetric(horizontal: horSpace, vertical: 50.h)),
+                EdgeInsets.symmetric(horizontal: horSpace, vertical: 50.h)
+              );
+            }, isLoading),
             30.h.verticalSpace,
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -151,7 +331,7 @@ class _RegistrationScreen extends State<RegistrationScreen> {
                   ),
                 )
               ],
-            )
+            ),
           ],
         ));
   }

@@ -20,6 +20,7 @@ import 'constant.dart';
 import 'fetch_pixels.dart';
 import 'get/product_data.dart';
 import 'get/route_key.dart';
+import 'get/cart_contr/cart_controller.dart';
 
 void showCustomToast(String texts) {
   Fluttertoast.showToast(
@@ -4073,7 +4074,8 @@ Widget buildMyCartItem(
     // Function functionAdd,
     // Function functionRemove,
     // Function removeCart,
-    {EdgeInsets margin = EdgeInsets.zero}) {
+    {EdgeInsets margin = EdgeInsets.zero,
+    int cartIndex = 0}) {
   return InkWell(
     onTap: () {
       function();
@@ -4161,9 +4163,56 @@ Widget buildMyCartItem(
           ),
           Align(
               alignment: Alignment.bottomRight,
-              child: getCustomFont(
-                  "Qty : ${product.qty}", 16, getFontColor(context), 1,
-                  fontWeight: FontWeight.w400)),
+              child: GetBuilder<CartController>(
+                init: CartController(),
+                builder: (controller) {
+                  return Container(
+                    padding: EdgeInsets.symmetric(horizontal: 6.h, vertical: 4.h),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey.shade300),
+                      borderRadius: BorderRadius.circular(8.h),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Minus button
+                        InkWell(
+                          onTap: () {
+                            int qty = int.parse(product.qty ?? '1');
+                            if (qty > 1 && cartIndex >= 0 && cartIndex < controller.cartOtherInfoList.length) {
+                              controller.decreaseQuantity(cartIndex);
+                            }
+                          },
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 6.h),
+                            child: Icon(Icons.remove, size: 16.h, color: getFontColor(context)),
+                          ),
+                        ),
+                        // Quantity display
+                        getCustomFont(
+                          "${product.qty}",
+                          14,
+                          getFontColor(context),
+                          1,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        // Plus button
+                        InkWell(
+                          onTap: () {
+                            if (cartIndex >= 0 && cartIndex < controller.cartOtherInfoList.length) {
+                              controller.increaseQuantity(cartIndex);
+                            }
+                          },
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 6.h),
+                            child: Icon(Icons.add, size: 16.h, color: getAccentColor(context)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              )),
         ],
       ),
     ),

@@ -7,8 +7,9 @@ import 'package:pet_shop/base/data_file.dart';
 import 'package:pet_shop/base/fetch_pixels.dart';
 import 'package:pet_shop/base/get/route_key.dart';
 import 'package:pet_shop/base/widget_utils.dart';
-
+import 'package:pet_shop/base/base_scaffold.dart';
 import '../model_ui/model_best_selling_pro.dart';
+
 
 
 class BestSellingList extends StatefulWidget {
@@ -68,7 +69,7 @@ class _BestSellingListState extends State<BestSellingList> {
     double itemHeight = 220.h;
 
     return WillPopScope(
-        child: Scaffold(
+        child: BaseScaffold(
           backgroundColor: getScaffoldColor(context),
           body: Column(
             children: [

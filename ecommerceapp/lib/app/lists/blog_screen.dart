@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:pet_shop/app/home/tabs/tab_home.dart';
+import 'package:pet_shop/base/base_scaffold.dart';
 import 'package:pet_shop/base/color_data.dart';
 import 'package:pet_shop/base/constant.dart';
 import 'package:pet_shop/base/data_file.dart';
@@ -36,7 +37,7 @@ class _BlogScreen extends State<BlogScreen> {
         backClick();
         return false;
       },
-      child: Scaffold(
+      child: BaseScaffold(
         backgroundColor: getScaffoldColor(context),
         body: Column(
           children: [

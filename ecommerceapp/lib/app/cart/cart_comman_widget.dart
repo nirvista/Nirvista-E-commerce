@@ -85,7 +85,7 @@ class _CartCommonWidgetState extends State<CartCommonWidget> {
                             context,
                             cart,
                             112.h,
-                                () {Constant.sendToNext(context, productDetailScreenRoute);},);
+                                () {Constant.sendToNext(context, productDetailScreenRoute);});
                       },
                       itemCount: cartList.length,
                       shrinkWrap: true,

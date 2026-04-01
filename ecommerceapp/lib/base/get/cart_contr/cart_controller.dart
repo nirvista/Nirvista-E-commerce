@@ -64,19 +64,34 @@ class CartController extends GetxController {
   }
 
   void removeItemInfo(String name) {
-    int? id;
+    try {
+      int? id;
 
-    for (var element in cartOtherInfoList) {
-      if (element.productName!.contains(name)) {
-        id = element.productId;
+      for (var element in cartOtherInfoList) {
+        if (element.productName!.contains(name)) {
+          id = element.productId;
+        }
       }
-    }
 
-    cartOtherInfoList.remove(
-        cartOtherInfoList.firstWhere((element) => element.productName == name));
-    cartItems
-        .remove(cartItems.firstWhere((element) => element.productId == id));
-    update();
+      // Remove from cart other info list
+      final itemToRemove = cartOtherInfoList
+          .firstWhere((element) => element.productName == name, orElse: () => CartOtherInfo());
+      if (itemToRemove.productName != null) {
+        cartOtherInfoList.remove(itemToRemove);
+      }
+
+      // Remove from cart items
+      if (id != null) {
+        final lineItemToRemove = cartItems
+            .firstWhere((element) => element.productId == id, orElse: () => LineItems());
+        if (lineItemToRemove.productId != null) {
+          cartItems.remove(lineItemToRemove);
+        }
+      }
+      update();
+    } catch (e) {
+      print("Error removing item: $e");
+    }
   }
 
   double cartTotalPriceF(quantity) {
@@ -90,17 +105,21 @@ class CartController extends GetxController {
 
 
   void increaseQuantity(int index) {
-    cartOtherInfoList[index].quantity =
-        cartOtherInfoList[index].quantity!.toInt() + 1;
-    createLineItems();
-    update();
+    if (index >= 0 && index < cartOtherInfoList.length) {
+      cartOtherInfoList[index].quantity =
+          cartOtherInfoList[index].quantity!.toInt() + 1;
+      createLineItems();
+      update();
+    }
   }
 
   void decreaseQuantity(int index) {
-    cartOtherInfoList[index].quantity =
-        cartOtherInfoList[index].quantity!.toInt() - 1;
-    createLineItems();
-    update();
+    if (index >= 0 && index < cartOtherInfoList.length) {
+      cartOtherInfoList[index].quantity =
+          cartOtherInfoList[index].quantity!.toInt() - 1;
+      createLineItems();
+      update();
+    }
   }
 
   @override

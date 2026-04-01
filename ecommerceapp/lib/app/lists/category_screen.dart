@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:pet_shop/app/model_ui/model_category.dart';
+import 'package:pet_shop/base/base_scaffold.dart';
 import 'package:pet_shop/base/color_data.dart';
 import 'package:pet_shop/base/constant.dart';
 import 'package:pet_shop/base/data_file.dart';
@@ -81,8 +82,8 @@ class _CategoryScreenState extends State<CategoryScreen> with TickerProviderStat
         backClick();
         return false;
       },
-      child: Scaffold(
-backgroundColor: getScaffoldColor(context),
+      child: BaseScaffold(
+        backgroundColor: getScaffoldColor(context),
         body: Column(
           children: [
             getDefaultHeader(context, "Category", (){backClick();}, isShowSearch: false),

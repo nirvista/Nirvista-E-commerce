@@ -3,12 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 
+
 import '../../base/color_data.dart';
 import '../../base/constant.dart';
 import '../../base/fetch_pixels.dart';
 import '../../base/get/route_key.dart';
 import '../../base/get/storage.dart';
 import '../../base/widget_utils.dart';
+import '../../services/loginregisterapi.dart';
 
 
 class LoginScreen extends StatefulWidget {
@@ -26,9 +28,12 @@ class _LoginScreen extends State<LoginScreen> {
   }
 
   RxBool showPass = false.obs;
+  RxBool isLoading = false.obs;
 
   TextEditingController emailController = TextEditingController();
   TextEditingController passController = TextEditingController();
+  String? userType;
+  bool isChecked = false;
 
   @override
   Widget build(BuildContext context) {
@@ -114,17 +119,104 @@ class _LoginScreen extends State<LoginScreen> {
                 ),
               ],
             ),
-            getButtonFigma(
+            SizedBox(height: 20,),
+                       getCustomFont("Select User Type", 16, getFontColor(context), 1,
+                fontWeight: FontWeight.w400),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [                       
+                            Radio<String>(
+                              value: "customer",
+                              groupValue: userType,
+                              onChanged: (String? value) {
+                                setState(() {
+                                  userType = value!;
+                                });
+                              },
+                            ),
+                            getCustomFont("Customer", 14, getFontColor(context), 1,
+        fontWeight: FontWeight.w400),
+                        
+                            Radio<String>(
+                              value: "vendor",
+                              groupValue: userType,
+                              onChanged: (String? value) {
+                                setState(() {
+                                  userType = value!;
+                                });
+                              },
+                            ),
+                            getCustomFont("Vendor", 14, getFontColor(context), 1,
+                                fontWeight: FontWeight.w400),
+
+                            
+                          ],
+                        ),
+            ObxValue((loading) {
+              return getButtonFigma(
                 context,
                 getAccentColor(context),
                 true,
-                "Log In",
+                isLoading.value ? "Logging in..." : "Log In",
                 Colors.white,
-                () {
-                  setLoggedIn(true);
-                  Constant.sendToNext(context, homeScreenRoute);
+                isLoading.value ? () {} : () async {
+                  // Validation
+                  if (emailController.text.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text("Please enter email address"))
+                    );
+                    return;
+                  }
+                  if (passController.text.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text("Please enter password"))
+                    );
+                    return;
+                  }
+                  if (userType == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text("Please select a user type"))
+                    );
+                    return;
+                  }
+                  
+                  isLoading.value = true;
+                  
+                  try {
+                    final result = await ApiService.userLogin(
+                      email: emailController.text.trim(),
+                      password: passController.text,
+                    );
+                    
+                    if (result['success']) {
+                      setLoggedIn(true);
+                      // Optionally save user data and token
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text("Login successful!"))
+                      );
+                      Constant.sendToNext(context, homeScreenRoute);
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(result['message'] ?? 'Login failed'),
+                          backgroundColor: Colors.red,
+                        )
+                      );
+                    }
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text("Error: ${e.toString()}"),
+                        backgroundColor: Colors.red,
+                      )
+                    );
+                  } finally {
+                    isLoading.value = false;
+                  }
                 },
-                EdgeInsets.symmetric(horizontal: horSpace, vertical: 62.h)),
+                EdgeInsets.symmetric(horizontal: horSpace, vertical: 62.h)
+              );
+            }, isLoading),
             // Row(
             //   mainAxisAlignment: MainAxisAlignment.center,
             //   crossAxisAlignment: CrossAxisAlignment.center,

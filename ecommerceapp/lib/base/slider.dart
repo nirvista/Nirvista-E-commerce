@@ -791,7 +791,9 @@ class _SliderState extends State<Slider> with TickerProviderStateMixin {
           );
         },
       );
-      Overlay.of(context)!.insert(overlayEntry!);
+      if (overlayEntry != null) {
+        Overlay.of(context).insert(overlayEntry!);
+      }
     }
   }
 }
@@ -1146,6 +1148,10 @@ class _RenderSlider extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
         return true;
       case ShowValueIndicator.never:
         return false;
+      case ShowValueIndicator.onDrag:
+        return false;
+      case ShowValueIndicator.alwaysVisible:
+        return true;
     }
   }
 
