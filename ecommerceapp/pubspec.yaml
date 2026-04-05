@@ -61,7 +61,7 @@ dependencies:
   flutter_widget_from_html_core: ^0.17.0
   readmore: ^3.0.0
   percent_indicator: ^4.2.5
-  getwidget: ^6.0.0
+  getwidget: ^7.0.0
   bmprogresshud: ^1.0.3
   dotted_line: ^3.2.3
   currency_formatter: ^2.3.0

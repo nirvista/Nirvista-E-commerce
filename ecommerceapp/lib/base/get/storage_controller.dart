@@ -5,12 +5,17 @@ import '../../app/model/woo_payment_gateway.dart';
 import '../../woocommerce/model/cart_item.dart';
 import '../../woocommerce/model/product_variation.dart';
 import '../../woocommerce/model/products.dart';
+import '../../app/model_ui/model_dummy_product.dart';
 
 class StorageController extends GetxController {
   WooProduct? selectedProduct;
+  DummyProduct? selectedDummyProduct;
   RxInt currentQuantity=1.obs;
   Rx<WooProductVariation?> variationModel = (null).obs;
   Rx<WooCartItem?> wooCartItem=(null).obs;
+  RxString selectedCategory = "for_you".obs;
+  RxString selectedColor = "".obs;
+  RxString selectedSize = "".obs;
 
   // WooCartItem? wooCartItem;
 
@@ -73,5 +78,31 @@ class StorageController extends GetxController {
       });
       print("getsize===${attributeList.length}");
     }
+  }
+
+  setSelectedDummyProduct(DummyProduct product) {
+    selectedDummyProduct = product;
+    if (product.colors.isNotEmpty) {
+      selectedColor.value = product.colors[0];
+    }
+    if (product.sizes.isNotEmpty) {
+      selectedSize.value = product.sizes[0];
+    }
+    update();
+  }
+
+  setSelectedCategory(String category) {
+    selectedCategory.value = category;
+    update();
+  }
+
+  setSelectedColor(String color) {
+    selectedColor.value = color;
+    update();
+  }
+
+  setSelectedSize(String size) {
+    selectedSize.value = size;
+    update();
   }
 }
