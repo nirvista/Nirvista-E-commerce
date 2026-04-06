@@ -18,6 +18,14 @@ const CartItem = sequelize.define("CartItem", {
             key: 'id'
         }
     },
+    variantId: {
+        type: DataTypes.UUID,
+        allowNull: false,
+        references: {
+            model: 'ProductVariants',
+            key: 'id'
+        }
+    },
     quantity: {
         type: DataTypes.INTEGER,
         allowNull: false,
