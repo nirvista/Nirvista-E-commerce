@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'dart:typed_data';
 
 class ApiService {
   static String get baseUrl{
@@ -10,7 +11,9 @@ class ApiService {
     }
     return url;
   }
-
+  static const String consumerKey = 'your_consumer_key_here';
+  static const String consumerSecret = 'your_consumer_secret_here';
+  
 //SIGN UP
 
   static Future<Map<String,dynamic>>userSignup({
@@ -24,7 +27,10 @@ class ApiService {
     try{
       final response = await http.post(
         Uri.parse('$baseUrl/auth/signup'),
-        headers: {'Content-Type':'application/json'},
+        headers: {
+          'Content-Type':'application/json',
+          'x-client-type': 'mobile',
+        },
         body: jsonEncode({
           'name':name,
           'email':email,
@@ -35,9 +41,11 @@ class ApiService {
         })
       );
       if (response.statusCode == 201 || response.statusCode == 200){
+        final decodedResponse = jsonDecode(response.body);
         return{
           'success':true,
-          'data':jsonDecode(response.body),
+          'data':decodedResponse['data'],
+          'message':decodedResponse['message'],
         };
       }else{
         return{
@@ -64,16 +72,21 @@ class ApiService {
     try{
       final response = await http.post(
         Uri.parse('$baseUrl/auth/login'),
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          'x-client-type': 'mobile',
+        },
         body: jsonEncode({
           'email':email,
           'password':password,
         })
       );
       if (response.statusCode == 200){
+        final decodedResponse = jsonDecode(response.body);
         return {
           'success':true,
-          'data':jsonDecode(response.body),
+          'data':decodedResponse['data'],
+          'message':decodedResponse['message'],
         };
       }else{
         return {

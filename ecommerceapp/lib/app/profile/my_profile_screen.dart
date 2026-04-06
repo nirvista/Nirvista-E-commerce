@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
-import 'package:pet_shop/base/get/home_controller.dart';
+// import 'package:pet_shop/base/get/home_controller.dart';
+import 'package:pet_shop/base/get/login_data_controller.dart';
+import 'package:pet_shop/woocommerce/model/user.dart';
 import '../../base/color_data.dart';
 import '../../base/constant.dart';
 import '../../base/fetch_pixels.dart';
@@ -18,15 +20,19 @@ class MyProfileScreen extends StatefulWidget {
 }
 
 class _MyProfileScreen extends State<MyProfileScreen> {
-  HomeController homeController = Get.find<HomeController>();
+  // HomeController homeController = Get.find<HomeController>();
+  final LoginDataController loginController = Get.find<LoginDataController>();
+  User? user;
+
 
   @override
   void initState() {
     super.initState();
+    user = loginController.currentUser.value;
   }
 
 
-  onBackClick(BuildContext context) {
+  void onBackClick(BuildContext context) {
     Constant.backToPrev(context);
   }
 
@@ -39,6 +45,10 @@ class _MyProfileScreen extends State<MyProfileScreen> {
     EdgeInsets edgeInsets = EdgeInsets.symmetric(horizontal: horSpace);
 
     return WillPopScope(
+      onWillPop:() async{
+        onBackClick(context);
+        return false;
+      },
         child: Scaffold(
           backgroundColor: getScaffoldColor(context),
           body: Column(
@@ -47,17 +57,16 @@ class _MyProfileScreen extends State<MyProfileScreen> {
               Expanded(
                   child: ListView(
                     padding: EdgeInsets.zero,
-                    shrinkWrap: true,
                     children: [
                       30.h.verticalSpace,
                       Center(
                           child: getCircleProfileImage(
-                              context, "L", 90.h)),
+                              context,user?.initials ?? "U", 90.h)),
                       40.h.verticalSpace,
                       getDefaultUnderlineTextFiled(
                           context,
                           'Name',
-                          TextEditingController(text: "Leslie Alexander"),
+                          TextEditingController(text: user?.displayName ??""),
                           getFontHint(context),
                               (value) {},
                           readOnly: true,),
@@ -65,7 +74,7 @@ class _MyProfileScreen extends State<MyProfileScreen> {
                       getDefaultUnderlineTextFiled(
                           context,
                           'Email Address',
-                          TextEditingController(text: "lesliealexander@gmail.com"),
+                          TextEditingController(text: user?.email ??""),
                           getFontHint(context),
                               (value) {},
                           readOnly: true),
@@ -74,7 +83,7 @@ class _MyProfileScreen extends State<MyProfileScreen> {
                           context,
                           'Phone Number',
                           TextEditingController(
-                              text: "(684) 555-0102"),
+                              text:user?.phone ?? ""),
                           getFontHint(context),
                               (value) {},
                           readOnly: true,),
@@ -88,6 +97,11 @@ class _MyProfileScreen extends State<MyProfileScreen> {
                   'Edit profile',
                   Colors.white, () {
                 Constant.sendToNextWithBackResult(context, editProfileRoute,(val){
+                  //refresh user data when coming back from edit profile screen
+                  loginController.loadCurrentUser();
+                  setState(() {
+                    user = loginController.currentUser.value;
+                  });
                 });
               },
                   edgeInsets)
@@ -95,9 +109,6 @@ class _MyProfileScreen extends State<MyProfileScreen> {
             ],
           ),
         ),
-        onWillPop: () async {
-          onBackClick(context);
-          return false;
-        });
+       );
   }
 }

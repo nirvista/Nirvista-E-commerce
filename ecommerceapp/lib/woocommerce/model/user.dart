@@ -31,45 +31,107 @@
 
  */
 
-class WooUser {
-  final int? id;
-  final String? email;
-  final String? username;
-  final String? password;
-  final String? firstName;
-  final String? lastName;
-  final String? name;
+// class WooUser {
+//   final int? id;
+//   final String? email;
+//   final String? username;
+//   final String? password;
+//   final String? firstName;
+//   final String? lastName;
+//   final String? name;
 
-  WooUser(
-      {this.id,
-      required String this.email,
-      required String this.username,
-      required this.password,
-      this.firstName,
-      this.lastName,
-      this.name});
+//   WooUser(
+//       {this.id,
+//       required String this.email,
+//       required String this.username,
+//       required this.password,
+//       this.firstName,
+//       this.lastName,
+//       this.name});
 
-  WooUser.fromJson(Map<String, dynamic> data)
-      : id = data['id'],
-        email = data['email'],
-        username = data['username'],
-        password = data['password'],
-        firstName = data['first_name'],
-        lastName = data['last_name'],
-        name = data['name'];
+//   WooUser.fromJson(Map<String, dynamic> data)
+//       : id = data['id'],
+//         email = data['email'],
+//         username = data['username'],
+//         password = data['password'],
+//         firstName = data['first_name'],
+//         lastName = data['last_name'],
+//         name = data['name'];
+
+//   Map<String, dynamic> toJson() {
+//     return {
+//       'id': id,
+//       'email': email,
+//       'username': username,
+//       'password': password,
+//       'first_name': firstName,
+//       'last_name': lastName,
+//       'name': name,
+//     };
+//   }
+
+//   @override
+//   toString() => toJson().toString();
+// }
+class User {
+  String? id;
+  String? name;
+  String? email;
+  String? phone;
+  String? userRole;
+  String? userStatus;
+  String? accessToken;
+  String? refreshToken;
+
+  User({
+    this.id,
+    this.name,
+    this.email,
+    this.phone,
+    this.userRole,
+    this.userStatus,
+    this.accessToken,
+    this.refreshToken,
+  });
+
+  User.fromJson(Map<String, dynamic> json) {
+    id = json['id'];
+    name = json['name'];
+    email = json['email'];
+    phone = json['phone'];
+    userRole = json['userRole'];
+    userStatus = json['userStatus'];
+  }
 
   Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'email': email,
-      'username': username,
-      'password': password,
-      'first_name': firstName,
-      'last_name': lastName,
-      'name': name,
-    };
+    final Map<String, dynamic> data = <String, dynamic>{};
+    data['id'] = id;
+    data['name'] = name;
+    data['email'] = email;
+    data['phone'] = phone;
+    data['userRole'] = userRole;
+    data['userStatus'] = userStatus;
+    return data;
   }
 
   @override
-  toString() => toJson().toString();
+  String toString() => toJson().toString();
+
+  String get displayName {
+    return name ?? email ?? 'User';
+  }
+
+  String get initials {
+    if (name != null && name!.isNotEmpty) {
+      final parts = name!.split(' ');
+      if (parts.length >= 2) {
+        return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+      }
+      return name![0].toUpperCase();
+    }
+    if (email != null && email!.isNotEmpty) {
+      return email![0].toUpperCase();
+    }
+    return 'U';
+  }
 }

@@ -2,8 +2,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
-
-
+import 'package:pet_shop/base/get/login_data_controller.dart';
+import 'package:pet_shop/woocommerce/model/user.dart';
 import '../../base/color_data.dart';
 import '../../base/constant.dart';
 import '../../base/fetch_pixels.dart';
@@ -189,8 +189,23 @@ class _LoginScreen extends State<LoginScreen> {
                     );
                     
                     if (result['success']) {
-                      setLoggedIn(true);
-                      // Optionally save user data and token
+                      final userData = result['data']['user'];
+                      final accessToken = result['data']['accessToken'];
+                      final refreshToken = result['data']['refreshToken'];
+
+                      User LoggedInUser =User(
+                        id :userData['id'],
+                        name:userData['name'],
+                        email: userData['email'],
+                        phone: userData['phone'],
+                        userRole: userData['userRole'],
+                      );
+                      final loginController = Get.find<LoginDataController>();
+                      loginController.saveUser(
+                        LoggedInUser,
+                        accessToken: accessToken,
+                        refreshToken: refreshToken,
+                      );
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(content: Text("Login successful!"))
                       );

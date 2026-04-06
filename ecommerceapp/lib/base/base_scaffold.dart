@@ -16,6 +16,7 @@ class BaseScaffold extends StatelessWidget {
   final Color? backgroundColor;
   final PreferredSizeWidget? appBar;
   final bool extendBodyBehindAppBar;
+  final bool showBottomBar;
 
   const BaseScaffold({
     Key? key,
@@ -23,6 +24,7 @@ class BaseScaffold extends StatelessWidget {
     this.backgroundColor,
     this.appBar,
     this.extendBodyBehindAppBar = false,
+    this.showBottomBar = true, // Default to true for backward compatibility
   }) : super(key: key);
 
   @override
@@ -37,67 +39,69 @@ class BaseScaffold extends StatelessWidget {
       backgroundColor: backgroundColor ?? getScaffoldColor(context),
       appBar: appBar,
       extendBodyBehindAppBar: extendBodyBehindAppBar,
-      bottomNavigationBar: Container(
-        width: double.infinity,
-        height: bottomNavHeight,
-        decoration: ShapeDecoration(
-          shadows: const [
-            BoxShadow(
-              color: Color.fromRGBO(133, 126, 150, 0.12999999523162842),
-              offset: Offset(0, -4),
-              blurRadius: 27,
-            ),
-          ],
-          color: getCardColor(context),
-          shape: SmoothRectangleBorder(
-            borderRadius: SmoothBorderRadius.vertical(
-              top: SmoothRadius(
-                cornerRadius: 40.h,
-                cornerSmoothing: 0.5,
+      bottomNavigationBar: showBottomBar 
+        ? Container(
+            width: double.infinity,
+            height: bottomNavHeight,
+            decoration: ShapeDecoration(
+              shadows: const [
+                BoxShadow(
+                  color: Color.fromRGBO(133, 126, 150, 0.12999999523162842),
+                  offset: Offset(0, -4),
+                  blurRadius: 27,
+                ),
+              ],
+              color: getCardColor(context),
+              shape: SmoothRectangleBorder(
+                borderRadius: SmoothBorderRadius.vertical(
+                  top: SmoothRadius(
+                    cornerRadius: 40.h,
+                    cornerSmoothing: 0.5,
+                  ),
+                ),
               ),
             ),
-          ),
-        ),
-        child: Obx(
-          () => BottomBar(
-            onTap: (p0) {
-              bottomController.changePos(p0);
-              Get.offAllNamed(homeScreenRoute);
-            },
-            currentIndex: bottomController.bottomBarSelectedItem.value,
-            selectedItemColor: getAccentColor(context),
-            selectedColorOpacity: 1,
-            unselectedItemColor: getFontBlackColor(context),
-            itemShape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.all(Radius.circular(27.h)),
-            ),
-            itemPadding: EdgeInsets.symmetric(
-              horizontal: 11.w,
-              vertical: 8.h,
-            ),
-            items: List.generate(allBottomNavList.length, (index) {
-              return BottomBarItem(
-                icon: getSvgImageWithSize(
-                  context,
-                  allBottomNavList[index].icon,
-                  24.h,
-                  24.h,
-                  fit: BoxFit.scaleDown,
-                  color: getFontBlackColor(context),
+            child: Obx(
+              () => BottomBar(
+                onTap: (p0) {
+                  bottomController.changePos(p0);
+                  Get.offAllNamed(homeScreenRoute);
+                },
+                currentIndex: bottomController.bottomBarSelectedItem.value,
+                selectedItemColor: getAccentColor(context),
+                selectedColorOpacity: 1,
+                unselectedItemColor: getFontBlackColor(context),
+                itemShape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.all(Radius.circular(27.h)),
                 ),
-                activeIcon: getSvgImageWithSize(
-                  context,
-                  allBottomNavList[index].activeIcon,
-                  24.h,
-                  24.h,
-                  fit: BoxFit.scaleDown,
-                  color: Colors.white,
+                itemPadding: EdgeInsets.symmetric(
+                  horizontal: 11.w,
+                  vertical: 8.h,
                 ),
-              );
-            }),
-          ),
-        ),
-      ),
+                items: List.generate(allBottomNavList.length, (index) {
+                  return BottomBarItem(
+                    icon: getSvgImageWithSize(
+                      context,
+                      allBottomNavList[index].icon,
+                      24.h,
+                      24.h,
+                      fit: BoxFit.scaleDown,
+                      color: getFontBlackColor(context),
+                    ),
+                    activeIcon: getSvgImageWithSize(
+                      context,
+                      allBottomNavList[index].activeIcon,
+                      24.h,
+                      24.h,
+                      fit: BoxFit.scaleDown,
+                      color: Colors.white,
+                    ),
+                  );
+                }),
+              ),
+            ),
+          )
+        : null,
       body: body,
     );
   }

@@ -8,6 +8,7 @@ import 'package:pet_shop/app/model_ui/model_best_selling_pro.dart';
 import 'package:pet_shop/app/model_ui/model_blog.dart';
 import 'package:pet_shop/app/model_ui/model_category.dart';
 import 'package:pet_shop/app/model_ui/model_popular_product.dart';
+import '../../lists/category_screen.dart';
 import 'package:pet_shop/base/color_data.dart';
 import 'package:pet_shop/base/constant.dart';
 import 'package:pet_shop/base/data_file.dart';
@@ -241,7 +242,7 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       buildViewAllWidget(context, "Choose Your Pet", () {
-                        Constant.sendToNext(context, categoryScreenRoute);
+                        controller.changePos(1); // Navigate to Categories tab (position 1)
                       }),
                       20.h.verticalSpace,
                       SizedBox(

@@ -8,6 +8,7 @@ import 'package:pet_shop/app/home/tabs/tab_favourite.dart';
 import 'package:pet_shop/app/home/tabs/tab_home.dart';
 import 'package:pet_shop/app/home/tabs/tab_profile.dart';
 import 'package:pet_shop/app/home/tabs/tab_search.dart';
+import 'package:pet_shop/app/lists/category_screen.dart';
 
 import '../../base/BottomBar.dart';
 import '../../base/color_data.dart';
@@ -64,8 +65,8 @@ class _HomeScreen extends State<HomeScreen> {
 
   List<Widget> bottomViewList = [
     TabHome(),
-    // TabCategory(),
-    TabSearch(),
+    CategoryScreen(),
+    // TabSearch(),
     TabCart(),
     TabFavourite(),
     TabProfile(),

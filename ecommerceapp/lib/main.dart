@@ -52,6 +52,7 @@ import 'base/get/store_binding.dart';
 import 'base/my_custom_scroll_behavior.dart';
 import 'generated/l10n.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:pet_shop/woocommerce/model/user.dart';
 
 Future<void> init() async {
   Get.lazyPut(() => HomeController());

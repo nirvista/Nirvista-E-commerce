@@ -63,6 +63,7 @@ class _CategoryScreenState extends State<CategoryScreen> with TickerProviderStat
   List<ModelSubCategory> subCategory = DataFile.getAllSubCategory();
   List<ModelCategory> allCategory = DataFile.getAllCategory();
 
+
   @override
   Widget build(BuildContext context) {
     double margin = FetchPixels.getDefaultHorSpaceFigma(context);
@@ -73,20 +74,27 @@ class _CategoryScreenState extends State<CategoryScreen> with TickerProviderStat
     double itemHeight = 102.w;
 
     Constant.setupSize(context);
-    void backClick() {
-      Constant.backToPrev(context);
-    }
+    // void backClick() {
+    //   Constant.backToPrev(context);
+    // }
 
     return WillPopScope(
       onWillPop: () async {
-        backClick();
-        return false;
+        // backClick();
+        return true;
       },
-      child: BaseScaffold(
+      child: Scaffold(
         backgroundColor: getScaffoldColor(context),
+        appBar: AppBar(
+          backgroundColor: getCardColor(context),
+          elevation: 0,
+          leading: null, // Explicitly remove any leading widget (back button)
+          title: getCustomFont("Categories", 18, getFontColor(context), 1,
+              fontWeight: FontWeight.w700),
+          centerTitle: true,
+        ),
         body: Column(
-          children: [
-            getDefaultHeader(context, "Category", (){backClick();}, isShowSearch: false),
+          children: [ 
             20.h.verticalSpace,
             Expanded(
               child: Row(
