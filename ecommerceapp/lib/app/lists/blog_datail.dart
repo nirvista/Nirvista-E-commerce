@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
-import 'package:pet_shop/app/home/tabs/tab_home.dart';
 import 'package:pet_shop/base/color_data.dart';
 import 'package:pet_shop/base/constant.dart';
 import 'package:pet_shop/base/fetch_pixels.dart';
@@ -96,4 +95,15 @@ class _BlogDetailScreen extends State<BlogDetailScreen> {
           return false;
         });
   }
+}
+
+Row buildDateRow(BuildContext context, String date) {
+  return Row(
+    children: [
+      getSvgImage(context, "calendar.svg", 18),
+      10.h.horizontalSpace,
+      getCustomFont(date, 14, getFontColor(context), 1,
+          fontWeight: FontWeight.w400)
+    ],
+  );
 }

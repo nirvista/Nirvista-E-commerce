@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
-import 'package:pet_shop/app/home/tabs/tab_home.dart';
 import 'package:pet_shop/base/base_scaffold.dart';
 import 'package:pet_shop/base/color_data.dart';
 import 'package:pet_shop/base/constant.dart';
@@ -72,4 +71,46 @@ class _BlogScreen extends State<BlogScreen> {
       ),
     );
   }
+}
+
+SizedBox buildCommonBlogView(double margin, BuildContext context, String title,
+    String image, String date) {
+  return SizedBox(
+    height: 110.h,
+    width: double.infinity,
+    child: Row(
+      children: [
+        Container(
+          height: 110.h,
+          width: 110.h,
+          margin: EdgeInsets.symmetric(horizontal: margin),
+          decoration:
+          BoxDecoration(image: getDecorationAssetImage(context, image)),
+        ),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              getMultilineCustomFont(title, 16, getFontColor(context),
+                  fontWeight: FontWeight.w600),
+              12.h.verticalSpace,
+              buildDateRow(context, date),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+Row buildDateRow(BuildContext context, String date) {
+  return Row(
+    children: [
+      getSvgImage(context, "calendar.svg", 18),
+      10.h.horizontalSpace,
+      getCustomFont(date, 14, getFontColor(context), 1,
+          fontWeight: FontWeight.w400)
+    ],
+  );
 }
