@@ -1,6 +1,7 @@
 import { Op, Sequelize } from "sequelize";
 import Product from "../models/productModel.js";
 import ProductVariant from "../models/variantModel.js";
+import Tag from "../models/tagModel.js";
 import { created, notFound, serverError, success } from "../utils/responseMessages.js";
 
 const variantInclude = {
@@ -12,6 +13,14 @@ const variantInclude = {
     ]
 };
 
+const tagInclude = {
+    model: Tag,
+    as: "tags",
+    attributes: ["id", "name", "slug"],
+    through: { attributes: [] } 
+};
+
+
 // Helper to build separated filter objects
 function buildFilters(query) {
     const productFilter = {};
@@ -20,7 +29,7 @@ function buildFilters(query) {
     // 1. Product Filters
     if (query.search) productFilter.title = { [Op.iLike]: `%${query.search}%` };
     
-    const multiSelectFields = ['category', 'brand', 'material'];
+    const multiSelectFields = ['categoryId', 'brandId', 'material'];
     multiSelectFields.forEach(field => {
         if (query[field]) {
             productFilter[field] = Array.isArray(query[field]) ? { [Op.in]: query[field] } : query[field];
@@ -64,8 +73,12 @@ export const createProduct = async (req, res) => {
         const product = await Product.create(req.body, {
             include: [{ model: ProductVariant, as: 'variants' }] // Allows creating base product + first variant in one payload
         });
+        if (req.body.tagIds && req.body.tagIds.length > 0) {
+            await product.setTags(req.body.tagIds);
+        }
         created(res, product, "Product created successfully");
     } catch (error) {
+        console.error(error);
         serverError(res, "Server error");
     }
 }
@@ -74,7 +87,7 @@ export const createProduct = async (req, res) => {
 export const getProductById = async (req, res) => {
     try {
         const product = await Product.findByPk(req.params.id, {
-            include: [variantInclude]
+            include: [variantInclude, tagInclude]
         });
         if (!product) return notFound(res, "Product not found");
         success(res, product, "Product fetched successfully");
@@ -136,6 +149,7 @@ export const getAllProducts = async (req, res) => {
             where: productFilter,
             order: sortOrder,
             include: [
+                tagInclude,
                 {
                     ...variantInclude,
                     // If variant filters exist, this acts as an INNER JOIN, 
@@ -157,19 +171,24 @@ export const getAllProducts = async (req, res) => {
 };
 
 // Update a product
-// Update a product
 export const updateProduct = async (req, res) => {
     try {
         const [updatedRows] = await Product.update(req.body, {
             where: { id: req.params.id }
         });
 
-        if (updatedRows === 0) return notFound(res, "Product not found");
+        const product = await Product.findByPk(req.params.id);
+        if (!product) return notFound(res, "Product not found");
+
+        // MAGIC METHOD: Update tags if provided
+        if (req.body.tagIds) {
+            await product.setTags(req.body.tagIds); // This completely overwrites the old tags
+        }
 
         const updatedProduct = await Product.findByPk(req.params.id, {
-            include: [variantInclude]
+            include: [variantInclude, tagInclude]
         });
-        created(res, updatedProduct, "Product updated successfully");
+        success(res, updatedProduct, "Product updated successfully");
     } catch (error) {
         serverError(res, "Server error");
     }
@@ -197,7 +216,7 @@ export const searchProducts = async (req, res) => {
                     { description: { [Op.iLike]: `%${keyword}%` } }
                 ]
             },
-            include: [variantInclude],
+            include: [variantInclude, tagInclude],
             limit: 30
         })
         success(res, products, "Search results fetched successfully");
@@ -211,7 +230,7 @@ export const getNewArrivals = async (req, res) => {
     try {
         const products = await Product.findAll({
             order: [['createdAt', 'DESC']],
-            include: [variantInclude],
+            include: [variantInclude, tagInclude],
             limit: 12
         });
         success(res, products, "New arrivals fetched");
@@ -225,7 +244,7 @@ export const getTopRatedProducts = async (req, res) => {
     try {
         const products = await Product.findAll({
             order: [['rating', 'DESC']],
-            include: [variantInclude],
+            include: [variantInclude, tagInclude],
             limit: 12
         });
         success(res, products, "Top rated products fetched");
@@ -238,7 +257,7 @@ export const getTopRatedProducts = async (req, res) => {
 export const getRelatedProducts = async (req, res) => {
     try {
         const currentProduct = await Product.findByPk(req.params.id, {
-            attributes: ['id', 'category', 'brand'] 
+            attributes: ['id', 'categoryId', 'brandId'] 
         });
 
         if (!currentProduct) return notFound(res, "Product not found");
@@ -247,17 +266,17 @@ export const getRelatedProducts = async (req, res) => {
             where: {
                 id: { [Op.ne]: currentProduct.id },
                 [Op.or]: [
-                    { category: currentProduct.category },
-                    { brand: currentProduct.brand }
+                    { categoryId: currentProduct.categoryId },
+                    { brandId: currentProduct.brandId }
                 ]
             },
-            include: [variantInclude],
+            include: [variantInclude, tagInclude],
             order: [
                 [
                     Sequelize.literal(`
                         CASE 
-                            WHEN "brand" = '${currentProduct.brand}' AND "category" = '${currentProduct.category}' THEN 1 
-                            WHEN "category" = '${currentProduct.category}' THEN 2
+                            WHEN "brand" = '${currentProduct.brandId}' AND "category" = '${currentProduct.categoryId}' THEN 1 
+                            WHEN "category" = '${currentProduct.categoryId}' THEN 2
                             ELSE 3 
                         END
                     `), 
