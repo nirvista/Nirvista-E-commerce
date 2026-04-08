@@ -33,3 +33,4 @@ String myAddressScreenRoute="keyMyAddressScreenRoute";
 String editAddressScreenRoute="keyEditAddressScreenRoute";
 String paymentMethodScreenRoute="keyPaymentMethodScreenRoute";
 String categoryProductsPageRoute="keyCategoryProductsPageRoute";
+String customerCareScreenRoute="keyCustomerCareScreenRoute";

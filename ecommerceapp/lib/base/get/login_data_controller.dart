@@ -33,7 +33,7 @@ class LoginDataController extends GetxController {
         
         if (baseUrl != null && baseUrl.isNotEmpty) {
           final response = await http.get(
-            Uri.parse('$baseUrl/auth/me'),
+            Uri.parse('$baseUrl/api/auth/me'),
             headers: {
               'Authorization': 'Bearer $accessToken',
               'Content-Type': 'application/json',

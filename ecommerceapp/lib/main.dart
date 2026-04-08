@@ -24,6 +24,7 @@ import 'package:pet_shop/app/login/verification_screen.dart';
 import 'package:pet_shop/app/order/my_order.dart';
 import 'package:pet_shop/app/order/track_order.dart';
 import 'package:pet_shop/app/payment_mtd/payment_method_screen.dart';
+import 'package:pet_shop/app/profile/customer_care_screen.dart';
 import 'package:pet_shop/app/profile/edit_profile.dart';
 import 'package:pet_shop/app/profile/more_screen.dart';
 import 'package:pet_shop/app/profile/my_favourite.dart';
@@ -171,6 +172,7 @@ class MyApp extends StatelessWidget {
         editAddressScreenRoute: (context) => EditAddressScreen(),
         paymentMethodScreenRoute: (context) => const PaymentMethodScreen(),
         categoryProductsPageRoute: (context) => const CategoryProductsPage(),
+        customerCareScreenRoute: (context) => const CustomerCareScreen(),
         // stripPaymentScreenRoute: (context) => NoWebhookPaymentScreen(),
       },
 

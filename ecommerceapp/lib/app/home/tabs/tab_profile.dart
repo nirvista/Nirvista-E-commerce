@@ -101,6 +101,10 @@ class TabProfile extends StatelessWidget {
                             Constant.sendToNext(context, paymentMethodScreenRoute);
                           }),
                           getDividerWidget(),
+                          buildRowWidget(context, "call.svg", "Customer Care", () {
+                            Constant.sendToNext(context, customerCareScreenRoute);
+                          }),
+                          getDividerWidget(),
                           buildRowWidget(context, "more.svg", "More", () {
                             Constant.sendToNext(context, moreScreenRoute);
                           }),

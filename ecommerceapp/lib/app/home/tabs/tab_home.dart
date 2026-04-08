@@ -4,17 +4,20 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:pet_shop/base/color_data.dart';
 import 'package:pet_shop/base/constant.dart';
-import 'package:pet_shop/base/data_file.dart';
 import 'package:pet_shop/base/fetch_pixels.dart';
 import 'package:pet_shop/base/get/route_key.dart';
 import 'package:pet_shop/base/get/storage_controller.dart';
+import 'package:pet_shop/base/get/login_data_controller.dart';
 import 'package:pet_shop/base/widget_utils.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
 import '../../../base/get/bottom_selection_controller.dart';
 import '../../../base/get/home_controller.dart';
 import '../../../base/get/product_data.dart';
-import '../../model_ui/model_dummy_product.dart';
+import '../../model/api_models.dart';
+import '../../../services/product_api.dart';
+import '../../../services/brand_api.dart';
+import '../../../services/category_api.dart';
 
 class TabHome extends StatefulWidget {
   const TabHome({Key? key}) : super(key: key);
@@ -29,36 +32,61 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
   HomeController homeController = Get.find<HomeController>();
   final controller = Get.find<BottomItemSelectionController>();
 
-  List<DummyProduct> allProducts = DataFile.getAllDummyProducts();
-  List<DummyProduct> bestSellingProducts = [];
-  List<DummyProduct> topDealProducts = [];
-  List<String> categories = [
-    "for_you",
-    "fashion",
-    "mobiles",
-    "beauty",
-    "electronics",
-    "home_decor"
-  ];
-  List<String> categoryLabels = [
-    "For You",
-    "Fashion",
-    "Mobiles",
-    "Beauty",
-    "Electronics",
-    "Home Decor"
-  ];
+  Future<List<ProductModel>>? bestSellingFuture;
+  Future<List<ProductModel>>? topDealsFuture;
+  Future<List<BrandModel>>? brandsFuture;
+  Future<List<ProductModel>>? popularPicksFuture;
+  Future<List<CategoryModel>>? categoriesFuture;
 
   RxString selectedCategory = "for_you".obs;
+  RxString selectedBrand = "".obs;
   RxInt sliderPos = 0.obs;
 
   @override
   void initState() {
     super.initState();
-    bestSellingProducts =
-        allProducts.where((p) => p.isBestSelling).toList().take(6).toList();
-    topDealProducts =
-        allProducts.where((p) => p.isTopDeal).toList().take(6).toList();
+    bestSellingFuture = _fetchProducts(ProductApiService.getAllProducts());
+    topDealsFuture = _fetchProducts(ProductApiService.getTopRatedProducts());
+    popularPicksFuture = _fetchProducts(ProductApiService.getNewArrivals());
+    brandsFuture = _fetchBrands();
+    categoriesFuture = _fetchCategories();
+  }
+
+  Future<List<ProductModel>> _fetchProducts(Future<Map<String, dynamic>> apiCall) async {
+    final res = await apiCall;
+    if (res['success']) {
+      dynamic data = res['data'];
+      List<dynamic> productsList = [];
+      if (data is List) {
+        productsList = data;
+      } else if (data is Map && data['products'] is List) {
+        productsList = data['products'];
+      }
+      return productsList.map((e) => ProductModel.fromJson(e)).toList();
+    }
+    return [];
+  }
+
+  Future<List<CategoryModel>> _fetchCategories() async {
+    final res = await CategoryApiService.getAllCategories();
+    if (res['success']) {
+      List<dynamic> data = res['data'];
+      return data.map((e) => CategoryModel.fromJson(e)).toList();
+    }
+    return [];
+  }
+
+  Future<List<BrandModel>> _fetchBrands() async {
+    final res = await BrandApiService.getAllBrands();
+    if (res['success']) {
+      List<dynamic> data = res['data'];
+      var b = data.map((e) => BrandModel.fromJson(e)).toList();
+      if (selectedBrand.value.isEmpty) {
+        selectedBrand.value = 'all';
+      }
+      return b;
+    }
+    return [];
   }
 
   @override
@@ -76,7 +104,7 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
             child: SingleChildScrollView(
               child: Column(
                 children: [
-                  // Category Tabs
+                   // Category Tabs
                   _buildCategoryTabs(context, margin),
                   SizedBox(height: 20.h),
                   // Banner Carousel
@@ -88,11 +116,11 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
                   // Top Deals For You
                   _buildTopDealsSection(context, margin),
                   SizedBox(height: 20.h),
-                  // Featured Brands
-                  _buildFeaturedBrandsSection(context, margin),
-                  SizedBox(height: 20.h),
                   // Popular Picks
                   _buildPopularPicksSection(context, margin),
+                  SizedBox(height: 20.h),
+                  // Featured Brands
+                  _buildFeaturedBrandsSection(context, margin),
                   SizedBox(height: 20.h),
                 ],
               ),
@@ -109,7 +137,6 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
       padding: EdgeInsets.symmetric(horizontal: margin, vertical: 12.h),
       child: Column(
         children: [
-          // Row 1: Location only
           Row(
             children: [
               Icon(Icons.home, color: accentColor, size: 20.w),
@@ -121,7 +148,6 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
             ],
           ),
           SizedBox(height: 12.h),
-          // Row 2: Search Bar
           Container(
             decoration: BoxDecoration(
               color: getGreyCardColor(context),
@@ -159,49 +185,72 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
     return Container(
       color: getCardColor(context),
       padding: EdgeInsets.symmetric(horizontal: margin, vertical: 12.h),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Obx(
-          () => Row(
-            children: List.generate(
-              categories.length,
-              (index) {
-                bool isSelected =
-                    selectedCategory.value == categories[index];
-                return InkWell(
-                  onTap: () {
-                    selectedCategory.value = categories[index];
-                  },
-                  child: Padding(
-                    padding: EdgeInsets.only(right: 20.w),
-                    child: Column(
-                      children: [
-                        getCustomFont(
-                          categoryLabels[index],
-                          14,
-                          isSelected ? accentColor : getFontGreyColor(context),
-                          1,
-                          fontWeight: isSelected
-                              ? FontWeight.w700
-                              : FontWeight.w500,
-                        ),
-                        if (isSelected)
-                          Container(
-                            height: 3.h,
-                            width: 30.w,
-                            margin: EdgeInsets.only(top: 4.h),
-                            decoration: BoxDecoration(
-                              color: accentColor,
-                              borderRadius: BorderRadius.circular(2.h),
-                            ),
-                          ),
-                      ],
-                    ),
+      child: FutureBuilder<List<CategoryModel>>(
+        future: categoriesFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return Center(child: CircularProgressIndicator(color: accentColor));
+          }
+          if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
+            return SizedBox(); // fallback if no categories
+          }
+
+          List<CategoryModel> apiCategories = snapshot.data!;
+          
+          return SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Obx(
+              () => Row(
+                children: [
+                  // Default 'For You' option
+                  _buildSingleCategoryTab(context, 'for_you', 'For You'),
+                  ...List.generate(
+                    apiCategories.length,
+                    (index) {
+                      return _buildSingleCategoryTab(context, apiCategories[index].id, apiCategories[index].name);
+                    },
                   ),
-                );
-              },
+                ]
+              ),
             ),
-          ),
+          );
+        }
+      ),
+    );
+  }
+
+  Widget _buildSingleCategoryTab(BuildContext context, String catId, String catName) {
+    bool isSelected = selectedCategory.value == catId;
+    return InkWell(
+      onTap: () {
+        selectedCategory.value = catId;
+        storeController.setSelectedCategory(catId);
+        storeController.setSelectedCategoryName(catName);
+        // Note: the original UI didn't refresh products on click, you might want to call _fetchProducts here
+        // if this tab is supposed to filter the sections below, or just navigate.
+      },
+      child: Padding(
+        padding: EdgeInsets.only(right: 20.w),
+        child: Column(
+          children: [
+            getCustomFont(
+              catName,
+              14,
+              isSelected ? accentColor : getFontGreyColor(context),
+              1,
+              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+            ),
+            if (isSelected)
+              Container(
+                height: 3.h,
+                width: 30.w,
+                margin: EdgeInsets.only(top: 4.h),
+                decoration: BoxDecoration(
+                  color: accentColor,
+                  borderRadius: BorderRadius.circular(2.h),
+                ),
+              ),
+          ],
         ),
       ),
     );
@@ -329,18 +378,42 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
           SizedBox(height: 16.h),
           SizedBox(
             height: 200.w,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              padding: EdgeInsets.symmetric(horizontal: margin),
-              itemCount: bestSellingProducts.length,
-              itemBuilder: (context, index) {
-                return _buildProductCard(
-                  context,
-                  bestSellingProducts[index],
-                  width: 150.w,
-                );
+            child: FutureBuilder<List<ProductModel>>(
+              future: bestSellingFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return Center(child: CircularProgressIndicator(color: accentColor));
+                }
+                if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
+                  return Center(child: getCustomFont("No products available", 14, getFontGreyColor(context), 1));
+                }
+                
+                var allProducts = snapshot.data!;
+                return Obx(() {
+                  var currentCat = selectedCategory.value;
+                  var products = currentCat == 'for_you'
+                      ? allProducts
+                      : allProducts.where((p) => p.categoryId == currentCat).toList();
+
+                  if (products.isEmpty) {
+                    return Center(child: getCustomFont("No products available", 14, getFontGreyColor(context), 1));
+                  }
+
+                  return ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    padding: EdgeInsets.symmetric(horizontal: margin),
+                    itemCount: products.length,
+                    itemBuilder: (context, index) {
+                      return _buildProductCard(
+                        context,
+                        products[index],
+                        width: 150.w,
+                      );
+                    },
+                  );
+                });
               },
-            ),
+            )
           ),
         ],
       ),
@@ -374,18 +447,42 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
           SizedBox(height: 16.h),
           SizedBox(
             height: 200.w,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              padding: EdgeInsets.symmetric(horizontal: margin),
-              itemCount: topDealProducts.length,
-              itemBuilder: (context, index) {
-                return _buildProductCard(
-                  context,
-                  topDealProducts[index],
-                  width: 150.w,
-                );
+            child: FutureBuilder<List<ProductModel>>(
+              future: topDealsFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return Center(child: CircularProgressIndicator(color: accentColor));
+                }
+                if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
+                  return Center(child: getCustomFont("No top deals available", 14, getFontGreyColor(context), 1));
+                }
+                
+                var allProducts = snapshot.data!;
+                return Obx(() {
+                  var currentCat = selectedCategory.value;
+                  var products = currentCat == 'for_you'
+                      ? allProducts
+                      : allProducts.where((p) => p.categoryId == currentCat).toList();
+
+                  if (products.isEmpty) {
+                    return Center(child: getCustomFont("No top deals available", 14, getFontGreyColor(context), 1));
+                  }
+
+                  return ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    padding: EdgeInsets.symmetric(horizontal: margin),
+                    itemCount: products.length,
+                    itemBuilder: (context, index) {
+                      return _buildProductCard(
+                        context,
+                        products[index],
+                        width: 150.w,
+                      );
+                    },
+                  );
+                });
               },
-            ),
+            )
           ),
         ],
       ),
@@ -393,8 +490,6 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
   }
 
   Widget _buildFeaturedBrandsSection(BuildContext context, double margin) {
-    List<String> brands = DataFile.getFeaturedBrands();
-
     return Container(
       color: getCardColor(context),
       padding: EdgeInsets.symmetric(vertical: margin),
@@ -409,37 +504,99 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
           SizedBox(height: 16.h),
           SizedBox(
             height: 40.h,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              padding: EdgeInsets.symmetric(horizontal: margin),
-              itemCount: brands.length,
-              itemBuilder: (context, index) {
-                return Container(
-                  margin: EdgeInsets.only(right: 10.w),
-                  padding: EdgeInsets.symmetric(horizontal: 16.w),
-                  decoration: BoxDecoration(
-                    color: getGreyCardColor(context),
-                    borderRadius: BorderRadius.circular(20.w),
-                    border: Border.all(color: dividerColor, width: 0.5),
-                  ),
-                  child: Center(
-                    child: getCustomFont(brands[index], 13, getFontColor(context),
-                        1,
-                        fontWeight: FontWeight.w600),
-                  ),
+            child: FutureBuilder<List<BrandModel>>(
+              future: brandsFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return SizedBox(); // Don't show anything or show small loader
+                }
+                if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
+                  return SizedBox();
+                }
+                var apiBrands = snapshot.data!;
+                var brands = [
+                  BrandModel(id: 'all', name: 'All', logoUrl: ''),
+                  ...apiBrands
+                ];
+                return ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  padding: EdgeInsets.symmetric(horizontal: margin),
+                  itemCount: brands.length,
+                  itemBuilder: (context, index) {
+                    return Obx(() {
+                      bool isSelected = selectedBrand.value == brands[index].id;
+                      return InkWell(
+                        onTap: () {
+                          selectedBrand.value = brands[index].id;
+                        },
+                        child: Container(
+                          margin: EdgeInsets.only(right: 10.w),
+                          padding: EdgeInsets.symmetric(horizontal: 16.w),
+                          decoration: BoxDecoration(
+                            color: isSelected ? accentColor : getGreyCardColor(context),
+                            borderRadius: BorderRadius.circular(20.w),
+                            border: Border.all(color: isSelected ? accentColor : dividerColor, width: isSelected ? 1 : 0.5),
+                          ),
+                          child: Center(
+                            child: getCustomFont(brands[index].name, 13, isSelected ? Colors.white : getFontColor(context),
+                                1,
+                                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600),
+                          ),
+                        ),
+                      );
+                    });
+                  },
                 );
-              },
-            ),
+              }
+            )
           ),
+          SizedBox(height: 16.h),
+          // Products for Selected Brand
+          Obx(() {
+            if (selectedBrand.value.isEmpty) return SizedBox();
+            return SizedBox(
+              height: 200.w,
+              child: FutureBuilder<Map<String, dynamic>>(
+                future: selectedBrand.value == 'all' 
+                    ? ProductApiService.getAllProducts() 
+                    : BrandApiService.getProductsByBrand(selectedBrand.value),
+                builder: (context, prodSnapshot) {
+                   if (prodSnapshot.connectionState == ConnectionState.waiting) {
+                      return Center(child: CircularProgressIndicator(color: accentColor));
+                   }
+                   if (!prodSnapshot.hasData || prodSnapshot.data!['success'] == false) {
+                     return Center(child: getCustomFont("No products available", 14, getFontGreyColor(context), 1));
+                   }
+                   
+                   List<dynamic> productsList = [];
+                   var resData = prodSnapshot.data!['data'];
+                   if (resData is List) productsList = resData;
+                   else if (resData is Map && resData['products'] is List) productsList = resData['products'];
+                   
+                   var products = productsList.map((e) => ProductModel.fromJson(e)).toList();
+                   
+                   if (products.isEmpty) {
+                     return Center(child: getCustomFont("No products available", 14, getFontGreyColor(context), 1));
+                   }
+                   
+                   return ListView.builder(
+                     scrollDirection: Axis.horizontal,
+                     padding: EdgeInsets.symmetric(horizontal: margin),
+                     itemCount: products.length,
+                     itemBuilder: (context, index) {
+                       return _buildProductCard(context, products[index], width: 150.w);
+                     }
+                   );
+                }
+              )
+            );
+          }),
         ],
       ),
     );
   }
 
   Widget _buildPopularPicksSection(BuildContext context, double margin) {
-    List<DummyProduct> popularProducts =
-        allProducts.where((p) => p.isBestSelling || p.isTopDeal).toList();
-
     return Container(
       color: getCardColor(context),
       padding: EdgeInsets.symmetric(vertical: margin, horizontal: margin),
@@ -448,46 +605,81 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              getCustomFont("Popular Picks", 18, getFontColor(context), 1,
+              getCustomFont("New Arrivals", 18, getFontColor(context), 1,
                   fontWeight: FontWeight.w700),
-              Icon(Icons.arrow_forward,
-                  color: getFontColor(context), size: 18.w),
+              GestureDetector(
+                onTap: () {
+                  storeController.setSelectedCategory("new_arrivals");
+                  storeController.setSelectedCategoryName("New Arrivals");
+                  Constant.sendToNext(context, categoryProductsPageRoute);
+                },
+                child: getCustomFont("View All", 14, accentColor, 1,
+                    fontWeight: FontWeight.w600),
+              ),
             ],
           ),
           SizedBox(height: 16.h),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              crossAxisSpacing: 12.w,
-              mainAxisSpacing: 12.w,
-              childAspectRatio: 0.75,
-            ),
-            itemCount: popularProducts.take(4).length,
-            itemBuilder: (context, index) {
-              return _buildProductCard(
-                context,
-                popularProducts[index],
-                width: double.infinity,
-              );
-            },
-          ),
+          FutureBuilder<List<ProductModel>>(
+            future: popularPicksFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return Center(child: CircularProgressIndicator(color: accentColor));
+              }
+              if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
+                return Center(child: getCustomFont("No picks available", 14, getFontGreyColor(context), 1));
+              }
+              var allProducts = snapshot.data!;
+              return Obx(() {
+                var currentCat = selectedCategory.value;
+                var popularProducts = currentCat == 'for_you'
+                    ? allProducts
+                    : allProducts.where((p) => p.categoryId == currentCat).toList();
+
+                if (popularProducts.isEmpty) {
+                  return Center(child: getCustomFont("No picks available", 14, getFontGreyColor(context), 1));
+                }
+
+                return GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    crossAxisSpacing: 12.w,
+                    mainAxisSpacing: 12.w,
+                    childAspectRatio: 0.75,
+                  ),
+                  itemCount: popularProducts.take(4).length,
+                  itemBuilder: (context, index) {
+                    return _buildProductCard(
+                      context,
+                      popularProducts[index],
+                      width: double.infinity,
+                    );
+                  },
+                );
+              });
+            }
+          )
         ],
       ),
     );
   }
 
-  Widget _buildProductCard(BuildContext context, DummyProduct product,
+  Widget _buildProductCard(BuildContext context, ProductModel product,
       {required double width}) {
-    double discountPercent = (((product.originalPrice - product.price) /
-                product.originalPrice) *
-            100)
-        .toDouble();
+    double basePrice = product.originalPrice;
+    double currentPrice = product.currentPrice;
+    double discountPercent = 0.0;
+    
+    if (basePrice > 0 && currentPrice > 0 && basePrice > currentPrice) {
+      discountPercent = (((basePrice - currentPrice) / basePrice) * 100).toDouble();
+    } else {
+      basePrice = currentPrice; // If no discount, original = current
+    }
 
     return InkWell(
       onTap: () {
-        storeController.setSelectedDummyProduct(product);
+        storeController.setSelectedProductModel(product);
         Constant.sendToNext(context, productDetailScreenRoute);
       },
       child: SizedBox(
@@ -513,7 +705,7 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(10.w),
                     child: CachedNetworkImage(
-                      imageUrl: product.imageUrl,
+                      imageUrl: product.imageUrl.isNotEmpty ? product.imageUrl : 'https://placehold.co/400',
                       fit: BoxFit.cover,
                       placeholder: (context, url) => Center(
                         child: CircularProgressIndicator(
@@ -529,11 +721,11 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
               ),
               SizedBox(height: 8.h),
               // Brand
-              getCustomFont(product.brand, 11, getFontGreyColor(context), 1,
+              getCustomFont(product.brandId, 11, getFontGreyColor(context), 1,
                   fontWeight: FontWeight.w500),
               SizedBox(height: 4.h),
               // Product Name
-              getCustomFont(product.name, 12, getFontColor(context), 2,
+              getCustomFont(product.title, 12, getFontColor(context), 2,
                   fontWeight: FontWeight.w600,
                   overflow: TextOverflow.ellipsis),
               SizedBox(height: 4.h),
@@ -548,10 +740,6 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
                       getFontColor(context),
                       1,
                       fontWeight: FontWeight.w500),
-                  SizedBox(width: 4.w),
-                  getCustomFont("(${product.reviewCount})", 10,
-                      getFontGreyColor(context), 1,
-                      fontWeight: FontWeight.w400),
                 ],
               ),
               SizedBox(height: 8.h),
@@ -559,19 +747,20 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
               Row(
                 children: [
                   getCustomFont(
-                      "₹${product.price.toStringAsFixed(0)}",
+                      "₹${currentPrice.toStringAsFixed(0)}",
                       13,
                       accentColor,
                       1,
                       fontWeight: FontWeight.w700),
                   SizedBox(width: 6.w),
-                  getCustomFont(
-                      "₹${product.originalPrice.toStringAsFixed(0)}",
-                      11,
-                      getFontGreyColor(context),
-                      1,
-                      fontWeight: FontWeight.w500,
-                      decoration: TextDecoration.lineThrough),
+                  if (discountPercent > 0)
+                    getCustomFont(
+                        "₹${basePrice.toStringAsFixed(0)}",
+                        11,
+                        getFontGreyColor(context),
+                        1,
+                        fontWeight: FontWeight.w500,
+                        decoration: TextDecoration.lineThrough),
                 ],
               ),
               // Discount Badge

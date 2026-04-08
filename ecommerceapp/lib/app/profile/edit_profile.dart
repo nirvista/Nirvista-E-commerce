@@ -208,7 +208,7 @@ class _EditProfile extends State<EditProfile> {
                   }
 
                   final response = await http.put(
-                    Uri.parse('$baseUrl/auth/profile'),
+                    Uri.parse('$baseUrl/api/auth/profile'),
                     headers: {
                       'Authorization': 'Bearer $accessToken',
                       'Content-Type': 'application/json',

@@ -4,12 +4,14 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:pet_shop/base/color_data.dart';
 import 'package:pet_shop/base/constant.dart';
-import 'package:pet_shop/base/data_file.dart';
 import 'package:pet_shop/base/fetch_pixels.dart';
 import 'package:pet_shop/base/get/route_key.dart';
 import 'package:pet_shop/base/get/storage_controller.dart';
 import 'package:pet_shop/base/widget_utils.dart';
-import 'package:pet_shop/app/model_ui/model_dummy_product.dart';
+import '../../app/model/api_models.dart';
+import '../../../services/product_api.dart';
+import '../../../services/category_api.dart';
+import '../../../services/brand_api.dart';
 
 class CategoryProductsPage extends StatefulWidget {
   const CategoryProductsPage({Key? key}) : super(key: key);
@@ -21,8 +23,11 @@ class CategoryProductsPage extends StatefulWidget {
 class _CategoryProductsPageState extends State<CategoryProductsPage> {
   StorageController storageController = Get.find<StorageController>();
   RxString selectedSubCategory = "all".obs;
-  List<DummyProduct> categoryProducts = [];
-  List<DummyProduct> filteredProducts = [];
+  
+  Future<List<ProductModel>>? productsFuture;
+  List<ProductModel> loadedProducts = [];
+
+
   Map<String, List<String>> subCategoriesMap = {
     "fashion": ["All", "Kurta", "Shirts", "Dresses", "Jeans", "Sarees"],
     "mobiles": ["All", "Smartphones", "Earphones", "Chargers", "Cases"],
@@ -35,31 +40,51 @@ class _CategoryProductsPageState extends State<CategoryProductsPage> {
   void initState() {
     super.initState();
     String category = storageController.selectedCategory.value;
+    
     if (category == "best_selling") {
-      categoryProducts = DataFile.getAllDummyProducts()
-          .where((p) => p.isBestSelling)
-          .toList();
+      productsFuture = _fetchProducts(ProductApiService.getAllProducts());
     } else if (category == "top_deals") {
-      categoryProducts = DataFile.getAllDummyProducts()
-          .where((p) => p.isTopDeal)
-          .toList();
-    } else if (category == "all") {
-      categoryProducts = DataFile.getAllDummyProducts();
-    } else if (category.isNotEmpty && category != "for_you") {
-      categoryProducts = DataFile.getProductsByCategory(category);
+      productsFuture = _fetchProducts(ProductApiService.getTopRatedProducts());
+    } else if (category == "new_arrivals") {
+      productsFuture = _fetchProducts(ProductApiService.getNewArrivals());
+    } else if (category == "all" || category == "for_you" || category.isEmpty) {
+      productsFuture = _fetchProducts(ProductApiService.getAllProducts());
+    } else if (category.startsWith("brand_")) {
+      String brandId = category.replaceFirst("brand_", "");
+      productsFuture = _fetchProducts(BrandApiService.getProductsByBrand(brandId));
+    } else {
+      productsFuture = _fetchProducts(CategoryApiService.getProductsByCategory(category));
     }
-    filteredProducts = categoryProducts;
   }
 
-  void _filterBySubCategory(String subCategory) {
-    if (subCategory.toLowerCase() == "all") {
-      filteredProducts = categoryProducts;
-    } else {
-      filteredProducts = categoryProducts
-          .where((p) => p.subCategory.toLowerCase().contains(subCategory.toLowerCase()))
-          .toList();
+  Future<List<ProductModel>> _fetchProducts(Future<Map<String, dynamic>> apiCall) async {
+    final res = await apiCall;
+    if (res['success']) {
+      dynamic data = res['data'];
+      List<dynamic> productsList = [];
+      if (data is List) {
+        productsList = data;
+      } else if (data is Map && data['products'] is List) {
+        productsList = data['products'];
+      }
+      var prods = productsList.map((e) => ProductModel.fromJson(e)).toList();
+      loadedProducts = prods;
+      return prods;
     }
-    selectedSubCategory.value = subCategory;
+    loadedProducts = [];
+    return [];
+  }
+
+  List<ProductModel> _getFilteredProducts() {
+    if (selectedSubCategory.value.toLowerCase() == "all") {
+      return loadedProducts;
+    }
+    // Filter logic using description or tags if subCategory is not explicitly modeled
+    return loadedProducts.where((p) {
+       var matchesDesc = p.description?.toLowerCase().contains(selectedSubCategory.value.toLowerCase()) ?? false;
+       var matchesTitle = p.title.toLowerCase().contains(selectedSubCategory.value.toLowerCase());
+       return matchesDesc || matchesTitle;
+    }).toList();
   }
 
   @override
@@ -69,19 +94,31 @@ class _CategoryProductsPageState extends State<CategoryProductsPage> {
     String category = storageController.selectedCategory.value.isEmpty
         ? "fashion"
         : storageController.selectedCategory.value;
-    String categoryTitle;
-    if (category == "best_selling") {
-      categoryTitle = "BEST SELLING PRODUCTS";
-    } else if (category == "top_deals") {
-      categoryTitle = "TOP DEALS FOR YOU";
-    } else if (category == "all") {
-      categoryTitle = "ALL PRODUCTS";
+        
+    String categoryTitle = storageController.selectedCategoryName.value;
+    if (categoryTitle.isEmpty) {
+      if (category == "best_selling") {
+        categoryTitle = "BEST SELLING PRODUCTS";
+      } else if (category == "top_deals") {
+        categoryTitle = "TOP DEALS FOR YOU";
+      } else if (category == "new_arrivals") {
+        categoryTitle = "NEW ARRIVALS";
+      } else if (category == "all" || category == "for_you") {
+        categoryTitle = "ALL PRODUCTS";
+      } else {
+        categoryTitle = category.replaceAll("_", " ").toUpperCase();
+      }
     } else {
-      categoryTitle = category.replaceAll("_", " ").toUpperCase();
+      categoryTitle = categoryTitle.toUpperCase();
     }
 
     List<String> subCategories = subCategoriesMap[category] ?? ["All"];
-    List<String> brands = _getBrandsForCategory(category);
+    
+    // Extracted Unique Brands
+    List<String> brands = loadedProducts.map((e) => e.brandId).toSet().toList();
+    if (brands.isEmpty) {
+       brands = ["Nike", "Adidas", "Puma"]; // Fallback if empty in UI rendering
+    }
 
     return Scaffold(
       backgroundColor: getScaffoldColor(context),
@@ -90,43 +127,52 @@ class _CategoryProductsPageState extends State<CategoryProductsPage> {
           children: [
             // Top Bar
             _buildTopBar(context, categoryTitle, margin),
-            // Sub-categories horizontal scroll
-            _buildSubCategoriesTabs(context, subCategories, margin),
-            SizedBox(height: 8.h),
-            // Brand filter pills
-            _buildBrandFilterSection(context, brands, margin),
             SizedBox(height: 12.h),
             // Products Grid
             Expanded(
-              child: Obx(
-                () => filteredProducts.isEmpty
-                    ? Center(
-                        child: getCustomFont(
-                            "No products found",
-                            16,
-                            getFontColor(context),
-                            1,
-                            fontWeight: FontWeight.w500),
-                      )
-                    : GridView.builder(
-                        padding:
-                            EdgeInsets.symmetric(horizontal: margin, vertical: 8.h),
-                        gridDelegate:
-                            SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          crossAxisSpacing: 12.w,
-                          mainAxisSpacing: 12.w,
-                          childAspectRatio: 0.75,
-                        ),
-                        itemCount: filteredProducts.length,
-                        itemBuilder: (context, index) {
-                          return _buildProductCard(
-                            context,
-                            filteredProducts[index],
-                          );
-                        },
-                      ),
-              ),
+              child: FutureBuilder<List<ProductModel>>(
+                future: productsFuture,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return Center(child: CircularProgressIndicator(color: accentColor));
+                  }
+                  if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
+                    return Center(
+                      child: getCustomFont(
+                          "No products found",
+                          16,
+                          getFontColor(context),
+                          1,
+                          fontWeight: FontWeight.w500),
+                    );
+                  }
+
+                  return Obx(() {
+                    var filtered = _getFilteredProducts();
+                    if (filtered.isEmpty) {
+                      return Center(child: Text("No items match filter."));
+                    }
+                    return GridView.builder(
+                          padding:
+                              EdgeInsets.symmetric(horizontal: margin, vertical: 8.h),
+                          gridDelegate:
+                              SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            crossAxisSpacing: 12.w,
+                            mainAxisSpacing: 12.w,
+                            childAspectRatio: 0.75,
+                          ),
+                          itemCount: filtered.length,
+                          itemBuilder: (context, index) {
+                            return _buildProductCard(
+                              context,
+                              filtered[index],
+                            );
+                          },
+                        );
+                  });
+                }
+              )
             ),
           ],
         ),
@@ -163,109 +209,21 @@ class _CategoryProductsPageState extends State<CategoryProductsPage> {
     );
   }
 
-  Widget _buildSubCategoriesTabs(BuildContext context, List<String> subCategories,
-      double margin) {
-    return Container(
-      color: getCardColor(context),
-      padding: EdgeInsets.symmetric(horizontal: margin, vertical: 12.h),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          getCustomFont("Filter by Category", 12, getFontGreyColor(context), 1,
-              fontWeight: FontWeight.w600),
-          SizedBox(height: 10.h),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Obx(
-              () => Row(
-                children: List.generate(
-                  subCategories.length,
-                  (index) {
-                    String subCategory = subCategories[index];
-                    bool isSelected = selectedSubCategory.value == subCategory;
-                    return GestureDetector(
-                      onTap: () {
-                        _filterBySubCategory(subCategory);
-                      },
-                      child: Container(
-                        margin: EdgeInsets.only(right: 10.w),
-                        padding:
-                            EdgeInsets.symmetric(horizontal: 14.w, vertical: 8.h),
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? accentColor
-                              : lightAccentColor,
-                          borderRadius: BorderRadius.circular(20.w),
-                          border: Border.all(
-                            color: isSelected ? accentColor : dividerColor,
-                            width: 1,
-                          ),
-                        ),
-                        child: getCustomFont(
-                            subCategory,
-                            12,
-                            isSelected ? Colors.white : accentColor,
-                            1,
-                            fontWeight: FontWeight.w600),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBrandFilterSection(
-      BuildContext context, List<String> brands, double margin) {
-    return Container(
-      color: getCardColor(context),
-      padding: EdgeInsets.symmetric(horizontal: margin, vertical: 12.h),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          getCustomFont("Featured Brands", 12, getFontColor(context), 1,
-              fontWeight: FontWeight.w600),
-          SizedBox(height: 10.h),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: List.generate(
-                brands.length,
-                (index) {
-                  return Container(
-                    margin: EdgeInsets.only(right: 10.w),
-                    padding:
-                        EdgeInsets.symmetric(horizontal: 14.w, vertical: 8.h),
-                    decoration: BoxDecoration(
-                      color: lightAccentColor,
-                      borderRadius: BorderRadius.circular(20.w),
-                      border: Border.all(color: accentColor, width: 1),
-                    ),
-                    child: getCustomFont(brands[index], 11,
-                        accentColor, 1,
-                        fontWeight: FontWeight.w600),
-                  );
-                },
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildProductCard(
-      BuildContext context, DummyProduct product) {
-    double discountPercent =
-        (((product.originalPrice - product.price) / product.originalPrice) * 100);
+      BuildContext context, ProductModel product) {
+    double basePrice = product.originalPrice;
+    double currentPrice = product.currentPrice;
+    double discountPercent = 0.0;
+    
+    if (basePrice > 0 && currentPrice > 0 && basePrice > currentPrice) {
+      discountPercent = (((basePrice - currentPrice) / basePrice) * 100).toDouble();
+    } else {
+      basePrice = currentPrice;
+    }
 
     return InkWell(
       onTap: () {
-        storageController.setSelectedDummyProduct(product);
+        storageController.setSelectedProductModel(product);
         Constant.sendToNext(context, productDetailScreenRoute);
       },
       child: Container(
@@ -296,7 +254,7 @@ class _CategoryProductsPageState extends State<CategoryProductsPage> {
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(10.w),
                   child: CachedNetworkImage(
-                    imageUrl: product.imageUrl,
+                    imageUrl: product.imageUrl.isNotEmpty ? product.imageUrl : 'https://placehold.co/400',
                     fit: BoxFit.cover,
                     placeholder: (context, url) => Center(
                       child: CircularProgressIndicator(
@@ -312,11 +270,11 @@ class _CategoryProductsPageState extends State<CategoryProductsPage> {
             ),
             SizedBox(height: 8.h),
             // Brand
-            getCustomFont(product.brand, 11, getFontGreyColor(context), 1,
+            getCustomFont(product.brandId, 11, getFontGreyColor(context), 1,
                 fontWeight: FontWeight.w500),
             SizedBox(height: 4.h),
             // Product Name
-            getCustomFont(product.name, 12, getFontColor(context), 2,
+            getCustomFont(product.title, 12, getFontColor(context), 2,
                 fontWeight: FontWeight.w600,
                 overflow: TextOverflow.ellipsis),
             SizedBox(height: 4.h),
@@ -331,10 +289,6 @@ class _CategoryProductsPageState extends State<CategoryProductsPage> {
                     getFontColor(context),
                     1,
                     fontWeight: FontWeight.w500),
-                SizedBox(width: 4.w),
-                getCustomFont("(${product.reviewCount})", 10,
-                    getFontGreyColor(context), 1,
-                    fontWeight: FontWeight.w400),
               ],
             ),
             SizedBox(height: 8.h),
@@ -342,19 +296,20 @@ class _CategoryProductsPageState extends State<CategoryProductsPage> {
             Row(
               children: [
                 getCustomFont(
-                    "₹${product.price.toStringAsFixed(0)}",
+                    "₹${currentPrice.toStringAsFixed(0)}",
                     13,
                     accentColor,
                     1,
                     fontWeight: FontWeight.w700),
                 SizedBox(width: 6.w),
-                getCustomFont(
-                    "₹${product.originalPrice.toStringAsFixed(0)}",
-                    11,
-                    getFontGreyColor(context),
-                    1,
-                    fontWeight: FontWeight.w500,
-                    decoration: TextDecoration.lineThrough),
+                if (discountPercent > 0)
+                  getCustomFont(
+                      "₹${basePrice.toStringAsFixed(0)}",
+                      11,
+                      getFontGreyColor(context),
+                      1,
+                      fontWeight: FontWeight.w500,
+                      decoration: TextDecoration.lineThrough),
               ],
             ),
             // Discount Badge
@@ -377,14 +332,5 @@ class _CategoryProductsPageState extends State<CategoryProductsPage> {
         ),
       ),
     );
-  }
-
-  List<String> _getBrandsForCategory(String category) {
-    List<DummyProduct> products = DataFile.getProductsByCategory(category);
-    Set<String> uniqueBrands = {};
-    for (var product in products) {
-      uniqueBrands.add(product.brand);
-    }
-    return uniqueBrands.toList();
   }
 }

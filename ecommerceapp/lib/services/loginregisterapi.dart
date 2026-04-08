@@ -26,7 +26,7 @@ class ApiService {
   })async{
     try{
       final response = await http.post(
-        Uri.parse('$baseUrl/auth/signup'),
+        Uri.parse('$baseUrl/api/auth/signup'),
         headers: {
           'Content-Type':'application/json',
           'x-client-type': 'mobile',
@@ -71,7 +71,7 @@ class ApiService {
   })async{
     try{
       final response = await http.post(
-        Uri.parse('$baseUrl/auth/login'),
+        Uri.parse('$baseUrl/api/auth/login'),
         headers: {
           'Content-Type': 'application/json',
           'x-client-type': 'mobile',
