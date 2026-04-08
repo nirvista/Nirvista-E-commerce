@@ -9,6 +9,8 @@ import Brand from './brandModel.js';
 import Tag from './tagModel.js';
 import Wishlist from './wishlistModel.js';
 import WishlistItem from './wishlistItemModel.js';
+import Order from './orderModel.js';
+import OrderItem from './orderItemModel.js';
 
 // Define associations
 Cart.hasMany(CartItem, { foreignKey: 'cartId', as: 'items' });
@@ -54,4 +56,16 @@ WishlistItem.belongsTo(ProductVariant, { foreignKey: 'variantId', as: 'variant' 
 
 CartItem.belongsTo(ProductVariant, { foreignKey: 'variantId', as: 'variant' });
 
-export { Cart, CartItem, Product, User, UserAddress, ProductVariant, Category, Brand, Tag, Wishlist, WishlistItem };
+User.hasMany(Order, { foreignKey: 'userId' });
+Order.belongsTo(User, { foreignKey: 'userId' });
+
+UserAddress.hasMany(Order, { foreignKey: 'addressId' });
+Order.belongsTo(UserAddress, { foreignKey: 'addressId', as: 'shippingAddress' });
+
+Order.hasMany(OrderItem, { foreignKey: 'orderId', as: 'items', onDelete: 'CASCADE' });
+OrderItem.belongsTo(Order, { foreignKey: 'orderId' });
+
+OrderItem.belongsTo(Product, { foreignKey: 'productId', as: 'product' });
+OrderItem.belongsTo(ProductVariant, { foreignKey: 'variantId', as: 'variant' });
+
+export { Cart, CartItem, Product, User, UserAddress, ProductVariant, Category, Brand, Tag, Wishlist, WishlistItem, Order, OrderItem };
