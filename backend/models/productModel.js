@@ -14,13 +14,23 @@ const Product = sequelize.define("Product", {
     description: {
         type: DataTypes.TEXT,
     },
-    category: {
-        type: DataTypes.STRING,
+    categoryId: {
+        type: DataTypes.UUID,
         allowNull: false,
+        references: {
+            model: 'Categories',
+            key: 'id'
+        },
+        onDelete: 'RESTRICT',
     },
-    brand: {
-        type: DataTypes.STRING,
+    brandId: {
+        type: DataTypes.UUID,
         allowNull: false,
+        references: {
+            model: 'Brands',
+            key: 'id'
+        },
+        onDelete: 'RESTRICT',
     },
     material: {
         type: DataTypes.STRING,
@@ -32,6 +42,6 @@ const Product = sequelize.define("Product", {
 },{
     timestamps: true,
     tableName: 'Products'
-})
+});
 
 export default Product;
