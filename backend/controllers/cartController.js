@@ -1,13 +1,14 @@
 import { Cart, CartItem } from "../models/association.js";
 import Product from "../models/productModel.js";
+import ProductVariant from "../models/variantModel.js";
 import { serverError } from "../utils/responseMessages.js";
 
 //Add to cart
 export const addToCart = async (req, res) => {
     try {
-        const {userId, productId} = req.body;
-        if (!userId || !productId) {
-            return res.status(400).json({ message: "userId and productId are required" });
+        const {userId, productId, variantId} = req.body;
+        if (!userId || !productId || !variantId) {
+            return res.status(400).json({ message: "userId, productId, and variantId are required" });
         }
 
         // Check if product exists
@@ -16,16 +17,22 @@ export const addToCart = async (req, res) => {
             return res.status(404).json({ message: "Product does not exist" });
         }
 
+        // Check if variant exists
+        const variant = await ProductVariant.findByPk(variantId);
+        if (!variant) {
+            return res.status(404).json({ message: "Product variant does not exist" });
+        }
+
         let cart = await Cart.findOne({ where: { userId } });
         if (!cart) {
             cart = await Cart.create({ userId });
         }
-        let cartItem = await CartItem.findOne({ where: { cartId: cart.id, productId } });
+        let cartItem = await CartItem.findOne({ where: { cartId: cart.id, productId, variantId } });
         if (cartItem) {
             cartItem.quantity += 1;
             await cartItem.save();
         } else {
-            await CartItem.create({ cartId: cart.id, productId, quantity: 1 });
+            await CartItem.create({ cartId: cart.id, productId, variantId, quantity: 1 });
         }
         res.status(200).json({ message: "Product added to cart successfully" });
     } catch (error) {
@@ -36,9 +43,9 @@ export const addToCart = async (req, res) => {
 // Reduce item quantity in cart
 export const reduceItemQuantity = async (req, res) => {
     try {
-        const { userId, productId } = req.body;
-        if (!userId || !productId) {
-            return res.status(400).json({ message: "userId and productId are required" });
+        const { userId, productId, variantId } = req.body;
+        if (!userId || !productId || !variantId) {
+            return res.status(400).json({ message: "userId, productId, and variantId are required" });
         }
 
         // Find the user's cart
@@ -48,7 +55,7 @@ export const reduceItemQuantity = async (req, res) => {
         }
 
         // Find the cart item
-        const cartItem = await CartItem.findOne({ where: { cartId: cart.id, productId } });
+        const cartItem = await CartItem.findOne({ where: { cartId: cart.id, productId, variantId } });
         if (!cartItem) {
             return res.status(404).json({ message: "Product not found in cart" });
         }
@@ -70,9 +77,9 @@ export const reduceItemQuantity = async (req, res) => {
 // Increase item quantity in cart
 export const increaseItemQuantity = async (req, res) => {
     try {
-        const { userId, productId } = req.body;
-        if (!userId || !productId) {
-            return res.status(400).json({ message: "userId and productId are required" });
+        const { userId, productId, variantId } = req.body;
+        if (!userId || !productId || !variantId) {
+            return res.status(400).json({ message: "userId, productId, and variantId are required" });
         }
 
         // Find the user's cart
@@ -82,7 +89,7 @@ export const increaseItemQuantity = async (req, res) => {
         }
 
         // Find the cart item
-        const cartItem = await CartItem.findOne({ where: { cartId: cart.id, productId } });
+        const cartItem = await CartItem.findOne({ where: { cartId: cart.id, productId, variantId } });
         if (!cartItem) {
             return res.status(404).json({ message: "Product not found in cart" });
         }
@@ -104,9 +111,9 @@ export const increaseItemQuantity = async (req, res) => {
 // Update quantity of an item in cart
 export const updateCartItemQuantity = async (req, res) => {
     try {
-        const { userId, productId, quantity } = req.body;
-        if (!userId || !productId || typeof quantity !== "number") {
-            return res.status(400).json({ message: "userId, productId, and quantity are required" });
+        const { userId, productId, variantId, quantity } = req.body;
+        if (!userId || !productId || !variantId || typeof quantity !== "number") {
+            return res.status(400).json({ message: "userId, productId, variantId, and quantity are required" });
         }
         if (quantity < 0) {
             return res.status(400).json({ message: "Quantity must be a non-negative integer" });
@@ -119,7 +126,7 @@ export const updateCartItemQuantity = async (req, res) => {
         }
 
         // Find the cart item
-        const cartItem = await CartItem.findOne({ where: { cartId: cart.id, productId } });
+        const cartItem = await CartItem.findOne({ where: { cartId: cart.id, productId, variantId } });
         if (!cartItem) {
             return res.status(404).json({ message: "Product not found in cart" });
         }
@@ -161,7 +168,12 @@ export const getCartByUserId = async (req, res) => {
                 {
                     model: Product,
                     as: 'product',
-                    attributes: ["id", "title", "price", "description"] // Add more fields as needed
+                    attributes: ["id", "title", "description"] // Add more fields as needed
+                },
+                {
+                    model: ProductVariant,
+                    as: 'variant',
+                    attributes: ["id", "variantName", "price", "discountPrice"] // Add more fields as needed
                 }
             ]
         });
@@ -170,7 +182,8 @@ export const getCartByUserId = async (req, res) => {
         const items = cartItems.map(item => ({
             productId: item.productId,
             quantity: item.quantity,
-            product: item.product // Will be null if product is missing
+            product: item.product, // Will be null if product is missing
+            variant: item.variant // Will be null if variant is missing
         }));
 
         return res.status(200).json({

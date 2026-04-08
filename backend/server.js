@@ -8,6 +8,11 @@ import userRoutes from './routes/userRoutes.js';
 import productRoutes from './routes/productRoutes.js';
 import cartRoutes from './routes/cartRoutes.js';
 import addressRoutes from './routes/addressRoutes.js';
+import categoryRoutes from './routes/categoryRoutes.js';
+import tagRoutes from './routes/tagRoutes.js';
+import wishlistRoutes from './routes/wishlistRoutes.js';
+import brandRoutes from './routes/brandRoutes.js';
+import orderRoutes from './routes/orderRoutes.js';
 import cookieParser from 'cookie-parser';
 
 const app = express();
@@ -22,6 +27,11 @@ app.use('/api/users', userRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/address', addressRoutes);
+app.use('/api/categories', categoryRoutes);
+app.use('/api/tags', tagRoutes);
+app.use('/api/wishlist', wishlistRoutes);
+app.use('/api/brands', brandRoutes);
+app.use('/api/orders', orderRoutes);
 
 app.get('/', (req, res) => {
   res.send('API is running...');
