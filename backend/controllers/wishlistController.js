@@ -3,7 +3,7 @@ import { Wishlist, WishlistItem, Cart, CartItem, Product, ProductVariant } from 
 import { serverError, notFound, success, badRequest } from "../utils/responseMessages.js";
 
 // Helper: Get user ID safely (assuming you use auth middleware that sets req.user)
-const getUserId = (req) => req.user?.id || req.body.userId;
+const getUserId = (req) => req.query.userId || req.body.userId ;
 
 // GET /api/wishlist - Get user's wishlist
 export const getWishlist = async (req, res) => {

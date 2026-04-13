@@ -36,7 +36,15 @@ const OrderItem = sequelize.define("OrderItem", {
     priceAtPurchase: {
         type: DataTypes.FLOAT,
         allowNull: false,
+    },
+    returnStatus: {
+        type: DataTypes.ENUM('none', 'requested', 'approved', 'rejected', 'completed'),
+        defaultValue: 'none',
+    },
+    returnedQuantity: {
+        type: DataTypes.INTEGER,
+        defaultValue: 0,
     }
-}, { tableName: 'OrderItems', timestamps: false });
+}, { tableName: 'OrderItems' });
 
 export default OrderItem;
