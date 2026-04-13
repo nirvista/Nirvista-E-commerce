@@ -42,6 +42,7 @@ import 'base/get/bottom_selection_controller.dart';
 import 'base/get/cart_contr/cart_controller.dart';
 import 'base/get/cart_contr/shipping_add_controller.dart';
 import 'base/get/home_controller.dart';
+import 'package:pet_shop/base/get/wishlist_controller.dart';
 import 'base/get/image_controller.dart';
 import 'base/get/login_data_controller.dart';
 import 'base/get/search_controller.dart';
@@ -54,15 +55,13 @@ import 'base/get/store_binding.dart';
 import 'base/my_custom_scroll_behavior.dart';
 import 'generated/l10n.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:pet_shop/woocommerce/model/user.dart';
 
 Future<void> init() async {
+  // These are fine as lazyPut — loaded on first access
   Get.lazyPut(() => HomeController());
   Get.lazyPut(() => ProductDataController());
   Get.lazyPut(() => CartController());
   Get.lazyPut(() => PaymentController());
-
-  Get.lazyPut(() => BottomItemSelectionController());
   Get.lazyPut(() => StorageController());
   Get.lazyPut(() => LoginDataController());
   Get.lazyPut(() => RegisterDataController());
@@ -70,17 +69,22 @@ Future<void> init() async {
   Get.lazyPut(() => SearchControllers());
   Get.lazyPut(() => ImageController());
 
+  // ✅ FIXED: These must be registered eagerly (not lazy) so they are
+  // available immediately when TabFavourite and the bottom nav build.
+  // lazyPut means onInit() (which calls fetchWishlist) never fires until
+  // someone calls Get.find<>() — by then the widget tree may already
+  // have tried to build and shown the error state.
+  Get.put(BottomItemSelectionController(), permanent: true);
+  Get.put(WishlistController(), permanent: true);
 }
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: ".env");
+  await GetStorage.init();
   await init();
 
-  await GetStorage.init();
   // Stripe.publishableKey = Payments.stripPublishKey;
-  // Stripe.merchantIdentifier
-  // Stripe.stripeAccountId
   // Stripe.instance.applySettings();
 
   runApp(const MyApp());
@@ -102,16 +106,13 @@ void configLoading(BuildContext context) {
     ..dismissOnTap = false;
 }
 
-// Update your main.dart to use GetMaterialApp with home: BaseScaffold()
-// Create a global navigation controller
 class GlobalNavController extends GetxController {
   final RxInt currentIndex = 0.obs;
-  
+
   void changeIndex(int index) {
     currentIndex.value = index;
   }
 }
-
 
 class MyApp extends StatelessWidget {
   const MyApp({Key? key}) : super(key: key);
@@ -133,10 +134,7 @@ class MyApp extends StatelessWidget {
       initialRoute: "/",
       builder: EasyLoading.init(),
       initialBinding: StoreBinding(),
-
       theme: controller.theme,
-
-
       routes: {
         "/": (context) => const SplashScreen(),
         splashRoute: (context) => const SplashScreen(),
@@ -147,7 +145,7 @@ class MyApp extends StatelessWidget {
         myOrderScreenRoute: (context) => const MyOrder(),
         forgotPassScreenRoute: (context) => const ForgotPasswordScreen(),
         resetPassScreenRoute: (context) => const ResetPasswordScreen(),
-        verificationScreenRoute: (context) => VerificationScreen('',false),
+        verificationScreenRoute: (context) => VerificationScreen('', false),
         newArrivalScreenList: (context) => const NewArrivalList(),
         bestSellingScreenList: (context) => const BestSellingList(),
         productDetailScreenRoute: (context) => const ProductDetailScreen(),
@@ -175,7 +173,6 @@ class MyApp extends StatelessWidget {
         customerCareScreenRoute: (context) => const CustomerCareScreen(),
         // stripPaymentScreenRoute: (context) => NoWebhookPaymentScreen(),
       },
-
     );
   }
 }

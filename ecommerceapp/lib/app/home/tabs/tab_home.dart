@@ -2,6 +2,7 @@ import 'package:carousel_slider/carousel_slider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
+import 'package:pet_shop/app/home/tabs/tab_search.dart'; 
 import 'package:pet_shop/base/color_data.dart';
 import 'package:pet_shop/base/constant.dart';
 import 'package:pet_shop/base/fetch_pixels.dart';
@@ -131,6 +132,11 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
     );
   }
 
+  // ─────────────────────────────────────────────
+  // ONLY THIS METHOD WAS CHANGED
+  // Wrapped the search bar in a GestureDetector + AbsorbPointer
+  // so that tapping anywhere on it navigates to SearchPage.
+  // ─────────────────────────────────────────────
   Widget _buildHeader(BuildContext context, double margin) {
     return Container(
       color: getCardColor(context),
@@ -148,34 +154,45 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
             ],
           ),
           SizedBox(height: 12.h),
-          Container(
-            decoration: BoxDecoration(
-              color: getGreyCardColor(context),
-              borderRadius: BorderRadius.circular(12.w),
-            ),
-            padding: EdgeInsets.symmetric(horizontal: 12.w),
-            child: Row(
-              children: [
-                Icon(Icons.search,
-                    color: getFontGreyColor(context), size: 18.w),
-                SizedBox(width: 8.w),
-                Expanded(
-                  child: TextField(
-                    style: TextStyle(color: getFontColor(context)),
-                    decoration: InputDecoration(
-                      hintText: "Search for products",
-                      hintStyle: TextStyle(color: getFontGreyColor(context)),
-                      border: InputBorder.none,
-                      contentPadding:
-                          EdgeInsets.symmetric(vertical: 10.h, horizontal: 8.w),
-                    ),
-                  ),
+          // ── CHANGED: wrap in GestureDetector + AbsorbPointer ──
+          GestureDetector(
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const SearchPage()),
+              );
+            },
+            child: AbsorbPointer(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: getGreyCardColor(context),
+                  borderRadius: BorderRadius.circular(12.w),
                 ),
-                Icon(Icons.camera_alt_outlined,
-                    color: getFontGreyColor(context), size: 18.w),
-              ],
+                padding: EdgeInsets.symmetric(horizontal: 12.w),
+                child: Row(
+                  children: [
+                    Icon(Icons.search,
+                        color: getFontGreyColor(context), size: 18.w),
+                    SizedBox(width: 8.w),
+                    Expanded(
+                      child: TextField(
+                        style: TextStyle(color: getFontColor(context)),
+                        decoration: InputDecoration(
+                          hintText: "Search for products",
+                          hintStyle: TextStyle(color: getFontGreyColor(context)),
+                          border: InputBorder.none,
+                          contentPadding:
+                              EdgeInsets.symmetric(vertical: 10.h, horizontal: 8.w),
+                        ),
+                      ),
+                    ),
+                    Icon(Icons.camera_alt_outlined,
+                        color: getFontGreyColor(context), size: 18.w),
+                  ],
+                ),
+              ),
             ),
           ),
+          // ── END CHANGE ──
         ],
       ),
     );
@@ -226,8 +243,6 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
         selectedCategory.value = catId;
         storeController.setSelectedCategory(catId);
         storeController.setSelectedCategoryName(catName);
-        // Note: the original UI didn't refresh products on click, you might want to call _fetchProducts here
-        // if this tab is supposed to filter the sections below, or just navigate.
       },
       child: Padding(
         padding: EdgeInsets.only(right: 20.w),
@@ -508,7 +523,7 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
               future: brandsFuture,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return SizedBox(); // Don't show anything or show small loader
+                  return SizedBox();
                 }
                 if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
                   return SizedBox();
@@ -674,7 +689,7 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
     if (basePrice > 0 && currentPrice > 0 && basePrice > currentPrice) {
       discountPercent = (((basePrice - currentPrice) / basePrice) * 100).toDouble();
     } else {
-      basePrice = currentPrice; // If no discount, original = current
+      basePrice = currentPrice;
     }
 
     return InkWell(
