@@ -29,7 +29,6 @@ import 'package:pet_shop/app/profile/edit_profile.dart';
 import 'package:pet_shop/app/profile/more_screen.dart';
 import 'package:pet_shop/app/profile/my_favourite.dart';
 import 'package:pet_shop/app/profile/my_profile_screen.dart';
-import 'package:pet_shop/base/payment.dart';
 import 'app/cart/order_confirm_screen.dart';
 import 'app/intro/splash_screen.dart';
 import 'app/lists/blog_datail.dart';
@@ -51,10 +50,10 @@ import 'base/get/register_data_controller.dart';
 import 'base/get/route_key.dart';
 import 'base/get/storage_controller.dart';
 import 'base/get/store_binding.dart';
+import 'base/get/order_controller.dart';
 import 'base/my_custom_scroll_behavior.dart';
 import 'generated/l10n.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:pet_shop/woocommerce/model/user.dart';
 
 Future<void> init() async {
   Get.lazyPut(() => HomeController());
@@ -69,7 +68,7 @@ Future<void> init() async {
   Get.lazyPut(() => ShippingAddressController());
   Get.lazyPut(() => SearchControllers());
   Get.lazyPut(() => ImageController());
-
+  Get.lazyPut(() => GlobalOrderController());
 }
 
 Future<void> main() async {

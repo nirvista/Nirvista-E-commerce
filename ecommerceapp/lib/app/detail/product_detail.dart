@@ -9,6 +9,11 @@ import 'package:pet_shop/base/get/storage_controller.dart';
 import 'package:pet_shop/base/widget_utils.dart';
 import 'package:pet_shop/base/pref_data.dart';
 import '../../app/model/api_models.dart';
+import '../../base/get/login_data_controller.dart';
+import '../../base/get/route_key.dart';
+import '../../base/get/cart_contr/cart_controller.dart';
+import '../../base/get/cart_contr/shipping_add_controller.dart';
+import '../../services/brand_api.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   const ProductDetailScreen({Key? key}) : super(key: key);
@@ -22,8 +27,8 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
   StorageController storageController = Get.find<StorageController>();
   RxString selectedColor = "".obs;
   RxString selectedSize = "".obs;
-  RxInt quantity = 1.obs;
   RxBool isWishlisted = false.obs;
+  RxString brandName = ''.obs;
   PrefData prefData = PrefData();
 
   @override
@@ -37,12 +42,27 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
         if (v.size != null) selectedSize.value = v.size!;
       }
       _loadWishlistStatus(product.id);
+      _fetchBrandName(product);
     }
   }
 
   void _loadWishlistStatus(String productId) async {
     List<String> favList = await prefData.getFavouriteList();
     isWishlisted.value = favList.contains(productId);
+  }
+
+  void _fetchBrandName(ProductModel product) async {
+    if (product.brandName.isNotEmpty) {
+      brandName.value = product.brandName;
+      return;
+    }
+    if (product.brandId.isEmpty) return;
+    try {
+      final res = await BrandApiService.getBrandById(product.brandId);
+      if (res['success'] && res['data'] != null) {
+        brandName.value = res['data']['name'] ?? '';
+      }
+    } catch (_) {}
   }
 
   void _toggleWishlist(String productId) async {
@@ -178,8 +198,13 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
             ),
           ),
           SizedBox(width: 12.w),
-          Icon(Icons.shopping_cart_outlined,
-              color: getFontColor(context), size: 24.w),
+          GestureDetector(
+            onTap: () {
+              Constant.sendToNext(context, myCartScreenRoute);
+            },
+            child: Icon(Icons.shopping_cart_outlined,
+                color: getFontColor(context), size: 24.w),
+          ),
         ],
       ),
     );
@@ -407,8 +432,10 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
         children: [
           Row(
             children: [
-              getCustomFont(product.brandId, 14, getFontGreyColor(context), 1,
-                  fontWeight: FontWeight.w700),
+              Obx(() => getCustomFont(
+                  brandName.value, 
+                  14, getFontGreyColor(context), 1,
+                  fontWeight: FontWeight.w700)),
               SizedBox(width: 8.w),
               GestureDetector(
                 onTap: () {},
@@ -479,11 +506,18 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
             children: [
               Icon(Icons.home, color: getFontColor(context), size: 16.w),
               SizedBox(width: 8.w),
-              Expanded(
-                child: getCustomFont("No.23, Sri Krishna St, Santhi Naga...",
+              Obx(() {
+                final shippingController = Get.find<ShippingAddressController>();
+                final selectedAddr = shippingController.selectedAddress.value;
+                return Expanded(
+                  child: getCustomFont(
+                    selectedAddr != null ? selectedAddr.fullAddress : "Select a shipping address",
                     12, getFontColor(context), 1,
-                    fontWeight: FontWeight.w500),
-              ),
+                    fontWeight: FontWeight.w500,
+                    overflow: TextOverflow.ellipsis
+                  ),
+                );
+              }),
               Icon(Icons.arrow_forward, color: getFontGreyColor(context), size: 16.w),
             ],
           ),
@@ -572,57 +606,175 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
     );
   }
 
+  VariantModel? _getSelectedVariant(ProductModel product) {
+    if (product.variants.isEmpty) return null;
+    try {
+      return product.variants.firstWhere(
+        (v) => (v.color == selectedColor.value || v.color == null || v.color!.isEmpty) && 
+               (v.size == selectedSize.value || v.size == null || v.size!.isEmpty)
+      );
+    } catch (_) {
+      return product.variants.first;
+    }
+  }
+
+  int _getCartQuantity(ProductModel product) {
+    try {
+      final cartController = Get.find<CartController>();
+      final cart = cartController.cartModel.value;
+      if (cart == null) return 0;
+      final variant = _getSelectedVariant(product);
+      if (variant == null) return 0;
+      final items = cart.items.where(
+        (i) => i.productId == product.id && i.variantId == variant.id
+      ).toList();
+      if (items.isNotEmpty) return items.first.quantity;
+    } catch (_) {}
+    return 0;
+  }
+
   Widget _buildBottomButtons(BuildContext context, ProductModel product) {
     return Container(
       color: getCardColor(context),
       padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 12.h),
       child: SafeArea(
         top: false,
-        child: Row(
-          children: [
-            Expanded(
-              child: GestureDetector(
-                onTap: () {
-                  // Add to cart logic
-                },
-                child: Container(
-                  padding: EdgeInsets.symmetric(vertical: 12.h),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: getFontColor(context), width: 1.5),
-                    borderRadius: BorderRadius.circular(8.w),
-                  ),
-                  child: Center(
-                    child: getCustomFont("Add to Cart", 14,
-                        getFontColor(context), 1,
-                        fontWeight: FontWeight.w700),
+        child: Obx(() {
+          final cartController = Get.find<CartController>();
+          // Read cartModel to trigger reactivity
+          final _cart = cartController.cartModel.value;
+          int cartQty = _getCartQuantity(product);
+          bool isInCart = cartQty > 0;
+
+          return Row(
+            children: [
+              // Left: "Add to Cart" OR quantity +/- selector
+              Expanded(
+                child: isInCart
+                    ? Container(
+                        padding: EdgeInsets.symmetric(vertical: 6.h),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: getFontColor(context), width: 1.5),
+                          borderRadius: BorderRadius.circular(8.w),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            GestureDetector(
+                              onTap: () {
+                                VariantModel? variant = _getSelectedVariant(product);
+                                if (variant == null) return;
+                                cartController.decreaseQuantity(product.id, variant.id);
+                              },
+                              child: SizedBox(
+                                width: 36.w,
+                                height: 36.w,
+                                child: Center(
+                                  child: Icon(Icons.remove, size: 20.w, color: getFontColor(context)),
+                                ),
+                              ),
+                            ),
+                            Container(
+                              width: 40.w,
+                              alignment: Alignment.center,
+                              child: getCustomFont("$cartQty", 16, getFontColor(context), 1, fontWeight: FontWeight.w700),
+                            ),
+                            GestureDetector(
+                              onTap: () {
+                                VariantModel? variant = _getSelectedVariant(product);
+                                if (variant == null) return;
+                                cartController.increaseQuantity(product.id, variant.id);
+                              },
+                              child: SizedBox(
+                                width: 36.w,
+                                height: 36.w,
+                                child: Center(
+                                  child: Icon(Icons.add, size: 20.w, color: accentColor),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    : GestureDetector(
+                        onTap: () async {
+                          VariantModel? variant = _getSelectedVariant(product);
+                          if (variant == null) return;
+                          try {
+                            final loginController = Get.find<LoginDataController>();
+                            if (loginController.currentUser.value == null || loginController.currentUser.value!.id == null) {
+                              Constant.sendToNext(context, loginRoute);
+                              return;
+                            }
+                            bool success = await cartController.addToCart(product.id, variant.id);
+                            if (success) {
+                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Added to cart!'), backgroundColor: Colors.green));
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to add to cart'), backgroundColor: Colors.red));
+                            }
+                          } catch (e) {
+                            Constant.sendToNext(context, loginRoute);
+                          }
+                        },
+                        child: Container(
+                          padding: EdgeInsets.symmetric(vertical: 12.h),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: getFontColor(context), width: 1.5),
+                            borderRadius: BorderRadius.circular(8.w),
+                          ),
+                          child: Center(
+                            child: getCustomFont("Add to Cart", 14,
+                                getFontColor(context), 1,
+                                fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ),
+              ),
+              SizedBox(width: 12.w),
+              // Right: Buy Now
+              Expanded(
+                child: GestureDetector(
+                  onTap: () async {
+                    VariantModel? variant = _getSelectedVariant(product);
+                    if (variant == null) return;
+                    try {
+                      final loginController = Get.find<LoginDataController>();
+                      if (loginController.currentUser.value == null || loginController.currentUser.value!.id == null) {
+                        Constant.sendToNext(context, loginRoute);
+                        return;
+                      }
+                      if (!isInCart) {
+                        bool success = await cartController.addToCart(product.id, variant.id);
+                        if (!success) {
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to prepare checkout'), backgroundColor: Colors.red));
+                          return;
+                        }
+                      }
+                      Constant.sendToNext(context, checkoutShippingScreenRoute);
+                    } catch (e) {
+                      Constant.sendToNext(context, loginRoute);
+                    }
+                  },
+                  child: Container(
+                    padding: EdgeInsets.symmetric(vertical: 12.h),
+                    decoration: BoxDecoration(
+                      color: ratedColor,
+                      borderRadius: BorderRadius.circular(8.w),
+                    ),
+                    child: Center(
+                      child: getCustomFont(
+                          "Buy at \u20B9${product.currentPrice.toStringAsFixed(0)}", 14,
+                          Colors.black, 1,
+                          fontWeight: FontWeight.w700),
+                    ),
                   ),
                 ),
               ),
-            ),
-            SizedBox(width: 12.w),
-            Expanded(
-              child: GestureDetector(
-                onTap: () {
-                  // Buy now logic
-                },
-                child: Container(
-                  padding: EdgeInsets.symmetric(vertical: 12.h),
-                  decoration: BoxDecoration(
-                    color: ratedColor,
-                    borderRadius: BorderRadius.circular(8.w),
-                  ),
-                  child: Center(
-                    child: getCustomFont(
-                        "Buy at ₹${product.currentPrice.toStringAsFixed(0)}", 14,
-                        Colors.black, 1,
-                        fontWeight: FontWeight.w700),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
+            ],
+          );
+        }),
       ),
     );
   }
 }
+

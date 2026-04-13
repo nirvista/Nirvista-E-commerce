@@ -10,7 +10,6 @@ import '../app/model/model_intro.dart';
 import '../app/model_ui/model_order.dart';
 import '../app/model_ui/model_popular_product.dart';
 import '../app/model_ui/model_sub_category.dart';
-import '../app/model_ui/model_dummy_product.dart';
 
 class DataFile {
   static List<ModelBottomNav> getAllBottomNavList() {

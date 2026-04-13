@@ -73,7 +73,6 @@ ThemeData getLightThemeData() {
   return ThemeData(
       scaffoldBackgroundColor: "#FAFAFA".toColor(),
       hintColor: "#A5A4AA".toColor(),
-      indicatorColor: "#F9F9F9".toColor(),
       dividerColor: "#F1F1F1".toColor(),
       textTheme: TextTheme(
         titleMedium: TextStyle(color: "#000000".toColor()),
@@ -84,7 +83,6 @@ ThemeData getLightThemeData() {
       splashColor: "#E5E5E5".toColor(),
       hoverColor: "#F7F7FF".toColor(),
       cardColor: "#FFFFFF".toColor(),
-      dialogBackgroundColor: "#FFFFFF".toColor(),
       unselectedWidgetColor: "#B9C1D3".toColor(),
       // focusColor: "#DEDEDE".toColor(),
       dividerTheme: DividerThemeData(color: "#DFDFDF".toColor()),
@@ -95,20 +93,18 @@ ThemeData getLightThemeData() {
 
 
       shadowColor: const Color.fromRGBO(131, 157, 216, 0.11999999731779099),
-      colorScheme: ColorScheme.fromSwatch().copyWith(secondary: accentColor));
+      colorScheme: ColorScheme.fromSwatch().copyWith(secondary: accentColor), dialogTheme: DialogThemeData(backgroundColor: "#FFFFFF".toColor()), tabBarTheme: TabBarThemeData(indicatorColor: "#F9F9F9".toColor()));
 }
 
 ThemeData getDarkThemeData() {
   return ThemeData(
       scaffoldBackgroundColor: "#161E2D".toColor(),
       hintColor: "#A5A4AA".toColor(),
-      indicatorColor: "#F9F9F9".toColor(),
       dividerColor: "#F1F1F1".toColor(),
 
 
       splashColor: "#161E2D".toColor(),
       hoverColor: "#21F6F7FF".toColor(),
-      dialogBackgroundColor: "#283048".toColor(),
       // focusColor: "#525E7B".toColor(),
       focusColor: Colors.transparent,
       dividerTheme: DividerThemeData(color: "#DFDFDF".toColor()),
@@ -126,7 +122,7 @@ ThemeData getDarkThemeData() {
         titleLarge: TextStyle(color: "#FFFFFF".toColor()),
         // caption: TextStyle(color: "#7C7C7C".toColor())
       ),
-      colorScheme: ColorScheme.fromSwatch().copyWith(secondary: accentColor));
+      colorScheme: ColorScheme.fromSwatch().copyWith(secondary: accentColor), dialogTheme: DialogThemeData(backgroundColor: "#283048".toColor()), tabBarTheme: TabBarThemeData(indicatorColor: "#F9F9F9".toColor()));
 }
 
 Color getAccentColor(BuildContext context) {

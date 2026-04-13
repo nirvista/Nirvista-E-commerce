@@ -10,17 +10,20 @@ import 'package:flutter_svg/svg.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:get/get.dart';
 import 'package:shimmer/shimmer.dart';
-import 'package:pet_shop/app/model_ui/model_order.dart';
-import 'package:pet_shop/base/data_file.dart';
 import '../app/model_ui/model_cart.dart';
 import '../woocommerce/model/cart_item.dart';
 import '../woocommerce/model/products.dart';
 import 'color_data.dart';
 import 'constant.dart';
 import 'fetch_pixels.dart';
-import 'get/product_data.dart';
 import 'get/route_key.dart';
 import 'get/cart_contr/cart_controller.dart';
+import 'get/login_data_controller.dart';
+import '../services/order_api.dart';
+import '../services/address_api.dart';
+import '../app/model/api_models.dart';
+import 'get/order_controller.dart';
+import 'get/cart_contr/shipping_add_controller.dart';
 
 void showCustomToast(String texts) {
   Fluttertoast.showToast(
@@ -743,128 +746,413 @@ Widget getCircleImage(BuildContext context, String imgName, double size) {
 Widget buildCommonMyOrderScreen(
     BuildContext context, double margin, Function backClick,
     {bool isBackAvailable = false, Function? refresh}) {
-  // ProductDataController productController = Get.find<ProductDataController>();
-  List<ModelOrder> orderList = DataFile.getAllOrderList();
+  return _MyOrderScreenWidget(margin: margin, backClick: backClick, isBackAvailable: isBackAvailable, refresh: refresh);
+}
 
-  return GetBuilder<ProductDataController>(
-    builder: (productController) {
-      return Column(
-        children: [
-          getDefaultHeader(context, "My Order", () {
-            Constant.backToPrev(context);
-          }, isShowSearch: false),
-          getVerSpace(20.h),
-          Expanded(
-            flex: 1,
-            child: SizedBox(
-              width: double.infinity,
-              height: double.infinity,
+void showAddressDialog(BuildContext context, {AddressModel? address, Function? onSaved}) {
+  final nameCtrl = TextEditingController(text: address?.recipientName ?? "");
+  final line1Ctrl = TextEditingController(text: address?.addressLine1 ?? "");
+  final line2Ctrl = TextEditingController(text: address?.addressLine2 ?? "");
+  final cityCtrl = TextEditingController(text: address?.city ?? "");
+  final stateCtrl = TextEditingController(text: address?.state ?? "");
+  final postalCtrl = TextEditingController(text: address?.postalCode ?? "");
+  final countryCtrl = TextEditingController(text: address?.country ?? "");
+  String label = address?.addressLabel ?? "";
+
+  showDialog(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: Text(address == null ? "Add Address" : "Edit Address"),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: "Recipient Name")),
+            StatefulBuilder(builder: (context, setState) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  getVerSpace(16.h),
+                  DropdownButtonFormField<String>(
+                    value: ['Home', 'Office', 'Other'].contains(label) ? label : null,
+                    decoration: InputDecoration(
+                      labelText: "Address Title",
+                      labelStyle: buildTextStyle(context, getFontColor(context), FontWeight.w600, 15),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 12.h),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.h)),
+                    ),
+                    items: ['Home', 'Office', 'Other'].map((String value) {
+                      return DropdownMenuItem<String>(
+                        value: value,
+                        child: getCustomFont(value, 15, getFontColor(context), 1),
+                      );
+                    }).toList(),
+                    onChanged: (String? newValue) {
+                      if (newValue != null) {
+                        setState(() {
+                          label = newValue;
+                        });
+                      }
+                    },
+                  ),
+                  getVerSpace(10.h),
+                ],
+              );
+            }),
+            TextField(controller: line1Ctrl, decoration: const InputDecoration(labelText: "Address Line 1")),
+            TextField(controller: line2Ctrl, decoration: const InputDecoration(labelText: "Address Line 2 (optional)")),
+            TextField(controller: cityCtrl, decoration: const InputDecoration(labelText: "City")),
+            TextField(controller: stateCtrl, decoration: const InputDecoration(labelText: "State")),
+            TextField(controller: postalCtrl, decoration: const InputDecoration(labelText: "Postal Code")),
+            TextField(controller: countryCtrl, decoration: const InputDecoration(labelText: "Country")),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Cancel")),
+        TextButton(
+          onPressed: () async {
+            if (label.isEmpty) {
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please select an Address Title (Home, Office, or Other)")));
+              return;
+            }
+            if (nameCtrl.text.isEmpty || line1Ctrl.text.isEmpty || cityCtrl.text.isEmpty || stateCtrl.text.isEmpty || postalCtrl.text.isEmpty) {
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please fill required fields")));
+              return;
+            }
+            
+            final loginController = Get.find<LoginDataController>();
+            final token = loginController.accessToken ?? '';
+            
+            Navigator.pop(ctx);
+            showDialog(context: context, barrierDismissible: false, builder: (_) => const Center(child: CircularProgressIndicator()));
+
+            Map<String, dynamic> res;
+            if (address == null) {
+              res = await AddressApiService.addAddress(
+                accessToken: token,
+                addressLabel: label,
+                recipientName: nameCtrl.text,
+                addressLine1: line1Ctrl.text,
+                addressLine2: line2Ctrl.text,
+                city: cityCtrl.text,
+                state: stateCtrl.text,
+                postalCode: postalCtrl.text,
+                country: countryCtrl.text,
+              );
+            } else {
+              res = await AddressApiService.updateAddress(
+                accessToken: token,
+                addressId: address.id,
+                addressLabel: label,
+                recipientName: nameCtrl.text,
+                addressLine1: line1Ctrl.text,
+                addressLine2: line2Ctrl.text,
+                city: cityCtrl.text,
+                state: stateCtrl.text,
+                postalCode: postalCtrl.text,
+                country: countryCtrl.text,
+              );
+            }
+
+            Navigator.pop(context); // hide loading
+
+            if (res['success']) {
+              final shippingController = Get.find<ShippingAddressController>();
+              await shippingController.fetchAddresses();
               
-              child: Builder(
-                builder: (context) {
-                  if (orderList.isNotEmpty) {
-                    return Container(
-                      // padding: EdgeInsets.all(20.h),
-                      // color: getCardColor(context),
-                      child: ListView.separated(
-                        padding: EdgeInsets.zero,
-                        itemBuilder: (context, index) {
-                          ModelOrder order = orderList[index];
-                          return Container(
-                            padding: EdgeInsets.symmetric(horizontal: margin,vertical: margin),
-                            color: getCardColor(context),
-                            child: InkWell(
-                              onTap: () {
-                                Constant.sendToNext(context, trackOrderScreenRoute);
-                              },
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  getCustomFont("Order ID: ${order.orderId}", 16,
-                                      getFontColor(context), 1,
-                                      fontWeight: FontWeight.w600),
-                                  6.h.verticalSpace,
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    crossAxisAlignment: CrossAxisAlignment.center,
-                                    children: [
-                                      Expanded(
-                                        flex: 1,
-                                        child: getCustomFont(
-                                            "Item(${order.item})",
-                                            16,
-                                            getFontColor(context),
-                                            1,
-                                            fontWeight: FontWeight.w400),
-                                      ),
-                                      getCustomFont(
-                                          "Total Amount:",
-                                          16,
-                                          getFontColor(context),
-                                          1,
-                                          fontWeight: FontWeight.w400),
-                                      getCustomFont(
-                                          order.amount,
-                                          16,
-                                          getFontColor(context),
-                                          1,
-                                          fontWeight: FontWeight.w600)
-                                    ],
-                                  ),
-                                  10.h.verticalSpace,
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    crossAxisAlignment: CrossAxisAlignment.center,
-                                    children: [
-                                      Expanded(
-                                        flex: 1,
-                                        child: getCustomFont(order.date, 14,
-                                            getFontColor(context), 1,
-                                            fontWeight: FontWeight.w400),
-                                      ),
-                                      getCustomFont(
-                                          order.status,
-                                          16,
-                                          Constant.getOrderStatusColor(
-                                              order.status),
-                                          1,
-                                          fontWeight: FontWeight.w500),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                        shrinkWrap: true,
-                        itemCount: orderList.length,
-                        separatorBuilder: (BuildContext context, int index) {
-                          return Container(
-                            color: getCardColor(context),
-                            child: getDivider(setColor: Colors.grey.shade300).marginSymmetric(horizontal: margin),
-                          );
-                        },
+              // If it's a new address, auto-select it
+              if (address == null && res['data'] != null) {
+                final newAddr = AddressModel.fromJson(res['data']);
+                shippingController.selectedAddress.value = newAddr;
+              }
+
+              if (onSaved != null) onSaved();
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(address == null ? "Address added!" : "Address updated!"), backgroundColor: Colors.green));
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res['message'] ?? "Failed"), backgroundColor: Colors.red));
+            }
+          },
+          child: const Text("Save"),
+        ),
+      ],
+    ),
+  );
+}
+
+void showAddressSelectorBottomSheet(BuildContext context) {
+  final shippingAddressController = Get.find<ShippingAddressController>();
+  
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: getCardColor(context),
+    isScrollControlled: true,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16.w))),
+    builder: (ctx) {
+      return Obx(() => Container(
+        padding: EdgeInsets.all(20.w),
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                getCustomFont("Select Address", 18, getFontColor(context), 1, fontWeight: FontWeight.w700),
+                IconButton(onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.close))
+              ],
+            ),
+            SizedBox(height: 16.h),
+            if (shippingAddressController.addresses.isEmpty)
+              Center(
+                child: Column(
+                  children: [
+                    getCustomFont("No addresses found", 14, getFontGreyColor(context), 1),
+                    SizedBox(height: 12.h),
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        showAddressDialog(context);
+                      },
+                      child: Container(
+                        padding: EdgeInsets.all(16.w),
+                        decoration: BoxDecoration(
+                          color: getAccentColor(context),
+                          borderRadius: BorderRadius.circular(12.w),
+                        ),
+                        child: Center(
+                          child: getCustomFont("+ Add New Address", 16, Colors.white, 1, fontWeight: FontWeight.w700),
+                        ),
                       ),
-                    );
-                  } else {
-                    return getEmptyWidget(
-                        context,
-                        "no_order.png",
-                        "No Order Yet!",
-                        "Explore more and shortlist some products.",
-                        "Add",
-                        () {});
+                    ),
+                  ],
+                ),
+              )
+            else
+              Expanded(
+                child: ListView(
+                  children: [
+                    ...shippingAddressController.addresses.map((addr) => GestureDetector(
+                      onTap: () {
+                        shippingAddressController.selectedAddress.value = addr;
+                        Navigator.pop(ctx);
+                      },
+                      child: Container(
+                        padding: EdgeInsets.all(12.w),
+                        margin: EdgeInsets.only(bottom: 8.h),
+                        decoration: BoxDecoration(
+                          color: shippingAddressController.selectedAddress.value?.id == addr.id ? getAccentColor(context).withOpacity(0.05) : Colors.transparent,
+                          border: Border.all(
+                            color: shippingAddressController.selectedAddress.value?.id == addr.id ? getAccentColor(context) : Colors.grey.shade300,
+                            width: shippingAddressController.selectedAddress.value?.id == addr.id ? 2 : 1,
+                          ),
+                          borderRadius: BorderRadius.circular(8.w),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                getCustomFont(addr.recipientName, 15, getFontColor(context), 1, fontWeight: FontWeight.w600),
+                                SizedBox(width: 8.w),
+                                Container(
+                                  padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
+                                  decoration: BoxDecoration(
+                                    color: getAccentColor(context).withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(4.w),
+                                  ),
+                                  child: getCustomFont(addr.addressLabel, 11, getAccentColor(context), 1, fontWeight: FontWeight.w600),
+                                ),
+                              ],
+                            ),
+                            SizedBox(height: 4.h),
+                            getCustomFont(addr.fullAddress, 13, getFontGreyColor(context), 2),
+                          ],
+                        ),
+                      ),
+                    )),
+                    SizedBox(height: 16.h),
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        showAddressDialog(context);
+                      },
+                      child: Container(
+                        padding: EdgeInsets.all(16.w),
+                        decoration: BoxDecoration(
+                          color: getAccentColor(context),
+                          borderRadius: BorderRadius.circular(12.w),
+                        ),
+                        child: Center(
+                          child: getCustomFont("+ Add New Address", 16, Colors.white, 1, fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ));
+    },
+  );
+}
+
+class _MyOrderScreenWidget extends StatefulWidget {
+  final double margin;
+  final Function backClick;
+  final bool isBackAvailable;
+  final Function? refresh;
+
+  const _MyOrderScreenWidget({
+    required this.margin,
+    required this.backClick,
+    this.isBackAvailable = false,
+    this.refresh,
+  });
+
+  @override
+  State<_MyOrderScreenWidget> createState() => _MyOrderScreenWidgetState();
+}
+
+class _MyOrderScreenWidgetState extends State<_MyOrderScreenWidget> {
+  final GlobalOrderController orderController = Get.find<GlobalOrderController>();
+
+  @override
+  void initState() {
+    super.initState();
+    orderController.fetchOrders();
+  }
+
+  String _monthName(int month) {
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return months[month - 1];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        getDefaultHeader(context, "My Order", () {
+          Constant.backToPrev(context);
+        }, isShowSearch: false),
+        getVerSpace(20.h),
+        Expanded(
+          flex: 1,
+          child: Obx(() {
+            if (orderController.isLoading.value) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (orderController.userOrders.isEmpty) {
+              return getEmptyWidget(
+                  context,
+                  "no_order.png",
+                  orderController.errorMessage.value.isNotEmpty ? orderController.errorMessage.value : "No Order Yet!",
+                  "Explore more and shortlist some products.",
+                  "Refresh",
+                  () {
+                    orderController.fetchOrders();
+                  });
+            }
+            return RefreshIndicator(
+              onRefresh: () => orderController.fetchOrders(),
+              child: ListView.separated(
+                padding: EdgeInsets.zero,
+                itemBuilder: (context, index) {
+                  OrderModel order = orderController.userOrders[index];
+                  String dateStr = '';
+                  if (order.createdAt.isNotEmpty) {
+                    try {
+                      final dt = DateTime.parse(order.createdAt);
+                      dateStr = "${dt.day} ${_monthName(dt.month)}, ${dt.year}";
+                    } catch (_) {
+                      dateStr = order.createdAt;
+                    }
                   }
+                  return Container(
+                    padding: EdgeInsets.symmetric(
+                        horizontal: widget.margin, vertical: widget.margin),
+                    color: getCardColor(context),
+                    child: InkWell(
+                      onTap: () async {
+                        Get.toNamed(trackOrderScreenRoute, arguments: order);
+                      },
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          getCustomFont(
+                              "Order ID: ${order.id.length > 8 ? order.id.substring(0, 8) : order.id}",
+                              16,
+                              getFontColor(context),
+                              1,
+                              fontWeight: FontWeight.w600),
+                          6.h.verticalSpace,
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Expanded(
+                                flex: 1,
+                                child: getCustomFont(
+                                    "Items(${order.items.length})",
+                                    16,
+                                    getFontColor(context),
+                                    1,
+                                    fontWeight: FontWeight.w400),
+                              ),
+                              getCustomFont("Total Amount:", 16,
+                                  getFontColor(context), 1,
+                                  fontWeight: FontWeight.w400),
+                              getCustomFont(
+                                  " \u20B9${order.totalAmount.toStringAsFixed(0)}",
+                                  16,
+                                  getFontColor(context),
+                                  1,
+                                  fontWeight: FontWeight.w600)
+                            ],
+                          ),
+                          10.h.verticalSpace,
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Expanded(
+                                flex: 1,
+                                child: getCustomFont(
+                                    dateStr, 14, getFontColor(context), 1,
+                                    fontWeight: FontWeight.w400),
+                              ),
+                              getCustomFont(
+                                  order.orderStatus,
+                                  16,
+                                  Constant.getOrderStatusColor(order.orderStatus),
+                                  1,
+                                  fontWeight: FontWeight.w500),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+                shrinkWrap: true,
+                itemCount: orderController.userOrders.length,
+                separatorBuilder: (BuildContext context, int index) {
+                  return Container(
+                    color: getCardColor(context),
+                    child: getDivider(setColor: Colors.grey.shade300)
+                        .marginSymmetric(horizontal: widget.margin),
+                  );
                 },
               ),
-            ),
-          ),
-        ],
-      );
-    },
-    init: ProductDataController(),
-  );
+            );
+          }),
+        ),
+      ],
+    );
+  }
 }
 
 Widget buildRowWidget(
@@ -4178,10 +4466,6 @@ Widget buildMyCartItem(
                         // Minus button
                         InkWell(
                           onTap: () {
-                            int qty = int.parse(product.qty ?? '1');
-                            if (qty > 1 && cartIndex >= 0 && cartIndex < controller.cartOtherInfoList.length) {
-                              controller.decreaseQuantity(cartIndex);
-                            }
                           },
                           child: Padding(
                             padding: EdgeInsets.symmetric(horizontal: 6.h),
@@ -4199,9 +4483,6 @@ Widget buildMyCartItem(
                         // Plus button
                         InkWell(
                           onTap: () {
-                            if (cartIndex >= 0 && cartIndex < controller.cartOtherInfoList.length) {
-                              controller.increaseQuantity(cartIndex);
-                            }
                           },
                           child: Padding(
                             padding: EdgeInsets.symmetric(horizontal: 6.h),
@@ -5423,6 +5704,7 @@ showGetDeleteDialog(
                           true,
                           btnTextCancel,
                           getAccentColor(context), () {
+                        Get.back();
                         if (functionCancel != null) {
                           functionCancel();
                         }
@@ -5440,6 +5722,7 @@ showGetDeleteDialog(
                           true,
                           btnText,
                           Colors.white, () {
+                        Get.back();
                         function();
                       },
                           EdgeInsets.zero)),

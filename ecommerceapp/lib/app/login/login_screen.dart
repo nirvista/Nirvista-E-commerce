@@ -8,7 +8,6 @@ import '../../base/color_data.dart';
 import '../../base/constant.dart';
 import '../../base/fetch_pixels.dart';
 import '../../base/get/route_key.dart';
-import '../../base/get/storage.dart';
 import '../../base/widget_utils.dart';
 import '../../services/loginregisterapi.dart';
 

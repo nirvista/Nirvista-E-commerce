@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
-import 'package:pet_shop/app/model_ui/model_cart.dart';
-import 'package:pet_shop/base/data_file.dart';
-import 'package:pet_shop/base/get/storage.dart';
+import 'package:pet_shop/app/model/api_models.dart';
 
 import '../../base/color_data.dart';
 import '../../base/constant.dart';
 import '../../base/get/bottom_selection_controller.dart';
 import '../../base/get/cart_contr/cart_controller.dart';
+import '../../base/get/login_data_controller.dart';
 import '../../base/get/route_key.dart';
 import '../../base/widget_utils.dart';
 
@@ -52,14 +51,84 @@ class _CartCommonWidgetState extends State<CartCommonWidget> {
   }
 
   TextEditingController couponController = TextEditingController();
+  final cartController = Get.find<CartController>();
+  final loginController = Get.find<LoginDataController>();
+  final bottomController = Get.find<BottomItemSelectionController>();
 
-  String inputCoupon = '';
+  RxInt selectedIndex = 0.obs;
 
-  List<ModelCart> cartList = DataFile.getAllCartList();
+  @override
+  void initState() {
+    super.initState();
+    // Refresh cart when opened
+    cartController.fetchCart();
+  }
 
-  BottomItemSelectionController bottomController = Get.find<BottomItemSelectionController>();
+  Widget _buildRealCartItem(BuildContext context, CartItemModel item) {
+    String name = item.product?.title ?? "Unknown Product";
+    String variantName = item.variant?.variantName ?? "";
+    double price = item.variant?.discountPrice != null && item.variant!.discountPrice! > 0 
+           ? item.variant!.discountPrice! 
+           : (item.variant?.price ?? 0.0);
+    String img = (item.variant?.images.isNotEmpty == true) ? item.variant!.images.first : (item.product?.imageUrl ?? "");
 
-  RxInt selectedIndex = 2.obs;
+    return GestureDetector(
+      onTap: () => Constant.sendToNext(context, productDetailScreenRoute),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            width: 100.w,
+            height: 100.w,
+            decoration: BoxDecoration(
+               borderRadius: BorderRadius.circular(8.w),
+               image: img.isNotEmpty ? DecorationImage(image: NetworkImage(img), fit: BoxFit.cover) : null,
+               color: Colors.grey.shade200,
+            ),
+          ),
+          SizedBox(width: 12.w),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                 getCustomFont(name, 16, getFontColor(context), 2, fontWeight: FontWeight.w600),
+                 SizedBox(height: 4.h),
+                 getCustomFont(variantName, 12, getFontHint(context), 1),
+                 SizedBox(height: 8.h),
+                 Row(
+                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                   children: [
+                     getCustomFont("₹${price.toStringAsFixed(0)}", 16, getAccentColor(context), 1, fontWeight: FontWeight.w700),
+                     Row(
+                       children: [
+                         InkWell(
+                           onTap: () => cartController.decreaseQuantity(item.productId, item.variantId),
+                           child: Container(
+                             padding: EdgeInsets.all(4.w),
+                             child: Icon(Icons.remove_circle_outline, size: 24.w, color: getFontHint(context)),
+                           )
+                         ),
+                         SizedBox(width: 8.w),
+                         getCustomFont("${item.quantity}", 16, getFontColor(context), 1, fontWeight: FontWeight.bold),
+                         SizedBox(width: 8.w),
+                         InkWell(
+                           onTap: () => cartController.increaseQuantity(item.productId, item.variantId),
+                           child: Container(
+                             padding: EdgeInsets.all(4.w),
+                             child: Icon(Icons.add_circle_outline, size: 24.w, color: getAccentColor(context)),
+                           )
+                         ),
+                       ],
+                     )
+                   ]
+                 )
+              ]
+            )
+          )
+        ]
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -67,28 +136,30 @@ class _CartCommonWidgetState extends State<CartCommonWidget> {
     return SizedBox(
         height: double.infinity,
         width: double.infinity,
-        child: GetBuilder<CartController>(
-          init: CartController(),
-          builder: (controller) {
-            if (cartList.isNotEmpty) {
-              return ListView(
-                padding: EdgeInsets.zero,
+        child: Obx(
+          () {
+            if (cartController.isLoading.value && cartController.cartModel.value == null) {
+               return const Center(child: CircularProgressIndicator());
+            }
+            if (cartController.cartCount > 0) {
+              return Column(
                 children: [
-                  Container(
+                  Expanded(
+                    child: ListView(
+                      padding: EdgeInsets.zero,
+                      children: [
+                        Container(
                     padding: EdgeInsets.all(20.h),
                     margin: EdgeInsets.symmetric(vertical: 20.h),
                     color: getCardColor(context),
                     child: ListView.separated(
                       itemBuilder: (context, index) {
-                        ModelCart cart = cartList[index];
-                        return buildMyCartItem(
-                            context,
-                            cart,
-                            112.h,
-                                () {Constant.sendToNext(context, productDetailScreenRoute);});
+                        CartItemModel cartItem = cartController.cartModel.value!.items[index];
+                        return _buildRealCartItem(context, cartItem);
                       },
-                      itemCount: cartList.length,
+                      itemCount: cartController.cartCount,
                       shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
                       padding: EdgeInsets.zero,
                       separatorBuilder:
                           (BuildContext context, int index) {
@@ -242,149 +313,59 @@ class _CartCommonWidgetState extends State<CartCommonWidget> {
                         buildSubtotalRow(
                             context,
                             "Subtotal",
-                            "\$80.00"),
-                        getDivider(setColor: Colors.grey.shade300)
-                            .marginSymmetric(vertical: 14.h),
-                        getCustomFont(
-                            'Shipping', 16, getFontColor(context), 1,
-                            fontWeight: FontWeight.w500,
-                            textAlign: TextAlign.start),
-                        getVerSpace(14.h),
-                        ListView.builder(
-                          shrinkWrap: true,
-                          padding: EdgeInsets.zero,
-                          physics:
-                          const NeverScrollableScrollPhysics(),
-                          itemCount: 3,
-                          itemBuilder: (context, index) {
-                            List<String> shippingMtd = ["Flat Rate","Local Pickup","Free Shipping (On order up to \$40.00"];
-                            // ModelShippingMethod shippingMtd =
-                            // shippingMethods[index];
-                            return Row(
-                              children: [
-                                ObxValue((p0) => InkWell(
-                                  onTap: () {
-                                    selectedIndex.value = index;
-                                    // cartController
-                                    //     .selectedShippingMethod
-                                    //     .value = shippingMtd;
-                                    // cartController.addShippingLines(ShippingLines(
-                                    //     methodId:
-                                    //     shippingMtd
-                                    //         .methodId,
-                                    //     methodTitle:
-                                    //     shippingMtd
-                                    //         .methodTitle,
-                                    //     total: shippingMtd
-                                    //         .settings!
-                                    //         .cost!
-                                    //         .value));
-                                    //
-                                    // storageController
-                                    //     .selectedShipping(
-                                    //     shippingMtd
-                                    //         .methodTitle);
-                                    //
-                                    // storageController
-                                    //     .selectedShippingRate(
-                                    //     shippingMtd
-                                    //         .settings!
-                                    //         .cost!
-                                    //         .value);
-                                  },
-                                  child: Container(
-                                    height: 20.h,
-                                    width: 20.h,
-                                    decoration: getButtonDecoration(
-                                        (selectedIndex.value == index)?getAccentColor(
-                                            context):Colors.transparent,
-                                        withBorder: true,
-                                        borderColor:
-                                        getFontHint(context),
-                                        withCorners: true,
-                                        corner: 6.h),
-                                    child: Center(
-                                      child: getSvgImage(context, "right.svg", 12.h,),
-                                    ),
-                                  ),
-                                ), selectedIndex),
-                                getHorSpace(8.h),
-                                getCustomFont(
-                                        shippingMtd[index],
-                                    14,
-                                    getFontColor(context),
-                                    1,
-                                    fontWeight:
-                                    FontWeight.w400,
-                                    textAlign:
-                                    TextAlign.start)
-                              ],
-                            ).marginSymmetric(vertical: 8.h);
-                          },
-                        ),
-                        // getDivider(setColor: Colors.grey.shade300)
-                        //     .marginSymmetric(vertical: 16.h),
-                        // buildSubtotalRow(
-                        //     context,
-                        //     "Shipping Charge",
-                        //     // "Tax ${(taxModel.value != null) ? taxModel.value!.rate!.replaceRange(1, 6, "") : ""}%",
-                        //     "+\$2.00"),
-                        getDivider(setColor: Colors.grey.shade300)
-                            .marginSymmetric(vertical: 14.h),
-                        buildSubtotalRow(
-                            context,
-                            "Tax",
-                            // "Tax ${(taxModel.value != null) ? taxModel.value!.rate!.replaceRange(1, 6, "") : ""}%",
-                            "+\$2.00",),
+                            "₹${cartController.cartSubTotal.toStringAsFixed(0)}"),
                         getDivider(setColor: Colors.grey.shade300)
                             .marginSymmetric(vertical: 14.h),
                         buildSubtotalRow(
                             context,
                             "Discount",
-                            "-\$5.00"),
+                            "-₹${cartController.promoPrice.value.toStringAsFixed(0)}"),
                         getDivider(setColor: Colors.grey.shade300)
                             .marginSymmetric(vertical: 14.h),
                         buildTotalRow(
                           context,
                           "Total",
-                          "\$77.00",
+                          "₹${cartController.cartTotal.toStringAsFixed(0)}",
                         ),
+                      ]
+                    ),
+                  ),
+                  InkWell(
+                     onTap: () async {
+                        await cartController.clearCartAction();
+                     },
+                     child: Container(
+                        alignment: Alignment.center,
+                        padding: EdgeInsets.symmetric(vertical: 10.h),
+                        child: getCustomFont("Clear Cart", 16, Colors.red, 1, fontWeight: FontWeight.w600)
+                     )
+                  ),
+                  getVerSpace(20.h),
                       ],
                     ),
                   ),
-                  getRowButtonFigma(
-                      context,
-                      getAccentColor(context),
-                      true,
-                      "3 item","\$30.00","Continue",
-                      Colors.white,
-                          () {
-                        // if (cartController.selectedShippingMethod.value !=
-                        //     null) {
-                        //   if (homeController.currentCustomer != null) {
-                            (isLoggedIn)?Constant.sendToNext(context, checkoutShippingScreenRoute):
-                            Constant.sendToNext(
-                                context, loginRoute);
-                        //   } else {
-                        //     Constant.sendToNext(context, loginRoute);
-                        //   }
-                        // } else {
-                        //   showCustomToast("Select Valid Shipping Method");
-                        // }
-                      },
-                      EdgeInsets.symmetric(horizontal: 20.h)),
-                  getVerSpace(30.h),
+                  Container(
+                     color: getScaffoldColor(context),
+                     padding: EdgeInsets.only(bottom: 30.h, top: 10.h),
+                     child: getRowButtonFigma(
+                        context,
+                        getAccentColor(context),
+                        true,
+                        "${cartController.cartCount} item","₹${cartController.cartTotal.toStringAsFixed(0)}","Continue",
+                        Colors.white,
+                            () {
+                               if (loginController.currentUser.value != null && loginController.currentUser.value!.id != null) {
+                                  Constant.sendToNext(context, checkoutShippingScreenRoute);
+                               } else {
+                                  Constant.sendToNext(context, loginRoute);
+                               }
+                        },
+                        EdgeInsets.symmetric(horizontal: 20.h)),
+                  ),
                 ],
               );
             } else {
-              return getEmptyWidget(
-                  context,
-                  "empty_card.svg",
-                  "Your Cart is Empty Yet!",
-                  "Explore more and shortlist some products.",
-                  "Go to Shop", () {
-                bottomController.changePos(0);
-              });
+              return emptyCard(context);
             }
           },
         )

@@ -4,6 +4,7 @@ class ProductModel {
   final String? description;
   final String categoryId;
   final String brandId;
+  final String brandName;
   final String? material;
   final double rating;
   final List<VariantModel> variants;
@@ -14,18 +15,25 @@ class ProductModel {
     this.description,
     required this.categoryId,
     required this.brandId,
+    this.brandName = '',
     this.material,
     required this.rating,
     this.variants = const [],
   });
 
   factory ProductModel.fromJson(Map<String, dynamic> json) {
+    // Try to get brand name from nested 'brand' object if available
+    String parsedBrandName = '';
+    if (json['brand'] != null && json['brand'] is Map) {
+      parsedBrandName = json['brand']['name'] ?? '';
+    }
     return ProductModel(
       id: json['id'] ?? '',
       title: json['title'] ?? '',
       description: json['description'],
       categoryId: json['categoryId'] ?? '',
       brandId: json['brandId'] ?? '',
+      brandName: parsedBrandName,
       material: json['material'],
       rating: json['rating'] != null ? (json['rating'] as num).toDouble() : 0.0,
       variants: json['variants'] != null
@@ -143,5 +151,186 @@ class BrandModel {
       description: json['description'],
       logoUrl: json['logoUrl'],
     );
+  }
+}
+
+class CartItemModel {
+  final String productId;
+  final String variantId;
+  final int quantity;
+  final ProductModel? product;
+  final VariantModel? variant;
+
+  CartItemModel({
+    required this.productId,
+    required this.variantId,
+    required this.quantity,
+    this.product,
+    this.variant,
+  });
+
+  factory CartItemModel.fromJson(Map<String, dynamic> json) {
+    return CartItemModel(
+      productId: json['productId'] ?? '',
+      variantId: json['variant'] != null ? (json['variant']['id'] ?? '') : (json['variantId'] ?? ''),
+      quantity: json['quantity'] ?? 0,
+      product: json['product'] != null ? ProductModel.fromJson(json['product']) : null,
+      variant: json['variant'] != null ? VariantModel.fromJson(json['variant']) : null,
+    );
+  }
+}
+
+class CartModel {
+  final String cartId;
+  final String userId;
+  final List<CartItemModel> items;
+
+  CartModel({
+    required this.cartId,
+    required this.userId,
+    this.items = const [],
+  });
+
+  factory CartModel.fromJson(Map<String, dynamic> json) {
+    return CartModel(
+      cartId: json['cartId'] ?? '',
+      userId: json['userId'] ?? '',
+      items: json['items'] != null
+          ? (json['items'] as List).map((i) => CartItemModel.fromJson(i)).toList()
+          : [],
+    );
+  }
+}
+
+class OrderItemModel {
+  final String productId;
+  final String variantId;
+  final int quantity;
+  final double priceAtPurchase;
+  final ProductModel? product;
+  final VariantModel? variant;
+
+  OrderItemModel({
+    required this.productId,
+    required this.variantId,
+    required this.quantity,
+    required this.priceAtPurchase,
+    this.product,
+    this.variant,
+  });
+
+  factory OrderItemModel.fromJson(Map<String, dynamic> json) {
+    return OrderItemModel(
+      productId: json['productId'] ?? '',
+      variantId: json['variantId'] ?? '',
+      quantity: json['quantity'] ?? 0,
+      priceAtPurchase: json['priceAtPurchase'] != null ? (json['priceAtPurchase'] as num).toDouble() : 0.0,
+      product: json['product'] != null ? ProductModel.fromJson(json['product']) : null,
+      variant: json['variant'] != null ? VariantModel.fromJson(json['variant']) : null,
+    );
+  }
+}
+
+class OrderModel {
+  final String id;
+  final String userId;
+  final String addressId;
+  final double totalAmount;
+  String orderStatus;
+  final String paymentMethod;
+  final String paymentStatus;
+  final String createdAt;
+  final String? shippingAddress;
+  final List<OrderItemModel> items;
+
+  OrderModel({
+    required this.id,
+    required this.userId,
+    required this.addressId,
+    required this.totalAmount,
+    required this.orderStatus,
+    required this.paymentMethod,
+    required this.paymentStatus,
+    required this.createdAt,
+    this.shippingAddress,
+    this.items = const [],
+  });
+
+  factory OrderModel.fromJson(Map<String, dynamic> json) {
+    String? derivedAddr;
+    if (json['address'] != null && json['address'] is Map) {
+      final a = json['address'];
+      derivedAddr = "${a['addressLine1'] ?? ''}${a['addressLine2'] != null ? ', ' + a['addressLine2'] : ''}, ${a['city'] ?? ''}, ${a['state'] ?? ''} - ${a['postal_code'] ?? ''}, ${a['country'] ?? ''}";
+    }
+    return OrderModel(
+      id: json['id'] ?? '',
+      userId: json['userId'] ?? '',
+      addressId: json['addressId'] ?? '',
+      totalAmount: json['totalAmount'] != null ? (json['totalAmount'] as num).toDouble() : 0.0,
+      orderStatus: json['orderStatus'] ?? 'pending',
+      paymentMethod: json['paymentMethod'] ?? 'COD',
+      paymentStatus: json['paymentStatus'] ?? 'pending',
+      createdAt: json['createdAt'] ?? '',
+      shippingAddress: derivedAddr,
+      items: json['items'] != null
+          ? (json['items'] as List).map((i) => OrderItemModel.fromJson(i)).toList()
+          : [],
+    );
+  }
+}
+
+class AddressModel {
+  final String id;
+  final String userId;
+  final String addressLabel;
+  final String recipientName;
+  final String addressLine1;
+  final String? addressLine2;
+  final String city;
+  final String state;
+  final String postalCode;
+  final String country;
+  final bool isDefaultBilling;
+  final bool isDefaultShipping;
+
+  AddressModel({
+    required this.id,
+    required this.userId,
+    required this.addressLabel,
+    required this.recipientName,
+    required this.addressLine1,
+    this.addressLine2,
+    required this.city,
+    required this.state,
+    required this.postalCode,
+    required this.country,
+    this.isDefaultBilling = false,
+    this.isDefaultShipping = false,
+  });
+
+  factory AddressModel.fromJson(Map<String, dynamic> json) {
+    return AddressModel(
+      id: json['id'] ?? '',
+      userId: json['userId'] ?? '',
+      addressLabel: json['addressLabel'] ?? 'Home',
+      recipientName: json['recipientName'] ?? '',
+      addressLine1: json['addressLine1'] ?? '',
+      addressLine2: json['addressLine2'],
+      city: json['city'] ?? '',
+      state: json['state'] ?? '',
+      postalCode: json['postal_code'] ?? '',
+      country: json['country'] ?? '',
+      isDefaultBilling: json['isDefaultBilling'] ?? false,
+      isDefaultShipping: json['isDefaultShipping'] ?? false,
+    );
+  }
+
+  String get fullAddress {
+    String addr = addressLine1;
+    if (addressLine2 != null && addressLine2!.isNotEmpty) {
+      addr += ', $addressLine2';
+    }
+    addr += ', $city, $state - $postalCode, $country';
+    return addr;
   }
 }

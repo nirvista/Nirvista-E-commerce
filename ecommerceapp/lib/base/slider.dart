@@ -363,20 +363,20 @@ class Slider extends StatefulWidget {
   /// widget.
   ///
   /// If [mouseCursor] is a [MaterialStateProperty<MouseCursor>],
-  /// [MaterialStateProperty.resolve] is used for the following [MaterialState]s:
+  /// [WidgetStateProperty.resolve] is used for the following [WidgetState]s:
   ///
-  ///  * [MaterialState.dragged].
-  ///  * [MaterialState.hovered].
-  ///  * [MaterialState.focused].
-  ///  * [MaterialState.disabled].
+  ///  * [WidgetState.dragged].
+  ///  * [WidgetState.hovered].
+  ///  * [WidgetState.focused].
+  ///  * [WidgetState.disabled].
   /// {@endtemplate}
   ///
   /// If null, then the value of [SliderThemeData.mouseCursor] is used. If that
-  /// is also null, then [MaterialStateMouseCursor.clickable] is used.
+  /// is also null, then [WidgetStateMouseCursor.clickable] is used.
   ///
   /// See also:
   ///
-  ///  * [MaterialStateMouseCursor], which can be used to create a [MouseCursor]
+  ///  * [WidgetStateMouseCursor], which can be used to create a [MouseCursor]
   ///    that is also a [MaterialStateProperty<MouseCursor>].
   final MouseCursor? mouseCursor;
 
@@ -687,13 +687,13 @@ class _SliderState extends State<Slider> with TickerProviderStateMixin {
         color: theme.colorScheme.onPrimary,
       ),
     );
-    final Set<MaterialState> states = <MaterialState>{
-      if (!_enabled) MaterialState.disabled,
-      if (_hovering) MaterialState.hovered,
-      if (_focused) MaterialState.focused,
-      if (_dragging) MaterialState.dragged,
+    final Set<WidgetState> states = <WidgetState>{
+      if (!_enabled) WidgetState.disabled,
+      if (_hovering) WidgetState.hovered,
+      if (_focused) WidgetState.focused,
+      if (_dragging) WidgetState.dragged,
     };
-    final MouseCursor effectiveMouseCursor = MaterialStateProperty.resolveAs<MouseCursor?>(widget.mouseCursor, states)
+    final MouseCursor effectiveMouseCursor = WidgetStateProperty.resolveAs<MouseCursor?>(widget.mouseCursor, states)
         ?? sliderTheme.mouseCursor?.resolve(states)
         ?? WidgetStateMouseCursor.clickable.resolve(states);
 
@@ -1144,12 +1144,11 @@ class _RenderSlider extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
         return isDiscrete;
       case ShowValueIndicator.onlyForContinuous:
         return !isDiscrete;
-      case ShowValueIndicator.always:
+      case ShowValueIndicator.onDrag:
         return true;
       case ShowValueIndicator.never:
         return false;
-      case ShowValueIndicator.onDrag:
-        return false;
+      case ShowValueIndicator.always:
       case ShowValueIndicator.alwaysVisible:
         return true;
     }

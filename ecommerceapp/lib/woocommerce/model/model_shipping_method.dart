@@ -2,7 +2,6 @@
 import 'dart:convert';
 
 
-import 'dart:convert';
 
 List<ModelShippingMethod> modelShippingMethodFromJson(String str) => List<ModelShippingMethod>.from(json.decode(str).map((x) => ModelShippingMethod.fromJson(x)));
 

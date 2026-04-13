@@ -1,7 +1,6 @@
 import 'package:get/get.dart';
 import 'package:pet_shop/base/get/home_controller.dart';
 import 'package:pet_shop/base/get/storage.dart';
-import 'package:pet_shop/base/widget_utils.dart';
 import 'package:pet_shop/woocommerce/model/user.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';

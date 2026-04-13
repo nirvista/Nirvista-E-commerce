@@ -7,7 +7,6 @@ import 'package:pet_shop/base/fetch_pixels.dart';
 import 'package:pet_shop/base/get/bottom_selection_controller.dart';
 import 'package:pet_shop/base/get/login_data_controller.dart';
 import 'package:pet_shop/base/get/route_key.dart';
-import 'package:pet_shop/base/get/storage.dart';
 import 'package:pet_shop/base/widget_utils.dart';
 
 // ignore: must_be_immutable
