@@ -18,20 +18,28 @@ const Order = sequelize.define("Order", {
         references: { model: 'UserAddresses', key: 'id' }
     },
     totalAmount: {
-        type: DataTypes.FLOAT,
+        type: DataTypes.DECIMAL(10, 2),
         allowNull: false,
     },
     orderStatus: {
-        type: DataTypes.ENUM('pending', 'processing', 'shipped', 'delivered', 'cancelled', 'return_requested', 'returned'),
-        defaultValue: 'pending',
+        type: DataTypes.ENUM('processing', 'reserved', 'confirmed', 'shipped', 'delivered', 'cancelled', 'return_requested', 'returned'),
+        defaultValue: 'processing',
     },
     paymentStatus: {
-        type: DataTypes.ENUM('pending', 'paid', 'failed', 'refund_initiated', 'refunded'),
+        type: DataTypes.ENUM('pending', 'reserved', 'paid', 'failed', 'refund_initiated', 'refunded'),
         defaultValue: 'pending',
     },
     paymentMethod: {
-        type: DataTypes.ENUM('debit card', 'credit card', 'COD', 'stripe', 'razorpay'),
-        defaultValue: 'COD',
+        type: DataTypes.ENUM('online', 'cod'),
+        defaultValue: 'cod',
+    },
+    razorpayOrderId: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
+    razorpayPaymentId: {
+        type: DataTypes.STRING,
+        allowNull: true
     }
 }, { tableName: 'Orders' });
 
