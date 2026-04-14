@@ -7,13 +7,13 @@ import 'package:pet_shop/base/constant.dart';
 import 'package:pet_shop/base/fetch_pixels.dart';
 import 'package:pet_shop/base/get/storage_controller.dart';
 import 'package:pet_shop/base/widget_utils.dart';
-import 'package:pet_shop/base/pref_data.dart';
 import '../../app/model/api_models.dart';
 import '../../base/get/login_data_controller.dart';
 import '../../base/get/route_key.dart';
 import '../../base/get/cart_contr/cart_controller.dart';
 import '../../base/get/cart_contr/shipping_add_controller.dart';
 import '../../services/brand_api.dart';
+import 'package:pet_shop/base/get/wishlist_controller.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   const ProductDetailScreen({Key? key}) : super(key: key);
@@ -25,6 +25,11 @@ class ProductDetailScreen extends StatefulWidget {
 class _ProductDetailScreen extends State<ProductDetailScreen>
     with TickerProviderStateMixin {
   StorageController storageController = Get.find<StorageController>();
+
+  // ── NEW: single shared controller ────────────────────────────────────
+  WishlistController wishlistController = Get.find<WishlistController>();
+  // ─────────────────────────────────────────────────────────────────────
+
   RxString selectedColor = "".obs;
   RxString selectedSize = "".obs;
   RxBool isWishlisted = false.obs;
@@ -85,22 +90,22 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
 
     if (product == null) {
       return Scaffold(
-        appBar: AppBar(title: Text("Error")),
+        appBar: AppBar(title: const Text("Error")),
         body: Center(
-          child: getCustomFont("Product not found or not mapped", 16, getFontColor(context), 1),
+          child: getCustomFont(
+              "Product not found or not mapped", 16, getFontColor(context), 1),
         ),
       );
     }
 
     double margin = FetchPixels.getDefaultHorSpaceFigma(context);
 
-    // Extract unique colors and sizes from variants
     List<String> uniqueColors = product.variants
         .where((v) => v.color != null && v.color!.isNotEmpty)
         .map((v) => v.color!)
         .toSet()
         .toList();
-        
+
     List<String> uniqueSizes = product.variants
         .where((v) => v.size != null && v.size!.isNotEmpty)
         .map((v) => v.size!)
@@ -112,49 +117,43 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
       body: SafeArea(
         child: Column(
           children: [
-            // Top Bar
             _buildTopBar(context, margin),
-            // Scrollable Content
             Expanded(
               child: SingleChildScrollView(
                 child: Column(
                   children: [
-                    // Product Image
                     _buildProductImage(context, product, margin),
                     SizedBox(height: 16.h),
-                    // Rating Pill
                     _buildRatingPill(context, product, margin),
                     SizedBox(height: 16.h),
-                    // Colors Section
                     if (uniqueColors.isNotEmpty)
                       _buildColorsSection(context, product, uniqueColors, margin),
-                    // Sizes Section
                     if (uniqueSizes.isNotEmpty)
                       _buildSizesSection(context, product, uniqueSizes, margin),
-                    // Brand and Price Info
                     _buildBrandAndPriceSection(context, product, margin),
                     SizedBox(height: 16.h),
-                    // Delivery Details
                     _buildDeliveryDetails(context, product, margin),
                     SizedBox(height: 16.h),
-                    // Trust Badges
                     _buildTrustBadges(context, margin),
                     SizedBox(height: 16.h),
-                    // Description
-                    if (product.description != null && product.description!.isNotEmpty)
+                    if (product.description != null &&
+                        product.description!.isNotEmpty)
                       _buildDescriptionSection(context, product, margin),
                     SizedBox(height: 20.h),
                   ],
                 ),
               ),
             ),
-            // Bottom Buttons
             _buildBottomButtons(context, product),
           ],
         ),
       ),
     );
   }
+
+  // ═══════════════════════════════════════════════════════
+  // TOP BAR
+  // ═══════════════════════════════════════════════════════
 
   Widget _buildTopBar(BuildContext context, double margin) {
     return Container(
@@ -210,8 +209,16 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
     );
   }
 
+  // ═══════════════════════════════════════════════════════
+  // PRODUCT IMAGE — heart button wired to WishlistController
+  // ═══════════════════════════════════════════════════════
+
   Widget _buildProductImage(
       BuildContext context, ProductModel product, double margin) {
+    // The first variant id (if available) tells the API which variant to save.
+    final String? firstVariantId =
+        product.variants.isNotEmpty ? product.variants.first.id : null;
+
     return Stack(
       children: [
         Container(
@@ -220,50 +227,73 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
           color: getGreyCardColor(context),
           child: ClipRRect(
             child: CachedNetworkImage(
-              imageUrl: product.imageUrl.isNotEmpty ? product.imageUrl : "https://placehold.co/400",
+              imageUrl: product.imageUrl.isNotEmpty
+                  ? product.imageUrl
+                  : "https://placehold.co/400",
               fit: BoxFit.cover,
-              placeholder: (context, url) => Center(
-                child: CircularProgressIndicator(color: accentColor),
-              ),
+              placeholder: (context, url) =>
+                  Center(child: CircularProgressIndicator(color: accentColor)),
               errorWidget: (context, url, error) =>
                   Icon(Icons.image_not_supported, size: 50.w),
             ),
           ),
         ),
+
+        // ── Heart button — observes WishlistController ──
         Positioned(
           top: 12.h,
           right: 12.w,
           child: Obx(
-            () => GestureDetector(
-              onTap: () => _toggleWishlist(product.id),
-              child: Container(
-                width: 48.w,
-                height: 48.w,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.2),
-                      blurRadius: 8.w,
-                      offset: Offset(0, 2),
-                    ),
-                  ],
+            () {
+              final wished = wishlistController.isWishlisted(product.id);
+              return GestureDetector(
+                onTap: () => wishlistController.toggleWishlist(
+                  product.id,
+                  variantId: firstVariantId,
                 ),
-                child: Center(
-                  child: Icon(
-                    isWishlisted.value ? Icons.favorite : Icons.favorite_border,
-                    color: isWishlisted.value ? accentColor : getFontGreyColor(context),
-                    size: 24.w,
+                child: Container(
+                  width: 48.w,
+                  height: 48.w,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.2),
+                        blurRadius: 8.w,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Center(
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 250),
+                      transitionBuilder: (child, animation) => ScaleTransition(
+                        scale: animation,
+                        child: child,
+                      ),
+                      child: Icon(
+                        wished ? Icons.favorite : Icons.favorite_border,
+                        key: ValueKey(wished),
+                        color: wished
+                            ? accentColor
+                            : getFontGreyColor(context),
+                        size: 24.w,
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ),
+              );
+            },
           ),
         ),
       ],
     );
   }
+
+  // ═══════════════════════════════════════════════════════
+  // RATING PILL
+  // ═══════════════════════════════════════════════════════
 
   Widget _buildRatingPill(
       BuildContext context, ProductModel product, double margin) {
@@ -279,32 +309,31 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
         children: [
           Icon(Icons.star, color: ratedColor, size: 14.w),
           SizedBox(width: 4.w),
-          getCustomFont(product.rating.toStringAsFixed(1),
-              13, getFontColor(context), 1,
+          getCustomFont(product.rating.toStringAsFixed(1), 13,
+              getFontColor(context), 1,
               fontWeight: FontWeight.w700),
           SizedBox(width: 8.w),
-          Container(
-            width: 1.w,
-            height: 14.h,
-            color: dividerColor,
-          ),
+          Container(width: 1.w, height: 14.h, color: dividerColor),
         ],
       ),
     );
   }
 
-  Widget _buildColorsSection(
-      BuildContext context, ProductModel product, List<String> colors, double margin) {
+  // ═══════════════════════════════════════════════════════
+  // COLORS
+  // ═══════════════════════════════════════════════════════
+
+  Widget _buildColorsSection(BuildContext context, ProductModel product,
+      List<String> colors, double margin) {
     return Container(
       margin: EdgeInsets.symmetric(horizontal: margin, vertical: 12.h),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Obx(
-            () => getCustomFont(
-                "Selected Color: ${selectedColor.value}", 14, getFontColor(context), 1,
-                fontWeight: FontWeight.w600),
-          ),
+          Obx(() => getCustomFont(
+              "Selected Color: ${selectedColor.value}", 14,
+              getFontColor(context), 1,
+              fontWeight: FontWeight.w600)),
           SizedBox(height: 12.h),
           SizedBox(
             height: 60.w,
@@ -312,35 +341,34 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
               scrollDirection: Axis.horizontal,
               itemCount: colors.length,
               itemBuilder: (context, index) {
-                String color = colors[index];
-                return Obx(
-                  () => GestureDetector(
-                    onTap: () {
-                      selectedColor.value = color;
-                      storageController.setSelectedColor(color);
-                    },
-                    child: Container(
-                      width: 60.w,
-                      height: 60.w,
-                      margin: EdgeInsets.only(right: 12.w),
-                      decoration: BoxDecoration(
-                        border: Border.all(
-                          color: selectedColor.value == color
-                              ? accentColor
-                              : dividerColor,
-                          width: selectedColor.value == color ? 3 : 1,
+                final color = colors[index];
+                return Obx(() => GestureDetector(
+                      onTap: () {
+                        selectedColor.value = color;
+                        storageController.setSelectedColor(color);
+                      },
+                      child: Container(
+                        width: 60.w,
+                        height: 60.w,
+                        margin: EdgeInsets.only(right: 12.w),
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: selectedColor.value == color
+                                ? accentColor
+                                : dividerColor,
+                            width: selectedColor.value == color ? 3 : 1,
+                          ),
+                          borderRadius: BorderRadius.circular(10.w),
+                          color: getGreyCardColor(context),
                         ),
-                        borderRadius: BorderRadius.circular(10.w),
-                        color: getGreyCardColor(context),
+                        child: Center(
+                          child: getCustomFont(
+                              color, 12, getFontColor(context), 1,
+                              fontWeight: FontWeight.w600,
+                              textAlign: TextAlign.center),
+                        ),
                       ),
-                      child: Center(
-                        child: getCustomFont(color, 12, getFontColor(context), 1,
-                            fontWeight: FontWeight.w600,
-                            textAlign: TextAlign.center),
-                      ),
-                    ),
-                  ),
-                );
+                    ));
               },
             ),
           ),
@@ -349,8 +377,12 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
     );
   }
 
-  Widget _buildSizesSection(
-      BuildContext context, ProductModel product, List<String> sizes, double margin) {
+  // ═══════════════════════════════════════════════════════
+  // SIZES
+  // ═══════════════════════════════════════════════════════
+
+  Widget _buildSizesSection(BuildContext context, ProductModel product,
+      List<String> sizes, double margin) {
     return Container(
       margin: EdgeInsets.symmetric(horizontal: margin, vertical: 12.h),
       child: Column(
@@ -359,55 +391,55 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              getCustomFont(
-                  "Select Size", 14, getFontColor(context), 1,
+              getCustomFont("Select Size", 14, getFontColor(context), 1,
                   fontWeight: FontWeight.w600),
               GestureDetector(
                 onTap: () {},
-                child: getCustomFont(
-                    "Size Chart", 12, accentColor, 1,
+                child: getCustomFont("Size Chart", 12, accentColor, 1,
                     fontWeight: FontWeight.w600),
               ),
             ],
           ),
           SizedBox(height: 12.h),
-          Obx(
-            () => Wrap(
-              spacing: 10.w,
-              runSpacing: 10.h,
-              children: sizes.map((size) {
-                bool isSelected = selectedSize.value == size;
-                return GestureDetector(
-                  onTap: () {
-                    selectedSize.value = size;
-                    storageController.setSelectedSize(size);
-                  },
-                  child: Container(
-                    padding:
-                        EdgeInsets.symmetric(horizontal: 20.w, vertical: 10.h),
-                    decoration: BoxDecoration(
-                      color: isSelected ? accentColor : Colors.transparent,
-                      border: Border.all(
-                        color: isSelected ? accentColor : dividerColor,
-                        width: 1.5,
+          Obx(() => Wrap(
+                spacing: 10.w,
+                runSpacing: 10.h,
+                children: sizes.map((size) {
+                  final isSelected = selectedSize.value == size;
+                  return GestureDetector(
+                    onTap: () {
+                      selectedSize.value = size;
+                      storageController.setSelectedSize(size);
+                    },
+                    child: Container(
+                      padding: EdgeInsets.symmetric(
+                          horizontal: 20.w, vertical: 10.h),
+                      decoration: BoxDecoration(
+                        color: isSelected ? accentColor : Colors.transparent,
+                        border: Border.all(
+                          color: isSelected ? accentColor : dividerColor,
+                          width: 1.5,
+                        ),
+                        borderRadius: BorderRadius.circular(8.w),
                       ),
-                      borderRadius: BorderRadius.circular(8.w),
+                      child: getCustomFont(
+                          size,
+                          12,
+                          isSelected ? Colors.white : getFontColor(context),
+                          1,
+                          fontWeight: FontWeight.w600),
                     ),
-                    child: getCustomFont(
-                        size,
-                        12,
-                        isSelected ? Colors.white : getFontColor(context),
-                        1,
-                        fontWeight: FontWeight.w600),
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
+                  );
+                }).toList(),
+              )),
         ],
       ),
     );
   }
+
+  // ═══════════════════════════════════════════════════════
+  // BRAND & PRICE
+  // ═══════════════════════════════════════════════════════
 
   Widget _buildBrandAndPriceSection(
       BuildContext context, ProductModel product, double margin) {
@@ -420,7 +452,8 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
     if (currentPrice <= 0) currentPrice = basePrice;
     
     if (basePrice > 0 && currentPrice > 0 && basePrice > currentPrice) {
-      discountPercent = (((basePrice - currentPrice) / basePrice) * 100).toDouble();
+      discountPercent =
+          (((basePrice - currentPrice) / basePrice) * 100).toDouble();
     } else {
       basePrice = currentPrice;
     }
@@ -439,8 +472,7 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
               SizedBox(width: 8.w),
               GestureDetector(
                 onTap: () {},
-                child: getCustomFont(
-                    "Visit Store", 12, accentColor, 1,
+                child: getCustomFont("Visit Store", 12, accentColor, 1,
                     fontWeight: FontWeight.w600),
               ),
             ],
@@ -474,11 +506,13 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
                 ),
                 SizedBox(width: 12.w),
                 getCustomFont(
-                    "₹${basePrice.toStringAsFixed(0)}", 12,
-                    getFontGreyColor(context), 1,
+                    "₹${basePrice.toStringAsFixed(0)}",
+                    12,
+                    getFontGreyColor(context),
+                    1,
                     fontWeight: FontWeight.w500,
                     decoration: TextDecoration.lineThrough),
-              ]
+              ],
             ],
           ),
           SizedBox(height: 8.h),
@@ -489,6 +523,10 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
       ),
     );
   }
+
+  // ═══════════════════════════════════════════════════════
+  // DELIVERY DETAILS
+  // ═══════════════════════════════════════════════════════
 
   Widget _buildDeliveryDetails(
       BuildContext context, ProductModel product, double margin) {
@@ -524,7 +562,8 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
           SizedBox(height: 12.h),
           Row(
             children: [
-              Icon(Icons.local_shipping, color: getFontColor(context), size: 16.w),
+              Icon(Icons.local_shipping,
+                  color: getFontColor(context), size: 16.w),
               SizedBox(width: 8.w),
               getCustomFont(
                   "Delivery by 8 Apr, Wed", 12, getFontColor(context), 1,
@@ -536,14 +575,14 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
     );
   }
 
+  // ═══════════════════════════════════════════════════════
+  // TRUST BADGES
+  // ═══════════════════════════════════════════════════════
+
   Widget _buildTrustBadges(BuildContext context, double margin) {
-    List<Map<String, dynamic>> badges = [
+    final badges = [
       {"icon": Icons.schedule, "title": "10-Day Return", "desc": "Change of mind"},
-      {
-        "icon": Icons.money,
-        "title": "Cash on Delivery",
-        "desc": "Pay on delivery"
-      },
+      {"icon": Icons.money, "title": "Cash on Delivery", "desc": "Pay on delivery"},
       {"icon": Icons.verified, "title": "Brand Assured", "desc": "Official product"},
     ];
 
@@ -553,7 +592,7 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: List.generate(
           badges.length,
-          (index) => Expanded(
+          (i) => Expanded(
             child: Container(
               margin: EdgeInsets.symmetric(horizontal: 6.w),
               padding: EdgeInsets.all(10.w),
@@ -563,15 +602,15 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
               ),
               child: Column(
                 children: [
-                  Icon(badges[index]["icon"] as IconData,
+                  Icon(badges[i]["icon"] as IconData,
                       color: accentColor, size: 20.w),
                   SizedBox(height: 8.h),
-                  getCustomFont(badges[index]["title"], 10,
+                  getCustomFont(badges[i]["title"] as String, 10,
                       getFontColor(context), 1,
                       fontWeight: FontWeight.w600,
                       textAlign: TextAlign.center),
                   SizedBox(height: 4.h),
-                  getCustomFont(badges[index]["desc"], 8,
+                  getCustomFont(badges[i]["desc"] as String, 8,
                       getFontGreyColor(context), 1,
                       fontWeight: FontWeight.w400,
                       textAlign: TextAlign.center),
@@ -584,6 +623,10 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
     );
   }
 
+  // ═══════════════════════════════════════════════════════
+  // DESCRIPTION
+  // ═══════════════════════════════════════════════════════
+
   Widget _buildDescriptionSection(
       BuildContext context, ProductModel product, double margin) {
     return Container(
@@ -591,15 +634,11 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              getCustomFont("Description", 16, getFontColor(context), 1,
-                  fontWeight: FontWeight.w700),
-            ],
-          ),
+          getCustomFont("Description", 16, getFontColor(context), 1,
+              fontWeight: FontWeight.w700),
           SizedBox(height: 12.h),
-          getCustomFont(product.description ?? "",
-              14, getFontGreyColor(context), 50,
+          getCustomFont(product.description ?? "", 14,
+              getFontGreyColor(context), 50,
               fontWeight: FontWeight.w500),
         ],
       ),
