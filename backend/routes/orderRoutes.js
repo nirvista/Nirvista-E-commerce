@@ -1,29 +1,39 @@
 import express from 'express';
 import { 
-    createOrder, 
+    createOrder,
+    confirmPayment,
+    cancelPayment,
+    approveReturn,
+    approvePartialReturn, 
     getUserOrders, 
     getOrderById, 
     cancelOrder, 
-    initiateReturn, 
+    initiateReturn,
+    initiatePartialReturn, 
     downloadInvoice,
     getOrderStatus,
-    updateOrderStatus 
+    updateOrderStatus,
+    razorpayWebhook 
 } from '../controllers/orderController.js';
 import verifyToken from '../middlewares/authMiddleware.js';
 import authorizeRoles from '../middlewares/roleMiddleware.js';
 
 const router = express.Router();
 
-// All order routes require authentication
-router.use(verifyToken);
+router.get('/', verifyToken, getUserOrders);
+router.get('/:id/invoice', verifyToken, downloadInvoice);
+router.get('/:id/status', verifyToken, getOrderStatus);
+router.get('/:id', verifyToken, getOrderById);
+router.post('/:id/confirm-payment', verifyToken, confirmPayment);
+router.post('/:id/cancel-payment', verifyToken, cancelPayment);
+router.post('/:id/approve-return', verifyToken, authorizeRoles('admin'), approveReturn);
+router.post('/:id/approve-partial-return', verifyToken, authorizeRoles('admin'), approvePartialReturn);
+router.post('/', verifyToken, createOrder);
+router.put('/:id/cancel', verifyToken, cancelOrder);
+router.post('/:id/return', verifyToken, initiateReturn);
+router.post('/:id/partial-return', verifyToken, initiatePartialReturn);
+router.put('/:id/status', verifyToken, authorizeRoles('admin'), updateOrderStatus);
 
-router.post('/', createOrder);
-router.get('/', getUserOrders);
-router.get('/:id', getOrderById);
-router.put('/:id/cancel', cancelOrder);
-router.post('/:id/return', initiateReturn);
-router.get('/:id/invoice', downloadInvoice);
-router.get('/:id/status', getOrderStatus);
-router.put('/:id/status', authorizeRoles('admin'), updateOrderStatus);
+router.post("/payment/webhook", express.json({ type: "*/*" }), razorpayWebhook); // Use raw body for HMAC signature verification
 
 export default router;
