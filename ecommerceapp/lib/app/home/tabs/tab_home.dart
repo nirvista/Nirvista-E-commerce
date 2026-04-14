@@ -8,7 +8,6 @@ import 'package:pet_shop/base/constant.dart';
 import 'package:pet_shop/base/fetch_pixels.dart';
 import 'package:pet_shop/base/get/route_key.dart';
 import 'package:pet_shop/base/get/storage_controller.dart';
-import 'package:pet_shop/base/get/login_data_controller.dart';
 import 'package:pet_shop/base/widget_utils.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
@@ -19,6 +18,8 @@ import '../../model/api_models.dart';
 import '../../../services/product_api.dart';
 import '../../../services/brand_api.dart';
 import '../../../services/category_api.dart';
+import '../../../services/address_api.dart';
+import '../../../base/get/login_data_controller.dart';
 
 class TabHome extends StatefulWidget {
   const TabHome({Key? key}) : super(key: key);
@@ -32,6 +33,9 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
   ProductDataController productController = Get.find<ProductDataController>();
   HomeController homeController = Get.find<HomeController>();
   final controller = Get.find<BottomItemSelectionController>();
+  final loginController = Get.find<LoginDataController>();
+
+  RxString userCity = "Set Location".obs;
 
   Future<List<ProductModel>>? bestSellingFuture;
   Future<List<ProductModel>>? topDealsFuture;
@@ -51,6 +55,25 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
     popularPicksFuture = _fetchProducts(ProductApiService.getNewArrivals());
     brandsFuture = _fetchBrands();
     categoriesFuture = _fetchCategories();
+    _fetchUserLocation();
+  }
+
+  Future<void> _fetchUserLocation() async {
+    final token = loginController.accessToken;
+    if (token != null && token.isNotEmpty) {
+      try {
+        final res = await AddressApiService.getUserAddresses(token);
+        if (res['success'] && res['data'] != null && (res['data'] as List).isNotEmpty) {
+          final addresses = (res['data'] as List).map((e) => AddressModel.fromJson(e)).toList();
+          final defaultAddr = addresses.where((a) => a.isDefaultShipping).toList();
+          if (defaultAddr.isNotEmpty) {
+            userCity.value = defaultAddr.first.city;
+          } else {
+            userCity.value = addresses.first.city;
+          }
+        }
+      } catch (_) {}
+    }
   }
 
   Future<List<ProductModel>> _fetchProducts(Future<Map<String, dynamic>> apiCall) async {
@@ -143,15 +166,20 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
       padding: EdgeInsets.symmetric(horizontal: margin, vertical: 12.h),
       child: Column(
         children: [
-          Row(
-            children: [
-              Icon(Icons.home, color: accentColor, size: 20.w),
-              SizedBox(width: 8.w),
-              getCustomFont("HOME", 14, getFontColor(context), 1,
-                  fontWeight: FontWeight.w700),
-              Spacer(),
-              Icon(Icons.expand_more, color: getFontGreyColor(context), size: 20.w),
-            ],
+          InkWell(
+            onTap: () {
+              showAddressSelectorBottomSheet(context);
+            },
+            child: Row(
+              children: [
+                Icon(Icons.location_on, color: accentColor, size: 20.w),
+                SizedBox(width: 8.w),
+                Obx(() => getCustomFont(userCity.value.toUpperCase(), 14, getFontColor(context), 1,
+                    fontWeight: FontWeight.w700)),
+                Spacer(),
+                Icon(Icons.expand_more, color: getFontGreyColor(context), size: 20.w),
+              ],
+            ),
           ),
           SizedBox(height: 12.h),
           // ── CHANGED: wrap in GestureDetector + AbsorbPointer ──
@@ -736,7 +764,7 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
               ),
               SizedBox(height: 8.h),
               // Brand
-              getCustomFont(product.brandId, 11, getFontGreyColor(context), 1,
+              getCustomFont(product.brandName, 11, getFontGreyColor(context), 1,
                   fontWeight: FontWeight.w500),
               SizedBox(height: 4.h),
               // Product Name

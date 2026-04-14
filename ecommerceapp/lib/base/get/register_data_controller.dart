@@ -1,5 +1,4 @@
 import 'package:get/get.dart';
-import '../../woocommerce/model/customer.dart';
 
 
 class RegisterDataController extends GetxController {

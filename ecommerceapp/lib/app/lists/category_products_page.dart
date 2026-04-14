@@ -270,7 +270,7 @@ class _CategoryProductsPageState extends State<CategoryProductsPage> {
             ),
             SizedBox(height: 8.h),
             // Brand
-            getCustomFont(product.brandId, 11, getFontGreyColor(context), 1,
+            getCustomFont(product.brandName, 11, getFontGreyColor(context), 1,
                 fontWeight: FontWeight.w500),
             SizedBox(height: 4.h),
             // Product Name

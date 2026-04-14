@@ -73,6 +73,7 @@ dependencies:
   email_otp:
 #  dio:
   flutter_staggered_animations: ^1.1.1
+  url_launcher: ^6.3.2
 
 
 
@@ -86,6 +87,14 @@ dependencies:
 
 
 
+  collection: any
+  synchronized: any
+  intl: any
+  flutter_secure_storage_web: any
+  image_picker_for_web: any
+  shared_preferences_web: any
+  flutter_web_plugins:
+    sdk: flutter
 dev_dependencies:
   flutter_test:
     sdk: flutter

@@ -8,7 +8,6 @@ import '../../base/get/image_controller.dart';
 import '../../base/get/login_data_controller.dart';
 import '../../base/widget_utils.dart';
 import 'package:pet_shop/woocommerce/model/user.dart';
-import 'package:pet_shop/services/loginregisterapi.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;

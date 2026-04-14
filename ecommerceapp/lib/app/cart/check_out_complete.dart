@@ -5,7 +5,6 @@ import 'package:get/get.dart';
 import 'package:pet_shop/base/checkout_slider.dart';
 import 'package:pet_shop/base/color_data.dart';
 import 'package:pet_shop/base/constant.dart';
-import 'package:pet_shop/base/data_file.dart';
 import 'package:pet_shop/base/fetch_pixels.dart';
 import 'package:pet_shop/base/get/already_in_cart.dart';
 import 'package:pet_shop/base/get/home_controller.dart';
@@ -14,10 +13,13 @@ import 'package:pet_shop/base/get/route_key.dart';
 import 'package:pet_shop/base/get/storage_controller.dart';
 import 'package:pet_shop/base/widget_utils.dart';
 import '../../base/get/cart_contr/cart_controller.dart';
-import '../../csc_picker/csc_picker.dart';
+import '../../base/get/cart_contr/shipping_add_controller.dart';
+import '../../base/get/login_data_controller.dart';
+import '../../services/order_api.dart';
+import '../../services/address_api.dart';
 import '../../woocommerce/model/model_shipping_method.dart';
 import '../../woocommerce/model/model_tax.dart';
-import '../model_ui/model_cart.dart';
+import '../../app/model/api_models.dart';
 
 
 class CheckOutComplete extends StatefulWidget {
@@ -31,7 +33,7 @@ class CheckOutComplete extends StatefulWidget {
 
 class _CheckOutComplete extends State<CheckOutComplete> {
   backClick(BuildContext context) {
-    Constant.backToPrev(context);
+    Constant.sendToNext(context, homeScreenRoute);
   }
 
   RxBool isCouponApply = false.obs;
@@ -51,13 +53,14 @@ class _CheckOutComplete extends State<CheckOutComplete> {
 
   // Rx<List<ModelShippingMethod?>> shippingMethods = (null as List<ModelShippingMethod?>).obs;
 
+  ShippingAddressController shippingAddressController = Get.find<ShippingAddressController>();
+
   Rx<ModelTax?> taxModel = (null).obs;
 
   @override
   void initState() {
     super.initState();
     getShippingMethods();
-    // getTaxRates();
   }
 
   // getTaxRates() async {
@@ -80,17 +83,128 @@ class _CheckOutComplete extends State<CheckOutComplete> {
   // }
 
   getShippingMethods() async {
-    // String zoneId = await productDataController.getShippingMethodZoneId(
-    //     homeController.wooCommerce!,
-    //     storageController.selectedShippingAddress!.country);
-    // shippingMethods =
-    // await homeController.wooCommerce!.getAllShippingMethods(zoneId);
-    // print(
-    //     'zoneId-----$zoneId-----${storageController.selectedShippingAddress!.country}');
     shippingMthLoaded.value = true;
   }
 
-  List<ModelCart> cartList = DataFile.getAllCartList();
+  Widget _buildCheckOutCartItem(BuildContext context, CartItemModel item) {
+    String name = item.product?.title ?? "Unknown Product";
+    String variantName = item.variant?.variantName ?? "";
+    double price = item.variant?.discountPrice != null && item.variant!.discountPrice! > 0 
+           ? item.variant!.discountPrice! 
+           : (item.variant?.price ?? 0.0);
+    String img = (item.variant?.images.isNotEmpty == true) ? item.variant!.images.first : (item.product?.imageUrl ?? "");
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Container(
+          width: 80.w,
+          height: 80.w,
+          decoration: BoxDecoration(
+             borderRadius: BorderRadius.circular(8.w),
+             image: img.isNotEmpty ? DecorationImage(image: NetworkImage(img), fit: BoxFit.cover) : null,
+             color: Colors.grey.shade200,
+          ),
+        ),
+        SizedBox(width: 12.w),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+               getCustomFont(name, 16, getFontColor(context), 2, fontWeight: FontWeight.w600),
+               SizedBox(height: 4.h),
+               getCustomFont(variantName, 12, getFontHint(context), 1),
+               SizedBox(height: 8.h),
+               Row(
+                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                 children: [
+                   getCustomFont("₹${price.toStringAsFixed(0)}", 16, getAccentColor(context), 1, fontWeight: FontWeight.w700),
+                   getCustomFont("Qty: ${item.quantity}", 14, getFontColor(context), 1, fontWeight: FontWeight.w500),
+                 ]
+               )
+            ]
+          )
+        )
+      ]
+    );
+  }
+
+  Widget _buildAddressSection(BuildContext context, double margin) {
+    return Obx(() {
+      if (shippingAddressController.isLoading.value) {
+        return Container(
+          color: getCardColor(context),
+          padding: EdgeInsets.all(margin),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              buildTitleWidget(context, "Shipping Address"),
+              getVerSpace(12.h),
+              const Center(child: CircularProgressIndicator()),
+            ],
+          ),
+        );
+      }
+
+      final selectedAddress = shippingAddressController.selectedAddress.value;
+
+      return Container(
+        color: getCardColor(context),
+        padding: EdgeInsets.all(margin),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                buildTitleWidget(context, "Shipping Address"),
+                Row(
+                  children: [
+                    TextButton(
+                      onPressed: () => showAddressSelectorBottomSheet(context),
+                      child: getCustomFont("Change", 14, getAccentColor(context), 1, fontWeight: FontWeight.w600),
+                    ),
+                    getHorSpace(8.w),
+                    TextButton(
+                      onPressed: () => showAddressDialog(context),
+                      child: getCustomFont("Add New", 14, getAccentColor(context), 1, fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            getVerSpace(8.h),
+            if (selectedAddress == null)
+              getMultilineCustomFont(
+                  "No address selected. Please add or select a shipping address.",
+                  14,
+                  getFontColor(context),
+                  fontWeight: FontWeight.w400)
+            else ...[
+              getCustomFont(selectedAddress.recipientName, 15, getFontColor(context), 1, fontWeight: FontWeight.w600),
+              getVerSpace(4.h),
+              getMultilineCustomFont(
+                  selectedAddress.fullAddress,
+                  14,
+                  getFontColor(context),
+                  fontWeight: FontWeight.w400),
+              getVerSpace(4.h),
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 2.h),
+                decoration: BoxDecoration(
+                  color: getAccentColor(context).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(4.w),
+                ),
+                child: getCustomFont(selectedAddress.addressLabel, 12, getAccentColor(context), 1, fontWeight: FontWeight.w600),
+              ),
+            ],
+          ],
+        ),
+      );
+    });
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -120,32 +234,13 @@ class _CheckOutComplete extends State<CheckOutComplete> {
                 child: ListView(
                   padding: EdgeInsets.zero,
                   children: [
-                    Container(
-                      color: getCardColor(context),
-                      padding: EdgeInsets.all(margin),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.start,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          buildTitleWidget(
-                              context, "Shipping Address"),
-                          getVerSpace(12.h),
-                          getMultilineCustomFont(
-                              "1901 Thornridge Cir. Shiloh, Hawaii 81063",
-                              14,
-                              getFontColor(context),
-                              fontWeight: FontWeight.w400),
-                        ],
-                      ),
-                    ),
+                    _buildAddressSection(context, margin),
                     getVerSpace(20.h),
                     Container(
                       color: getCardColor(context),
                       padding: EdgeInsets.all(margin),
                       child: Builder(
                         builder: (context) {
-                          // WooPaymentGateway modelPaymentGateway =
-                          // storageController.selectedPaymentGateway!;
                           return Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -159,10 +254,10 @@ class _CheckOutComplete extends State<CheckOutComplete> {
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      getCustomFont("Paypal", 14, getFontColor(context), 1,fontWeight: FontWeight.w400),
+                                      getCustomFont("Cash On Delivery", 14, getFontColor(context), 1,fontWeight: FontWeight.w400),
                                       getVerSpace(6.h),
                                       getCustomFont(
-                                          "XXXX XXXX XXXX 2563",
+                                          "Pay when you receive",
                                           14,
                                           getFontColor(context),1,
                                           fontWeight: FontWeight.w400),
@@ -185,55 +280,14 @@ class _CheckOutComplete extends State<CheckOutComplete> {
                         children: [
                           buildTitleWidget(context,"Cart Detail"),
                           getVerSpace(20.h),
-                          ListView.separated(
+                          Obx(() => ListView.separated(
                             physics: const NeverScrollableScrollPhysics(),
                             itemBuilder: (context, index) {
-                              ModelCart cart = cartList[index];
-                              return buildMyCartItem(
-                                context,
-                                cart,
-                                112.h,
-                                    () {},
-                                //         () async {
-                                //   isCouponApply.value = false;
-                                //   controller.coupon.clear();
-                                //   controller.clearPromoPrice();
-                                //   controller.increaseQuantity(index);
-                                // }, () async {
-                                //   if (controller
-                                //       .cartOtherInfoList[index]
-                                //       .quantity! !=
-                                //       1) {
-                                //     isCouponApply.value = false;
-                                //   }
-                                //   controller.cartOtherInfoList[index]
-                                //       .quantity! >
-                                //       1
-                                //       ? controller
-                                //       .decreaseQuantity(index)
-                                //       : controller
-                                //       .cartOtherInfoList[index]
-                                //       .quantity = 1;
-                                //
-                                //   // controller.decreaseQuantity(index);
-                                // }, () {
-                                //   controller.removeItemInfo(controller
-                                //       .cartOtherInfoList[index]
-                                //       .productName
-                                //       .toString());
-                                //   controller.coupon.clear();
-                                //   controller.clearPromoPrice();
-                                //   isCouponApply.value = false;
-                                //   if (controller
-                                //       .cartOtherInfoList.isEmpty) {
-                                //     // Constant.sendToNext(
-                                //     //     context, myCartScreenRoute);
-                                //   }
-                                // }
-                              );
+                              if (cartController.cartModel.value == null) return const SizedBox();
+                              CartItemModel cart = cartController.cartModel.value!.items[index];
+                              return _buildCheckOutCartItem(context, cart);
                             },
-                            itemCount:
-                            cartList.length,
+                            itemCount: cartController.cartModel.value?.items.length ?? 0,
                             shrinkWrap: true,
                             padding: EdgeInsets.zero,
                             separatorBuilder:
@@ -241,22 +295,20 @@ class _CheckOutComplete extends State<CheckOutComplete> {
                               return getDivider(setColor: Colors.grey.shade300).marginSymmetric(
                                   vertical: 20.h);
                             },
-                          )
+                          )),
                         ],
                       ),
                     ),
                     getVerSpace(20.h),
                     Container(
                       color: getCardColor(context),
-                      child: GetBuilder<CartController>(
-                          init: CartController(),
-                          builder: (controller) {
+                      child: Obx(() {
                             return Column(
                               children: [
                                 buildSubtotalRow(
                                     context,
                                     "Subtotal",
-                                    "\$80.00"),
+                                    "₹${cartController.cartSubTotal.toStringAsFixed(0)}"),
                                 getDivider(setColor: Colors.grey.shade300)
                                     .marginSymmetric(vertical: 14.h),
                                 buildSubtotalRow(
@@ -268,19 +320,19 @@ class _CheckOutComplete extends State<CheckOutComplete> {
                                 buildSubtotalRow(
                                   context,
                                   "Tax",
-                                  "+\$2.00",),
+                                  "+₹0",),
                                 getDivider(setColor: Colors.grey.shade300)
                                     .marginSymmetric(vertical: 14.h),
                                 buildSubtotalRow(
                                     context,
                                     "Discount",
-                                    "-\$5.00"),
+                                    "-₹${cartController.promoPrice.value.toStringAsFixed(0)}"),
                                 getDivider(setColor: Colors.grey.shade300)
                                     .marginSymmetric(vertical: 14.h),
                                 buildTotalRow(
                                   context,
                                   "Total",
-                                  "\$77.00",
+                                  "₹${cartController.cartTotal.toStringAsFixed(0)}",
                                 ),
                               ],
                             ).marginSymmetric(
@@ -291,86 +343,46 @@ class _CheckOutComplete extends State<CheckOutComplete> {
                 ),
               ),
               getButtonFigma(context, getAccentColor(context), true,
-                  "Confirm Order", Colors.white, () {
-                Constant.sendToNext(context, orderConfirmScreenRoute);
-                    // Payments.completePaymentProgress(
-                    //     context,
-                    //     storageController.selectedPaymentGateway!,
-                    //         () async {},
-                    //     homeController.currentCustomer!,
-                    //     getTotalString(),
-                    //     getSubTotal(),
-                    //     cartController.tax,
-                    //     storageController.selectedShippingRate.value,
-                    //     cartController.cartOtherInfoList,
-                    //     storageController.selectedShippingAddress!,
-                    //         (isPaid) async {
-                    //       print("Getres--create--order----true");
-                    //
-                    //       storageController.selectedShippingAddress!.country =
-                    //           (await CSCPickerState().getCountriesCode(
-                    //               storageController
-                    //                   .selectedShippingAddress!.country)) ??
-                    //               "";
-                    //       print(
-                    //           'country-----${storageController.selectedShippingAddress!.country}');
-                    //       bool isCreated = await homeController.wooCommerce!
-                    //           .createOrder(
-                    //           homeController.currentCustomer!,
-                    //           cartController.cartItems,
-                    //           storageController
-                    //               .selectedPaymentGateway!.methodTitle!,
-                    //           isPaid,
-                    //           storageController.selectedShippingAddress!,
-                    //           cartController.coupon,
-                    //           cartController.shippingLines);
-                    //       print('isCreated-------$isCreated');
-                    //       if (isCreated) {
-                    //         EasyLoading.dismiss();
-                    //
-                    //         // WooGetCreatedOrder? order = productDataController.myOrderList[0];
-                    //         cartController.clearCart();
-                    //         alreadyInCart.alreadyInPurchase.value = false;
-                    //         storageController.currentQuantity.value = 1;
-                    //
-                    //         // WidgetsBinding.instance.addPostFrameCallback((_) {
-                    //         //   showGetDialog(
-                    //         //       context,
-                    //         //       "order_confirm.png",
-                    //         //       "Order Confirm",
-                    //         //       "Your order has been successfully\ncompleted!",
-                    //         //       "Ok", () async {
-                    //         //     backClick(context);
-                    //         //     Future.delayed(
-                    //         //       Duration.zero,
-                    //         //           () {
-                    //         //         Constant.sendToNext(
-                    //         //             context, myOrderScreenRoute);
-                    //         //       },
-                    //         //     );
-                    //         //   },
-                    //         //       dialogHeight: 464,
-                    //         //       imgHeight: 146,
-                    //         //       imgWidth: 146,
-                    //         //       fit: BoxFit.fill,
-                    //         //       barrierDismissible: false
-                    //         //
-                    //         //   );
-                    //         // });
-                    //         WidgetsBinding.instance
-                    //             .addPostFrameCallback((timeStamp) {
-                    //           Constant.sendToScreen(
-                    //               OrderConfirmScreen(), context, (value) {});
-                    //           // Constant.sendToNext(
-                    //           //     context, orderConfirmScreenRoute);
-                    //         });
-                    //       } else {
-                    //         EasyLoading.showError("Order not created");
-                    //
-                    //         Constant.sendToNext(context, homeScreenRoute);
-                    //       }
-                    //     });
-                  }, EdgeInsets.symmetric(horizontal: margin, vertical: 20.h))
+                  "Confirm Order", Colors.white, () async {
+                
+                final loginController = Get.find<LoginDataController>();
+                final token = loginController.accessToken;
+                if (token == null || token.isEmpty) {
+                   Constant.sendToNext(context, loginRoute);
+                   return;
+                }
+
+                // Validate address
+                if (shippingAddressController.selectedAddress.value == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Please add or select a shipping address'), backgroundColor: Colors.red),
+                  );
+                  return;
+                }
+                
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (context) => const Center(child: CircularProgressIndicator()),
+                );
+
+                String paymentMethod = "COD";
+                
+                final res = await OrderApiService.createOrder(
+                   accessToken: token,
+                   addressId: shippingAddressController.selectedAddress.value!.id,
+                   paymentMethod: paymentMethod,
+                );
+                
+                Navigator.pop(context); // Dismiss loading dialog
+
+                if (res['success']) {
+                   await cartController.clearCartAction();
+                   Constant.sendToNext(context, orderConfirmScreenRoute);
+                } else {
+                   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res['message'] ?? 'Failed to place order')));
+                }
+              }, EdgeInsets.symmetric(horizontal: margin, vertical: 20.h))
             ],
           ),
         ),
@@ -381,57 +393,15 @@ class _CheckOutComplete extends State<CheckOutComplete> {
   }
 
   String getTotalString() {
-    double totalVals = (isCouponApply.value)
-        ? (cartController.cartTotalPriceF(1) -
-        cartController.promoPrice +
-        double.parse(getTax()))
-        : cartController.cartTotalPriceF(1) + double.parse(getTax());
-
-    if (selectedShippingMethod.value != null) {
-      totalVals = totalVals +
-          double.parse(
-              selectedShippingMethod.value!.settings!.cost!.value ?? "0");
-    }
-    return totalVals.toString();
-    // return (isCouponApply.value)
-    //     ? (cartController.cartTotalPriceF(1) - cartController.promoPrice)
-    //         .toString()
-    //     : cartController.cartTotalPriceF(1).toString();
+    return cartController.cartTotal.toStringAsFixed(2);
   }
 
   String getSubTotal() {
-    return cartController.cartTotalPriceF(1).toString();
+    return cartController.cartSubTotal.toStringAsFixed(2);
   }
 
   String getTax() {
-    double total = double.parse(getSubTotal());
-    double tax = 0;
-    double vatTax = 0;
-    double shippingTax = 0;
-    if (taxModel.value != null) {
-      vatTax = (double.parse(taxModel.value!.rate ?? "0"));
-    }
-    if (taxModel.value != null) {
-      tax = (total * vatTax) / 100;
-    }
-    if (selectedShippingMethod.value != null) {
-      shippingTax = double.parse(
-          selectedShippingMethod.value!.settings!.cost!.value ?? "0") *
-          vatTax /
-          100;
-    }
-
-    double totalTax = tax;
-    if (taxModel.value != null) {
-      if (taxModel.value!.shipping!) {
-        totalTax = tax + shippingTax;
-        return totalTax.toString();
-      } else {
-        return totalTax.toString();
-      }
-    } else {
-      return totalTax.toString();
-    }
+    return "0.00";
   }
 
   Widget buildTitleWidget(BuildContext context,String title) {

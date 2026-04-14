@@ -6,12 +6,13 @@ import '../../base/Constant.dart';
 import '../../base/color_data.dart';
 import '../../base/widget_utils.dart';
 import '../../csc_picker/csc_picker.dart';
+import '../../app/model/api_models.dart';
+import '../../services/address_api.dart';
+import '../../base/get/login_data_controller.dart';
 
 class EditAddressScreen extends StatefulWidget {
-  bool? isBilling;
-  bool? isShipping;
-
-  EditAddressScreen({Key? key, this.isBilling, this.isShipping}) : super(key: key);
+  final AddressModel? address;
+  const EditAddressScreen({Key? key, this.address}) : super(key: key);
 
   @override
   State<StatefulWidget> createState() {
@@ -24,26 +25,37 @@ class _EditAddressScreen extends State<EditAddressScreen> {
     Constant.backToPrev(context);
   }
 
-  TextEditingController fullNameController = TextEditingController();
-  TextEditingController emailController = TextEditingController();
-  TextEditingController pinCodeController = TextEditingController();
-  TextEditingController add1Controller = TextEditingController();
-  TextEditingController add2Controller = TextEditingController();
-
-  String countryValue = "Kentucky";
-  String stateValue = "Manchester";
-  String cityValue = "";
+  final fullNameController = TextEditingController();
+  final line1Controller = TextEditingController();
+  final line2Controller = TextEditingController();
+  final cityController = TextEditingController();
+  final postalCodeController = TextEditingController();
+  
+  String countryValue = "India";
+  String stateValue = "Maharashtra";
+  String addressLabel = "Home";
+  bool isDefault = false;
+  
+  AddressModel? existingAddress;
 
   @override
   void initState() {
     super.initState();
-    fullNameController.text = "Leslie Alexander";
-    emailController.text = "lesliealexander@gmail.com";
-    pinCodeController.text = "(704) 555-0127";
-    add1Controller.text = "4517 Washington Ave. Manchester, Kentucky 39495";
-    add2Controller.text = "";
+    // Check if we are editing an existing address passed via arguments
+    existingAddress = Get.arguments as AddressModel?;
+    
+    if (existingAddress != null) {
+      fullNameController.text = existingAddress!.recipientName;
+      line1Controller.text = existingAddress!.addressLine1;
+      line2Controller.text = existingAddress!.addressLine2 ?? "";
+      cityController.text = existingAddress!.city;
+      postalCodeController.text = existingAddress!.postalCode;
+      countryValue = existingAddress!.country;
+      stateValue = existingAddress!.state;
+      addressLabel = existingAddress!.addressLabel;
+      isDefault = existingAddress!.isDefaultShipping;
+    }
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -59,9 +71,9 @@ class _EditAddressScreen extends State<EditAddressScreen> {
         backgroundColor: getScaffoldColor(context),
         body: Column(
           children: [
-            getDefaultHeader(context, "Edit Address", () {
+            getDefaultHeader(context, existingAddress != null ? "Edit Address" : "Add Address", () {
               backClick(context);
-            },isShowSearch: false),
+            }, isShowSearch: false),
             Expanded(
               flex: 1,
               child: Container(
@@ -73,113 +85,161 @@ class _EditAddressScreen extends State<EditAddressScreen> {
                   shrinkWrap: true,
                   children: [
                     20.h.verticalSpace,
-                    getCustomFont("Full name", 16, getFontColor(context), 1,
-                        fontWeight: FontWeight.w400)
-                        .marginSymmetric(horizontal: horSpace),
+                    getLabel("Address Label (e.g. Home, Office)", horSpace),
                     6.h.verticalSpace,
-                    getDefaultTextFiled(
-                        context,
-                        "Enter Full Name",
-                        fullNameController,
-                        getFontColor(context),
-                            (value) {}),
+                    _buildLabelSelector(context, horSpace),
                     20.h.verticalSpace,
-                    getCustomFont("Address", 16, getFontColor(context), 1,
-                        fontWeight: FontWeight.w400)
-                        .marginSymmetric(horizontal: horSpace),
+                    getLabel("Full name", horSpace),
                     6.h.verticalSpace,
-                    getDefaultTextFiled(
-                        context,
-                        "Enter Address",
-                        add1Controller,
-                        getFontColor(context),
-                            (value) {}),
+                    getDefaultTextFiled(context, "Full Name", fullNameController, getFontColor(context), (v){}),
                     20.h.verticalSpace,
-
-
-                    CSCPicker(
-                      showStates: true,
-                      currentCountry: countryValue,
-                      currentState: stateValue,
-
-                      disabledDropdownDecoration: BoxDecoration(
-                          borderRadius:
-                          BorderRadius.all(Radius.circular(12.h)),
+                    getLabel("Address Line 1", horSpace),
+                    6.h.verticalSpace,
+                    getDefaultTextFiled(context, "Street, House No", line1Controller, getFontColor(context), (v){}),
+                    20.h.verticalSpace,
+                    getLabel("Address Line 2 (Optional)", horSpace),
+                    6.h.verticalSpace,
+                    getDefaultTextFiled(context, "Apartment, Suite, etc", line2Controller, getFontColor(context), (v){}),
+                    20.h.verticalSpace,
+                    
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: horSpace),
+                      child: CSCPicker(
+                        showStates: true,
+                        showCities: false,
+                        currentCountry: countryValue,
+                        currentState: stateValue,
+                        dropdownDecoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12.h),
                           color: Colors.transparent,
-                          border: Border.all(
-                              color: black20,
-                              width: 1.h)),
-                      dropdownDecoration:
-                      BoxDecoration(
-                          borderRadius:
-                          BorderRadius.all(Radius.circular(12.h)),
-                          color: Colors.transparent,
-                          border: Border.all(
-                              color: black20,
-                              width: 1.h)),
-                      // getButtonDecoration(Colors.transparent,
-                      // withCorners: true, corner: 20.h,),
-
-                      /// Enable disable city drop down
-                      showCities: false,
-                      // currentCity: controller.cityValue, ,
-                      selectedCountry: countryValue,
-                      selectedState: stateValue,
-                      selectedCity: "",
-                      flagState: CountryFlag.SHOW_IN_DROP_DOWN_ONLY,
-                      layout: Layout.vertical,
-                      countrySearchPlaceholder: "Select Country",
-                      stateSearchPlaceholder: "Select Town",
-
-                      dropdownItemStyle: buildTextStyle(context,
-                          getFontColor(context), FontWeight.w400, 16),
-                      selectedItemStyle: buildTextStyle(context,
-                          getFontColor(context), FontWeight.w400, 16),
-                      onCountryChanged: (value) {
-                        
-                      },
-                      onStateChanged: (value) {
-                        
-                      },
-                      onCityChanged: (value) {
-                        
-                      },
+                          border: Border.all(color: black20, width: 1.h)
+                        ),
+                        onCountryChanged: (v) => setState(() => countryValue = v),
+                        onStateChanged: (v) => setState(() => stateValue = v ?? ""),
+                        onCityChanged: (v) {},
+                      ),
                     ),
-
-
+                    
                     20.h.verticalSpace,
-                    getCustomFont("Email", 16, getFontColor(context), 1,
-                        fontWeight: FontWeight.w400)
-                        .marginSymmetric(horizontal: horSpace),
+                    getLabel("City", horSpace),
                     6.h.verticalSpace,
-                    getDefaultTextFiled(
-                        context,
-                        "Enter email",
-                        emailController,
-                        getFontColor(context),
-                            (value) {},
-                        keyboardType: TextInputType.emailAddress),
+                    getDefaultTextFiled(context, "City", cityController, getFontColor(context), (v){}),
                     20.h.verticalSpace,
-                    getCustomFont("Phone Number", 16, getFontColor(context), 1,
-                        fontWeight: FontWeight.w400)
-                        .marginSymmetric(horizontal: horSpace),
+                    getLabel("Postal Code", horSpace),
                     6.h.verticalSpace,
-                    getDefaultTextFiled(context, "Enter phone number",
-                        pinCodeController, getFontColor(context), (value) {},
-                        keyboardType: TextInputType.number),
+                    getDefaultTextFiled(context, "Postal Code", postalCodeController, getFontColor(context), (v){}, keyboardType: TextInputType.number),
+                    
+                    20.h.verticalSpace,
+                    CheckboxListTile(
+                      title: getCustomFont("Set as default address", 14, getFontColor(context), 1),
+                      value: isDefault,
+                      onChanged: (v) => setState(() => isDefault = v ?? false),
+                      activeColor: getAccentColor(context),
+                      contentPadding: EdgeInsets.symmetric(horizontal: horSpace),
+                    )
                   ],
                 ),
               ),
-
             ),
-            getButtonFigma(
-                context, getAccentColor(context), true, "Save", Colors.white,
-                    () async {
-                  backClick(context);
-                }, EdgeInsets.symmetric(horizontal: 20.h, vertical: 15.h)),
+            getButtonFigma(context, getAccentColor(context), true, "Save Address", Colors.white, () async {
+              _saveAddress();
+            }, EdgeInsets.symmetric(horizontal: 20.h, vertical: 15.h)),
           ],
         ),
       ),
     );
+  }
+
+  Widget getLabel(String text, double horSpace) {
+    return getCustomFont(text, 16, getFontColor(context), 1, fontWeight: FontWeight.w400).marginSymmetric(horizontal: horSpace);
+  }
+
+  Widget _buildLabelSelector(BuildContext context, double horSpace) {
+    List<String> labels = ["Home", "Office", "Other"];
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: horSpace),
+      child: DropdownButtonFormField<String>(
+        value: labels.contains(addressLabel) ? addressLabel : null,
+        hint: getCustomFont("Select Label", 14, getFontGreyColor(context), 1),
+        decoration: InputDecoration(
+          contentPadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.h)),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12.h),
+            borderSide: BorderSide(color: black20, width: 1.h),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12.h),
+            borderSide: BorderSide(color: getAccentColor(context), width: 1.h),
+          ),
+        ),
+        items: labels.map((l) => DropdownMenuItem(
+          value: l,
+          child: getCustomFont(l, 14, getFontColor(context), 1),
+        )).toList(),
+        onChanged: (v) {
+          if (v != null) setState(() => addressLabel = v);
+        },
+      ),
+    );
+  }
+
+  Future<void> _saveAddress() async {
+    if (fullNameController.text.isEmpty || line1Controller.text.isEmpty || cityController.text.isEmpty || postalCodeController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please fill all required fields')));
+      return;
+    }
+
+    final loginController = Get.find<LoginDataController>();
+    final token = loginController.accessToken ?? '';
+    
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      Map<String, dynamic> res;
+      if (existingAddress != null) {
+        res = await AddressApiService.updateAddress(
+          accessToken: token,
+          addressId: existingAddress!.id,
+          addressLabel: addressLabel,
+          recipientName: fullNameController.text,
+          addressLine1: line1Controller.text,
+          addressLine2: line2Controller.text,
+          city: cityController.text,
+          state: stateValue,
+          postalCode: postalCodeController.text,
+          country: countryValue,
+          isDefaultShipping: isDefault,
+        );
+      } else {
+        res = await AddressApiService.addAddress(
+          accessToken: token,
+          addressLabel: addressLabel,
+          recipientName: fullNameController.text,
+          addressLine1: line1Controller.text,
+          addressLine2: line2Controller.text,
+          city: cityController.text,
+          state: stateValue,
+          postalCode: postalCodeController.text,
+          country: countryValue,
+          isDefaultShipping: isDefault,
+        );
+      }
+
+      Navigator.pop(context); // hide loading
+
+      if (res['success']) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Address saved successfully'), backgroundColor: Colors.green));
+        Get.back(result: true); // Refresh calling screen
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res['message'] ?? 'Failed to save address')));
+      }
+    } catch (e) {
+      Navigator.pop(context);
+    }
   }
 }
