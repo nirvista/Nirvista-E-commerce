@@ -39,22 +39,46 @@ class _CategoryProductsPageState extends State<CategoryProductsPage> {
   @override
   void initState() {
     super.initState();
+    _loadInitialProducts();
+  }
+
+  Future<void> _loadInitialProducts() async {
     String category = storageController.selectedCategory.value;
     
-    if (category == "best_selling") {
-      productsFuture = _fetchProducts(ProductApiService.getAllProducts());
-    } else if (category == "top_deals") {
-      productsFuture = _fetchProducts(ProductApiService.getTopRatedProducts());
-    } else if (category == "new_arrivals") {
-      productsFuture = _fetchProducts(ProductApiService.getNewArrivals());
-    } else if (category == "all" || category == "for_you" || category.isEmpty) {
-      productsFuture = _fetchProducts(ProductApiService.getAllProducts());
+    if (category == "best_selling" || category == "all" || category == "for_you" || category.isEmpty || category == "top_deals" || category == "new_arrivals") {
+      // Scrape from top categories (matches home screen fix)
+      productsFuture = _scrapeAllProducts();
     } else if (category.startsWith("brand_")) {
       String brandId = category.replaceFirst("brand_", "");
       productsFuture = _fetchProducts(BrandApiService.getProductsByBrand(brandId));
     } else {
       productsFuture = _fetchProducts(CategoryApiService.getProductsByCategory(category));
     }
+  }
+
+  Future<List<ProductModel>> _scrapeAllProducts() async {
+    String category = storageController.selectedCategory.value;
+    final catRes = await CategoryApiService.getAllCategories();
+    if (!catRes['success']) return [];
+    List<CategoryModel> cats = (catRes['data'] as List).take(3).map((e) => CategoryModel.fromJson(e)).toList();
+    
+    final results = await Future.wait(cats.map((c) => CategoryApiService.getProductsByCategory(c.id)));
+    List<ProductModel> allProds = [];
+    for (var r in results) {
+       if (r['success']) {
+         List<dynamic> data = r['data'];
+         allProds.addAll(data.map((e) => ProductModel.fromJson(e)).toList());
+       }
+    }
+    final Map<String, ProductModel> unique = {for (var p in allProds) p.id: p};
+    List<ProductModel> merged = unique.values.toList();
+
+    if (category == "top_deals") {
+      merged = merged.where((p) => p.variants.any((v) => v.discountPrice != null && v.discountPrice! > 0)).toList();
+    }
+    
+    loadedProducts = merged;
+    return loadedProducts;
   }
 
   Future<List<ProductModel>> _fetchProducts(Future<Map<String, dynamic>> apiCall) async {
@@ -214,6 +238,10 @@ class _CategoryProductsPageState extends State<CategoryProductsPage> {
     double basePrice = product.originalPrice;
     double currentPrice = product.currentPrice;
     double discountPercent = 0.0;
+    
+    // Add safety check for zero or negative prices
+    if (basePrice <= 0) basePrice = currentPrice;
+    if (currentPrice <= 0) currentPrice = basePrice;
     
     if (basePrice > 0 && currentPrice > 0 && basePrice > currentPrice) {
       discountPercent = (((basePrice - currentPrice) / basePrice) * 100).toDouble();

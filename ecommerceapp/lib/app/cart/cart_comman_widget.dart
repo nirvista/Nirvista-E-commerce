@@ -112,7 +112,20 @@ class _CartCommonWidgetState extends State<CartCommonWidget> {
                          getCustomFont("${item.quantity}", 16, getFontColor(context), 1, fontWeight: FontWeight.bold),
                          SizedBox(width: 8.w),
                          InkWell(
-                           onTap: () => cartController.increaseQuantity(item.productId, item.variantId),
+                           onTap: () {
+                             // Check for available stock before incrementing
+                             if (item.variant != null && item.quantity >= item.variant!.availableStock) {
+                               ScaffoldMessenger.of(context).showSnackBar(
+                                 const SnackBar(
+                                   content: Text('Maximum available stock reached'),
+                                   backgroundColor: Colors.orange,
+                                   duration: Duration(seconds: 2),
+                                 )
+                               );
+                               return;
+                             }
+                             cartController.increaseQuantity(item.productId, item.variantId);
+                           },
                            child: Container(
                              padding: EdgeInsets.all(4.w),
                              child: Icon(Icons.add_circle_outline, size: 24.w, color: getAccentColor(context)),
@@ -169,8 +182,6 @@ class _CartCommonWidgetState extends State<CartCommonWidget> {
                     ),
                   ),
 
-
-
                   Container(
                     color: getCardColor(context),
                     padding: EdgeInsets.all(20.h),
@@ -226,48 +237,9 @@ class _CartCommonWidgetState extends State<CartCommonWidget> {
                                 GetBuilder<CartController>(
                                   init: CartController(),
                                   builder: (controller) {
-                                    // final double totalPrice =
-                                    // controller.cartTotalPriceF(1);
-
                                     return GestureDetector(
                                       onTap: () async {
-                                        // if (inputCoupon == '') {
-                                        //   ScaffoldMessenger.of(context)
-                                        //       .showSnackBar(const SnackBar(
-                                        //     content: Text(
-                                        //       "Enter Coupon",
-                                        //     ),
-                                        //   ));
-                                        // } else {
-                                        //   // EasyLoading.show(
-                                        //   //     status: "Loading");
-                                        //   // setState(() {
-                                        //   // finalInputCoupon = inputCoupon;
-                                        //   // couponController.text =
-                                        //   //     finalInputCoupon;
-                                        //   // });
-                                        //   // CouponLines coupon = CouponLines(
-                                        //   //     code: inputCoupon);
-                                        //   // controller.addCoupon(coupon);
-                                        //   // var promoPrice =
-                                        //   // await homeController
-                                        //   //     .wooCommerce!
-                                        //   //     .retrieveCoupon(
-                                        //   //     finalInputCoupon,
-                                        //   //     totalPrice);
-                                        //   // print("promoprice==$promoPrice");
-                                        //   // if (promoPrice > 0.0) {
-                                        //   //   controller
-                                        //   //       .updatePrice(promoPrice);
-                                        //     // setState(() {
-                                        //     // isCouponApply.value = true;
-                                        //     // });
-                                        //     // EasyLoading.showSuccess(
-                                        //     //     "Applied");
-                                        //   // } else {
-                                        //   //   EasyLoading.showError("Failed");
-                                        //   // }
-                                        // }
+                                        // Coupon logic implementation
                                       },
                                       child: getCustomFont(
                                         "Apply",
@@ -301,7 +273,6 @@ class _CartCommonWidgetState extends State<CartCommonWidget> {
                       ],
                     ),
                   ),
-
 
                   Container(
                     padding: EdgeInsets.all(20.h),

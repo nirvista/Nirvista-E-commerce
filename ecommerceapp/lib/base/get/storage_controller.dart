@@ -19,6 +19,7 @@ class StorageController extends GetxController {
   RxString selectedCategoryName = "".obs;
   RxString selectedColor = "".obs;
   RxString selectedSize = "".obs;
+  RxString selectedPaymentMethod = "online".obs;
 
   // WooCartItem? wooCartItem;
 

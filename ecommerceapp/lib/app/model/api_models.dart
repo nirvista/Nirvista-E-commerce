@@ -28,14 +28,16 @@ class ProductModel {
       parsedBrandName = json['brand']['name'] ?? '';
     }
     return ProductModel(
-      id: json['id'] ?? '',
-      title: json['title'] ?? '',
-      description: json['description'],
-      categoryId: json['categoryId'] ?? '',
-      brandId: json['brandId'] ?? '',
+      id: json['id']?.toString() ?? '',
+      title: json['title']?.toString() ?? '',
+      description: json['description']?.toString(),
+      categoryId: json['categoryId']?.toString() ?? '',
+      brandId: json['brandId']?.toString() ?? '',
       brandName: parsedBrandName,
-      material: json['material'],
-      rating: json['rating'] != null ? (json['rating'] as num).toDouble() : 0.0,
+      material: json['material']?.toString(),
+      rating: json['rating'] != null 
+          ? (json['rating'] is num ? (json['rating'] as num).toDouble() : double.tryParse(json['rating'].toString()) ?? 0.0)
+          : 0.0,
       variants: json['variants'] != null
           ? (json['variants'] as List).map((i) => VariantModel.fromJson(i)).toList()
           : [],
@@ -64,6 +66,7 @@ class ProductModel {
 
 class VariantModel {
   final String id;
+  final String productId;
   final String? variantName;
   final double price;
   final double? discountPrice;
@@ -72,9 +75,13 @@ class VariantModel {
   final String? size;
   final String status;
   final int stock;
+  final int reservedstock;
+  final int availableStock;
+  final String approvalStatus;
 
   VariantModel({
     required this.id,
+    required this.productId,
     this.variantName,
     required this.price,
     this.discountPrice,
@@ -83,19 +90,33 @@ class VariantModel {
     this.size,
     this.status = 'in-stock',
     this.stock = 0,
+    this.reservedstock = 0,
+    this.availableStock = 0,
+    this.approvalStatus = 'pending',
   });
 
   factory VariantModel.fromJson(Map<String, dynamic> json) {
     return VariantModel(
-      id: json['id'] ?? '',
-      variantName: json['variantName'],
-      price: json['price'] != null ? (json['price'] as num).toDouble() : 0.0,
-      discountPrice: json['discountPrice'] != null ? (json['discountPrice'] as num).toDouble() : null,
-      images: json['images'] != null ? List<String>.from(json['images']) : [],
-      color: json['color'],
-      size: json['size'],
-      status: json['status'] ?? 'in-stock',
-      stock: json['stock'] ?? 0,
+      id: json['id']?.toString() ?? '',
+      productId: json['productId']?.toString() ?? '',
+      variantName: json['variantName']?.toString(),
+      price: json['price'] != null 
+    ? (json['price'] is num ? (json['price'] as num).toDouble() : double.tryParse(json['price'].toString()) ?? 0.0)
+      : 0.0,
+      discountPrice: json['discountPrice'] != null 
+    ? (json['discountPrice'] is num ? (json['discountPrice'] as num).toDouble() : double.tryParse(json['discountPrice'].toString()))
+    : null,
+
+      images: json['images'] != null ? List<String>.from(json['images'].map((i) => i.toString())) : [],
+      color: json['color']?.toString(),
+      size: json['size']?.toString(),
+      status: json['status']?.toString() ?? 'in-stock',
+      stock: json['stock'] != null ? (json['stock'] is num ? (json['stock'] as num).toInt() : int.tryParse(json['stock'].toString()) ?? 0) : 0,
+      reservedstock: json['reservedstock'] != null ? (json['reservedstock'] is num ? (json['reservedstock'] as num).toInt() : int.tryParse(json['reservedstock'].toString()) ?? 0) : (json['reservedStock'] != null ? (json['reservedStock'] is num ? (json['reservedStock'] as num).toInt() : int.tryParse(json['reservedStock'].toString()) ?? 0) : 0),
+      availableStock: json['availableStock'] != null 
+    ? (json['availableStock'] is num ? (json['availableStock'] as num).toInt() : int.tryParse(json['availableStock'].toString()) ?? 0)
+    : (int.tryParse(json['stock']?.toString() ?? '0') ?? 0) - (int.tryParse(json['reservedstock']?.toString() ?? json['reservedStock']?.toString() ?? '0') ?? 0),
+      approvalStatus: json['approvalStatus']?.toString() ?? 'pending',
     );
   }
 }
@@ -119,11 +140,11 @@ class CategoryModel {
 
   factory CategoryModel.fromJson(Map<String, dynamic> json) {
     return CategoryModel(
-      id: json['id'] ?? '',
-      name: json['name'] ?? '',
-      slug: json['slug'] ?? '',
-      description: json['description'],
-      parentId: json['parentId'],
+      id: json['id']?.toString() ?? '',
+      name: json['name']?.toString() ?? '',
+      slug: json['slug']?.toString() ?? '',
+      description: json['description']?.toString(),
+      parentId: json['parentId']?.toString(),
       children: json['children'] != null
           ? (json['children'] as List).map((i) => CategoryModel.fromJson(i)).toList()
           : [],
@@ -146,15 +167,17 @@ class BrandModel {
 
   factory BrandModel.fromJson(Map<String, dynamic> json) {
     return BrandModel(
-      id: json['id'] ?? '',
-      name: json['name'] ?? '',
-      description: json['description'],
-      logoUrl: json['logoUrl'],
+      id: json['id']?.toString() ?? '',
+      name: json['name']?.toString() ?? '',
+      description: json['description']?.toString(),
+      logoUrl: json['logoUrl']?.toString(),
     );
   }
 }
 
 class CartItemModel {
+  final String? id;
+  final String cartId;
   final String productId;
   final String variantId;
   final int quantity;
@@ -162,6 +185,8 @@ class CartItemModel {
   final VariantModel? variant;
 
   CartItemModel({
+    this.id,
+    required this.cartId,
     required this.productId,
     required this.variantId,
     required this.quantity,
@@ -171,9 +196,11 @@ class CartItemModel {
 
   factory CartItemModel.fromJson(Map<String, dynamic> json) {
     return CartItemModel(
-      productId: json['productId'] ?? '',
-      variantId: json['variant'] != null ? (json['variant']['id'] ?? '') : (json['variantId'] ?? ''),
-      quantity: json['quantity'] ?? 0,
+      id: json['id']?.toString(),
+      cartId: json['cartId']?.toString() ?? '',
+      productId: json['productId']?.toString() ?? '',
+      variantId: json['variant'] != null ? (json['variant']['id']?.toString() ?? '') : (json['variantId']?.toString() ?? ''),
+      quantity: json['quantity'] != null ? (json['quantity'] is num ? (json['quantity'] as num).toInt() : int.tryParse(json['quantity'].toString()) ?? 0) : 0,
       product: json['product'] != null ? ProductModel.fromJson(json['product']) : null,
       variant: json['variant'] != null ? VariantModel.fromJson(json['variant']) : null,
     );
@@ -193,8 +220,8 @@ class CartModel {
 
   factory CartModel.fromJson(Map<String, dynamic> json) {
     return CartModel(
-      cartId: json['cartId'] ?? '',
-      userId: json['userId'] ?? '',
+      cartId: json['id']?.toString() ?? json['cartId']?.toString() ?? '',
+      userId: json['userId']?.toString() ?? '',
       items: json['items'] != null
           ? (json['items'] as List).map((i) => CartItemModel.fromJson(i)).toList()
           : [],
@@ -203,28 +230,42 @@ class CartModel {
 }
 
 class OrderItemModel {
+  final String id;
+  final String orderId;
   final String productId;
   final String variantId;
   final int quantity;
   final double priceAtPurchase;
+  final String returnStatus;
+  final int returnedQuantity;
   final ProductModel? product;
   final VariantModel? variant;
 
   OrderItemModel({
+    required this.id,
+    required this.orderId,
     required this.productId,
     required this.variantId,
     required this.quantity,
     required this.priceAtPurchase,
+    this.returnStatus = 'none',
+    this.returnedQuantity = 0,
     this.product,
     this.variant,
   });
 
   factory OrderItemModel.fromJson(Map<String, dynamic> json) {
     return OrderItemModel(
-      productId: json['productId'] ?? '',
-      variantId: json['variantId'] ?? '',
-      quantity: json['quantity'] ?? 0,
-      priceAtPurchase: json['priceAtPurchase'] != null ? (json['priceAtPurchase'] as num).toDouble() : 0.0,
+      id: json['id']?.toString() ?? '',
+      orderId: json['orderId']?.toString() ?? '',
+      productId: json['productId']?.toString() ?? '',
+      variantId: json['variantId']?.toString() ?? '',
+      quantity: json['quantity'] != null ? (json['quantity'] is num ? (json['quantity'] as num).toInt() : int.tryParse(json['quantity'].toString()) ?? 0) : 0,
+      priceAtPurchase: json['priceAtPurchase'] != null 
+    ? (json['priceAtPurchase'] is num ? (json['priceAtPurchase'] as num).toDouble() : double.tryParse(json['priceAtPurchase'].toString()) ?? 0.0)
+    : 0.0,
+      returnStatus: json['returnStatus']?.toString() ?? 'none',
+      returnedQuantity: json['returnedQuantity'] != null ? (json['returnedQuantity'] is num ? (json['returnedQuantity'] as num).toInt() : int.tryParse(json['returnedQuantity'].toString()) ?? 0) : 0,
       product: json['product'] != null ? ProductModel.fromJson(json['product']) : null,
       variant: json['variant'] != null ? VariantModel.fromJson(json['variant']) : null,
     );
@@ -239,6 +280,8 @@ class OrderModel {
   String orderStatus;
   final String paymentMethod;
   final String paymentStatus;
+  final String? razorpayOrderId;
+  final String? razorpayPaymentId;
   final String createdAt;
   final String? shippingAddress;
   final List<OrderItemModel> items;
@@ -251,6 +294,8 @@ class OrderModel {
     required this.orderStatus,
     required this.paymentMethod,
     required this.paymentStatus,
+    this.razorpayOrderId,
+    this.razorpayPaymentId,
     required this.createdAt,
     this.shippingAddress,
     this.items = const [],
@@ -263,14 +308,18 @@ class OrderModel {
       derivedAddr = "${a['addressLine1'] ?? ''}${a['addressLine2'] != null ? ', ' + a['addressLine2'] : ''}, ${a['city'] ?? ''}, ${a['state'] ?? ''} - ${a['postal_code'] ?? ''}, ${a['country'] ?? ''}";
     }
     return OrderModel(
-      id: json['id'] ?? '',
-      userId: json['userId'] ?? '',
-      addressId: json['addressId'] ?? '',
-      totalAmount: json['totalAmount'] != null ? (json['totalAmount'] as num).toDouble() : 0.0,
-      orderStatus: json['orderStatus'] ?? 'pending',
-      paymentMethod: json['paymentMethod'] ?? 'COD',
-      paymentStatus: json['paymentStatus'] ?? 'pending',
-      createdAt: json['createdAt'] ?? '',
+      id: json['id']?.toString() ?? '',
+      userId: json['userId']?.toString() ?? '',
+      addressId: json['addressId']?.toString() ?? '',
+     totalAmount: json['totalAmount'] != null 
+      ? (json['totalAmount'] is num ? (json['totalAmount'] as num).toDouble() : double.tryParse(json['totalAmount'].toString()) ?? 0.0)
+      : 0.0,
+      orderStatus: json['orderStatus']?.toString() ?? 'processing',
+      paymentMethod: json['paymentMethod']?.toString() ?? 'cod',
+      paymentStatus: json['paymentStatus']?.toString() ?? 'pending',
+      razorpayOrderId: json['razorpayOrderId']?.toString(),
+      razorpayPaymentId: json['razorpayPaymentId']?.toString(),
+      createdAt: json['createdAt']?.toString() ?? '',
       shippingAddress: derivedAddr,
       items: json['items'] != null
           ? (json['items'] as List).map((i) => OrderItemModel.fromJson(i)).toList()
@@ -310,18 +359,18 @@ class AddressModel {
 
   factory AddressModel.fromJson(Map<String, dynamic> json) {
     return AddressModel(
-      id: json['id'] ?? '',
-      userId: json['userId'] ?? '',
-      addressLabel: json['addressLabel'] ?? 'Home',
-      recipientName: json['recipientName'] ?? '',
-      addressLine1: json['addressLine1'] ?? '',
-      addressLine2: json['addressLine2'],
-      city: json['city'] ?? '',
-      state: json['state'] ?? '',
-      postalCode: json['postal_code'] ?? '',
-      country: json['country'] ?? '',
-      isDefaultBilling: json['isDefaultBilling'] ?? false,
-      isDefaultShipping: json['isDefaultShipping'] ?? false,
+      id: json['id']?.toString() ?? '',
+      userId: json['userId']?.toString() ?? '',
+      addressLabel: json['addressLabel']?.toString() ?? 'Home',
+      recipientName: json['recipientName']?.toString() ?? '',
+      addressLine1: json['addressLine1']?.toString() ?? '',
+      addressLine2: json['addressLine2']?.toString(),
+      city: json['city']?.toString() ?? '',
+      state: json['state']?.toString() ?? '',
+      postalCode: json['postal_code']?.toString() ?? '',
+      country: json["country"]?.toString() ?? '',
+      isDefaultBilling: json['isDefaultBilling'] == true || json['isDefaultBilling'] == 1,
+      isDefaultShipping: json['isDefaultShipping'] == true || json['isDefaultShipping'] == 1,
     );
   }
 
@@ -332,5 +381,34 @@ class AddressModel {
     }
     addr += ', $city, $state - $postalCode, $country';
     return addr;
+  }
+}
+
+class WishlistItemModel {
+  final String id;
+  final String wishlistId;
+  final String productId;
+  final String variantId;
+  final ProductModel? product;
+  final VariantModel? variant;
+
+  WishlistItemModel({
+    required this.id,
+    required this.wishlistId,
+    required this.productId,
+    required this.variantId,
+    this.product,
+    this.variant,
+  });
+
+  factory WishlistItemModel.fromJson(Map<String, dynamic> json) {
+    return WishlistItemModel(
+      id: json['id'] ?? '',
+      wishlistId: json['wishlistId'] ?? '',
+      productId: json['productId'] ?? '',
+      variantId: json['variantId'] ?? (json['variant'] != null ? json['variant']['id'] : ''),
+      product: json['product'] != null ? ProductModel.fromJson(json['product']) : null,
+      variant: json['variant'] != null ? VariantModel.fromJson(json['variant']) : null,
+    );
   }
 }

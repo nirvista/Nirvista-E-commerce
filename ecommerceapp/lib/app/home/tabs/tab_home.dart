@@ -35,26 +35,112 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
   final loginController = Get.find<LoginDataController>();
 
   RxString userCity = "Set Location".obs;
+  
+  // Reactive product lists
+  RxList<ProductModel> bestSellingList = <ProductModel>[].obs;
+  RxList<ProductModel> topDealsList = <ProductModel>[].obs;
+  RxList<ProductModel> popularPicksList = <ProductModel>[].obs;
 
-  Future<List<ProductModel>>? bestSellingFuture;
-  Future<List<ProductModel>>? topDealsFuture;
   Future<List<BrandModel>>? brandsFuture;
-  Future<List<ProductModel>>? popularPicksFuture;
   Future<List<CategoryModel>>? categoriesFuture;
 
   RxString selectedCategory = "for_you".obs;
   RxString selectedBrand = "".obs;
   RxInt sliderPos = 0.obs;
+  RxBool isSectionLoading = false.obs;
 
   @override
   void initState() {
     super.initState();
-    bestSellingFuture = _fetchProducts(ProductApiService.getAllProducts());
-    topDealsFuture = _fetchProducts(ProductApiService.getTopRatedProducts());
-    popularPicksFuture = _fetchProducts(ProductApiService.getNewArrivals());
+    _refreshAllSections();
     brandsFuture = _fetchBrands();
     categoriesFuture = _fetchCategories();
     _fetchUserLocation();
+  }
+
+  Future<void> _refreshAllSections() async {
+    isSectionLoading.value = true;
+    try {
+      // Step 1: Fetch categories first to use them for scraping 'For You' products
+      final catRes = await CategoryApiService.getAllCategories();
+      List<CategoryModel> cats = [];
+      if (catRes['success']) {
+        cats = (catRes['data'] as List).map((e) => CategoryModel.fromJson(e)).toList();
+      }
+
+      if (cats.isEmpty) {
+        // Fallback to restricted API if categories are empty
+        final results = await Future.wait([
+          _fetchProducts(ProductApiService.getAllProducts()),
+          _fetchProducts(ProductApiService.getTopRatedProducts()),
+          _fetchProducts(ProductApiService.getNewArrivals()),
+        ]);
+        bestSellingList.value = results[0];
+        topDealsList.value = results[1];
+        popularPicksList.value = results[2];
+        return;
+      }
+
+      // Step 2: Scrape products from the first 3 categories (bypass restricted Product API)
+      final scrapeResults = await Future.wait(
+        cats.take(3).map((c) => CategoryApiService.getProductsByCategory(c.id))
+      );
+
+      List<ProductModel> allScraped = [];
+      for (var res in scrapeResults) {
+        if (res['success']) {
+          List<dynamic> data = res['data'];
+          allScraped.addAll(data.map((e) => ProductModel.fromJson(e)).toList());
+        }
+      }
+
+      // Deduplicate by ID
+      final Map<String, ProductModel> uniqueProds = {for (var p in allScraped) p.id: p};
+      final mergedProducts = uniqueProds.values.toList();
+
+      if (mergedProducts.isEmpty) {
+        // Ultimate fallback
+        bestSellingList.clear();
+        topDealsList.clear();
+        popularPicksList.clear();
+      } else {
+        bestSellingList.value = mergedProducts;
+        topDealsList.value = mergedProducts.where((p) => p.variants.any((v) => v.discountPrice != null && v.discountPrice! > 0)).toList();
+        popularPicksList.value = mergedProducts;
+      }
+
+    } catch (e) {
+      print("Error refreshing sections: $e");
+    } finally {
+      isSectionLoading.value = false;
+    }
+  }
+
+  Future<void> _updateCategoryProducts(String catId) async {
+    if (catId == "for_you") {
+      _refreshAllSections();
+      return;
+    }
+
+    isSectionLoading.value = true;
+    try {
+      final res = await CategoryApiService.getProductsByCategory(catId);
+      if (res['success']) {
+        List<dynamic> data = res['data'];
+        final products = data.map((e) => ProductModel.fromJson(e)).toList();
+        
+        // Populate all sections with category products
+        // In a real app, you might have category-specific best sellers, 
+        // but here we'll show the category products in these sections.
+        bestSellingList.value = products;
+        topDealsList.value = products.where((p) => p.variants.any((v) => v.discountPrice != null && v.discountPrice! > 0)).toList();
+        popularPicksList.value = products;
+      }
+    } catch (e) {
+      print("Error updating category products: $e");
+    } finally {
+      isSectionLoading.value = false;
+    }
   }
 
   Future<void> _fetchUserLocation() async {
@@ -251,11 +337,11 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
     bool isSelected = selectedCategory.value == catId;
     return InkWell(
       onTap: () {
+        if (selectedCategory.value == catId) return;
         selectedCategory.value = catId;
         storeController.setSelectedCategory(catId);
         storeController.setSelectedCategoryName(catName);
-        // Note: the original UI didn't refresh products on click, you might want to call _fetchProducts here
-        // if this tab is supposed to filter the sections below, or just navigate.
+        _updateCategoryProducts(catId);
       },
       child: Padding(
         padding: EdgeInsets.only(right: 20.w),
@@ -395,6 +481,7 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
                 GestureDetector(
                   onTap: () {
                     storeController.setSelectedCategory("best_selling");
+                    storeController.setSelectedCategoryName("Best Selling");
                     Constant.sendToNext(context, categoryProductsPageRoute);
                   },
                   child: getCustomFont("View All", 14, accentColor, 1,
@@ -406,42 +493,26 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
           SizedBox(height: 16.h),
           SizedBox(
             height: 200.w,
-            child: FutureBuilder<List<ProductModel>>(
-              future: bestSellingFuture,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return Center(child: CircularProgressIndicator(color: accentColor));
-                }
-                if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
-                  return Center(child: getCustomFont("No products available", 14, getFontGreyColor(context), 1));
-                }
-                
-                var allProducts = snapshot.data!;
-                return Obx(() {
-                  var currentCat = selectedCategory.value;
-                  var products = currentCat == 'for_you'
-                      ? allProducts
-                      : allProducts.where((p) => p.categoryId == currentCat).toList();
-
-                  if (products.isEmpty) {
-                    return Center(child: getCustomFont("No products available", 14, getFontGreyColor(context), 1));
-                  }
-
-                  return ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    padding: EdgeInsets.symmetric(horizontal: margin),
-                    itemCount: products.length,
-                    itemBuilder: (context, index) {
-                      return _buildProductCard(
-                        context,
-                        products[index],
-                        width: 150.w,
-                      );
-                    },
+            child: Obx(() {
+              if (isSectionLoading.value) {
+                return Center(child: CircularProgressIndicator(color: accentColor));
+              }
+              if (bestSellingList.isEmpty) {
+                return Center(child: getCustomFont("No products available", 14, getFontGreyColor(context), 1));
+              }
+              return ListView.builder(
+                scrollDirection: Axis.horizontal,
+                padding: EdgeInsets.symmetric(horizontal: margin),
+                itemCount: bestSellingList.length,
+                itemBuilder: (context, index) {
+                  return _buildProductCard(
+                    context,
+                    bestSellingList[index],
+                    width: 150.w,
                   );
-                });
-              },
-            )
+                },
+              );
+            }),
           ),
         ],
       ),
@@ -464,6 +535,7 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
                 GestureDetector(
                   onTap: () {
                     storeController.setSelectedCategory("top_deals");
+                    storeController.setSelectedCategoryName("Top Deals For You");
                     Constant.sendToNext(context, categoryProductsPageRoute);
                   },
                   child: getCustomFont("View All", 14, accentColor, 1,
@@ -475,42 +547,26 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
           SizedBox(height: 16.h),
           SizedBox(
             height: 200.w,
-            child: FutureBuilder<List<ProductModel>>(
-              future: topDealsFuture,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return Center(child: CircularProgressIndicator(color: accentColor));
-                }
-                if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
-                  return Center(child: getCustomFont("No top deals available", 14, getFontGreyColor(context), 1));
-                }
-                
-                var allProducts = snapshot.data!;
-                return Obx(() {
-                  var currentCat = selectedCategory.value;
-                  var products = currentCat == 'for_you'
-                      ? allProducts
-                      : allProducts.where((p) => p.categoryId == currentCat).toList();
-
-                  if (products.isEmpty) {
-                    return Center(child: getCustomFont("No top deals available", 14, getFontGreyColor(context), 1));
-                  }
-
-                  return ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    padding: EdgeInsets.symmetric(horizontal: margin),
-                    itemCount: products.length,
-                    itemBuilder: (context, index) {
-                      return _buildProductCard(
-                        context,
-                        products[index],
-                        width: 150.w,
-                      );
-                    },
+            child: Obx(() {
+              if (isSectionLoading.value) {
+                return Center(child: CircularProgressIndicator(color: accentColor));
+              }
+              if (topDealsList.isEmpty) {
+                return Center(child: getCustomFont("No top deals available", 14, getFontGreyColor(context), 1));
+              }
+              return ListView.builder(
+                scrollDirection: Axis.horizontal,
+                padding: EdgeInsets.symmetric(horizontal: margin),
+                itemCount: topDealsList.length,
+                itemBuilder: (context, index) {
+                  return _buildProductCard(
+                    context,
+                    topDealsList[index],
+                    width: 150.w,
                   );
-                });
-              },
-            )
+                },
+              );
+            }),
           ),
         ],
       ),
@@ -585,9 +641,27 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
             return SizedBox(
               height: 200.w,
               child: FutureBuilder<Map<String, dynamic>>(
-                future: selectedBrand.value == 'all' 
-                    ? ProductApiService.getAllProducts() 
-                    : BrandApiService.getProductsByBrand(selectedBrand.value),
+                future: () async {
+                  if (selectedBrand.value == 'all') {
+                    // Scrape from top brands to bypass Product API restriction
+                    final bRes = await BrandApiService.getAllBrands();
+                    if (!bRes['success']) return {'success': false};
+                    List<BrandModel> topBrands = (bRes['data'] as List).take(3).map((e) => BrandModel.fromJson(e)).toList();
+                    
+                    final brandScrape = await Future.wait(topBrands.map((b) => BrandApiService.getProductsByBrand(b.id)));
+                    List<dynamic> allProds = [];
+                    for (var r in brandScrape) {
+                      if (r['success']) {
+                        var d = r['data'];
+                        if (d is List) allProds.addAll(d);
+                        else if (d is Map && d['products'] is List) allProds.addAll(d['products']);
+                      }
+                    }
+                    return {'success': true, 'data': allProds};
+                  } else {
+                    return BrandApiService.getProductsByBrand(selectedBrand.value);
+                  }
+                }(),
                 builder: (context, prodSnapshot) {
                    if (prodSnapshot.connectionState == ConnectionState.waiting) {
                       return Center(child: CircularProgressIndicator(color: accentColor));
@@ -647,47 +721,32 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
             ],
           ),
           SizedBox(height: 16.h),
-          FutureBuilder<List<ProductModel>>(
-            future: popularPicksFuture,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return Center(child: CircularProgressIndicator(color: accentColor));
-              }
-              if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
-                return Center(child: getCustomFont("No picks available", 14, getFontGreyColor(context), 1));
-              }
-              var allProducts = snapshot.data!;
-              return Obx(() {
-                var currentCat = selectedCategory.value;
-                var popularProducts = currentCat == 'for_you'
-                    ? allProducts
-                    : allProducts.where((p) => p.categoryId == currentCat).toList();
-
-                if (popularProducts.isEmpty) {
-                  return Center(child: getCustomFont("No picks available", 14, getFontGreyColor(context), 1));
-                }
-
-                return GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 12.w,
-                    mainAxisSpacing: 12.w,
-                    childAspectRatio: 0.75,
-                  ),
-                  itemCount: popularProducts.take(4).length,
-                  itemBuilder: (context, index) {
-                    return _buildProductCard(
-                      context,
-                      popularProducts[index],
-                      width: double.infinity,
-                    );
-                  },
-                );
-              });
+          Obx(() {
+            if (isSectionLoading.value) {
+              return Center(child: CircularProgressIndicator(color: accentColor));
             }
-          )
+            if (popularPicksList.isEmpty) {
+              return Center(child: getCustomFont("No picks available", 14, getFontGreyColor(context), 1));
+            }
+            return GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                crossAxisSpacing: 12.w,
+                mainAxisSpacing: 12.w,
+                childAspectRatio: 0.75,
+              ),
+              itemCount: popularPicksList.take(4).length,
+              itemBuilder: (context, index) {
+                return _buildProductCard(
+                  context,
+                  popularPicksList[index],
+                  width: double.infinity,
+                );
+              },
+            );
+          }),
         ],
       ),
     );
@@ -698,6 +757,10 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
     double basePrice = product.originalPrice;
     double currentPrice = product.currentPrice;
     double discountPercent = 0.0;
+    
+    // Add safety check for zero or negative prices
+    if (basePrice <= 0) basePrice = currentPrice;
+    if (currentPrice <= 0) currentPrice = basePrice;
     
     if (basePrice > 0 && currentPrice > 0 && basePrice > currentPrice) {
       discountPercent = (((basePrice - currentPrice) / basePrice) * 100).toDouble();

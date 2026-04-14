@@ -32,27 +32,27 @@ class RetrieveCoupon {
       this.links,});
 
   RetrieveCoupon.fromJson(dynamic json) {
-    id = json['id'];
-    code = json['code'];
-    amount = json['amount'];
-    status = json['status'];
-    dateCreated = json['date_created'];
-    dateCreatedGmt = json['date_created_gmt'];
-    dateModified = json['date_modified'];
-    dateModifiedGmt = json['date_modified_gmt'];
-    discountType = json['discount_type'];
-    description = json['description'];
-    dateExpires = json['date_expires'];
-    dateExpiresGmt = json['date_expires_gmt'];
-    usageCount = json['usage_count'];
+    id = json['id'] is int ? json['id'] : int.tryParse(json['id']?.toString() ?? '');
+    code = json['code']?.toString();
+    amount = json['amount']?.toString();
+    status = json['status']?.toString();
+    dateCreated = json['date_created']?.toString();
+    dateCreatedGmt = json['date_created_gmt']?.toString();
+    dateModified = json['date_modified']?.toString();
+    dateModifiedGmt = json['date_modified_gmt']?.toString();
+    discountType = json['discount_type']?.toString();
+    description = json['description']?.toString();
+    dateExpires = json['date_expires']?.toString();
+    dateExpiresGmt = json['date_expires_gmt']?.toString();
+    usageCount = json['usage_count'] is int ? json['usage_count'] : int.tryParse(json['usage_count']?.toString() ?? '');
     individualUse = json['individual_use'];
     usageLimit = json['usage_limit'];
     usageLimitPerUser = json['usage_limit_per_user'];
     limitUsageToXItems = json['limit_usage_to_x_items'];
     freeShipping = json['free_shipping'];
     excludeSaleItems = json['exclude_sale_items'];
-    minimumAmount = json['minimum_amount'];
-    maximumAmount = json['maximum_amount'];
+    minimumAmount = json['minimum_amount']?.toString();
+    maximumAmount = json['maximum_amount']?.toString();
     links = json['_links'] != null ? Links.fromJson(json['_links']) : null;
   }
   int? id;

@@ -34,7 +34,8 @@ class DummyProduct {
   });
 
   double get discountPercentage {
-    if (originalPrice == 0) return 0;
-    return ((originalPrice - price) / originalPrice * 100).toStringAsFixed(0) as double;
+    if (originalPrice <= 0) return 0;
+    double discount = ((originalPrice - price) / originalPrice * 100);
+    return double.tryParse(discount.toStringAsFixed(0)) ?? 0.0;
   }
 }

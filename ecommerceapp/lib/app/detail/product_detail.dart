@@ -214,7 +214,6 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
       BuildContext context, ProductModel product, double margin) {
     return Stack(
       children: [
-        // Product Image
         Container(
           width: double.infinity,
           height: 300.h,
@@ -231,7 +230,6 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
             ),
           ),
         ),
-        // Wishlist Heart Button
         Positioned(
           top: 12.h,
           right: 12.w,
@@ -365,9 +363,7 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
                   "Select Size", 14, getFontColor(context), 1,
                   fontWeight: FontWeight.w600),
               GestureDetector(
-                onTap: () {
-                  // Size chart action
-                },
+                onTap: () {},
                 child: getCustomFont(
                     "Size Chart", 12, accentColor, 1,
                     fontWeight: FontWeight.w600),
@@ -418,6 +414,10 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
     double basePrice = product.originalPrice;
     double currentPrice = product.currentPrice;
     double discountPercent = 0.0;
+    
+    // Add safety check for zero or negative prices
+    if (basePrice <= 0) basePrice = currentPrice;
+    if (currentPrice <= 0) currentPrice = basePrice;
     
     if (basePrice > 0 && currentPrice > 0 && basePrice > currentPrice) {
       discountPercent = (((basePrice - currentPrice) / basePrice) * 100).toDouble();
@@ -641,101 +641,119 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
         top: false,
         child: Obx(() {
           final cartController = Get.find<CartController>();
-          // Read cartModel to trigger reactivity
           final _cart = cartController.cartModel.value;
           int cartQty = _getCartQuantity(product);
           bool isInCart = cartQty > 0;
+          
+          VariantModel? variant = _getSelectedVariant(product);
+          bool isOutOfStock = variant != null && variant.availableStock <= 0;
+          bool hasReachedMaxStock = variant != null && cartQty >= variant.availableStock;
 
           return Row(
             children: [
               // Left: "Add to Cart" OR quantity +/- selector
               Expanded(
-                child: isInCart
+                child: isOutOfStock 
                     ? Container(
-                        padding: EdgeInsets.symmetric(vertical: 6.h),
+                        padding: EdgeInsets.symmetric(vertical: 12.h),
                         decoration: BoxDecoration(
-                          border: Border.all(color: getFontColor(context), width: 1.5),
+                          color: Colors.grey.shade400,
                           borderRadius: BorderRadius.circular(8.w),
                         ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            GestureDetector(
-                              onTap: () {
-                                VariantModel? variant = _getSelectedVariant(product);
-                                if (variant == null) return;
-                                cartController.decreaseQuantity(product.id, variant.id);
-                              },
-                              child: SizedBox(
-                                width: 36.w,
-                                height: 36.w,
-                                child: Center(
-                                  child: Icon(Icons.remove, size: 20.w, color: getFontColor(context)),
-                                ),
-                              ),
-                            ),
-                            Container(
-                              width: 40.w,
-                              alignment: Alignment.center,
-                              child: getCustomFont("$cartQty", 16, getFontColor(context), 1, fontWeight: FontWeight.w700),
-                            ),
-                            GestureDetector(
-                              onTap: () {
-                                VariantModel? variant = _getSelectedVariant(product);
-                                if (variant == null) return;
-                                cartController.increaseQuantity(product.id, variant.id);
-                              },
-                              child: SizedBox(
-                                width: 36.w,
-                                height: 36.w,
-                                child: Center(
-                                  child: Icon(Icons.add, size: 20.w, color: accentColor),
-                                ),
-                              ),
-                            ),
-                          ],
+                        child: Center(
+                          child: getCustomFont("Out of Stock", 14,
+                              Colors.white, 1,
+                              fontWeight: FontWeight.w700),
                         ),
                       )
-                    : GestureDetector(
-                        onTap: () async {
-                          VariantModel? variant = _getSelectedVariant(product);
-                          if (variant == null) return;
-                          try {
-                            final loginController = Get.find<LoginDataController>();
-                            if (loginController.currentUser.value == null || loginController.currentUser.value!.id == null) {
-                              Constant.sendToNext(context, loginRoute);
-                              return;
-                            }
-                            bool success = await cartController.addToCart(product.id, variant.id);
-                            if (success) {
-                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Added to cart!'), backgroundColor: Colors.green));
-                            } else {
-                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to add to cart'), backgroundColor: Colors.red));
-                            }
-                          } catch (e) {
-                            Constant.sendToNext(context, loginRoute);
-                          }
-                        },
-                        child: Container(
-                          padding: EdgeInsets.symmetric(vertical: 12.h),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: getFontColor(context), width: 1.5),
-                            borderRadius: BorderRadius.circular(8.w),
+                    : isInCart
+                        ? Container(
+                            padding: EdgeInsets.symmetric(vertical: 6.h),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: getFontColor(context), width: 1.5),
+                              borderRadius: BorderRadius.circular(8.w),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                GestureDetector(
+                                  onTap: () {
+                                    if (variant == null) return;
+                                    cartController.decreaseQuantity(product.id, variant.id);
+                                  },
+                                  child: SizedBox(
+                                    width: 36.w,
+                                    height: 36.w,
+                                    child: Center(
+                                      child: Icon(Icons.remove, size: 20.w, color: getFontColor(context)),
+                                    ),
+                                  ),
+                                ),
+                                Container(
+                                  width: 40.w,
+                                  alignment: Alignment.center,
+                                  child: getCustomFont("$cartQty", 16, getFontColor(context), 1, fontWeight: FontWeight.w700),
+                                ),
+                                GestureDetector(
+                                  onTap: () {
+                                    if (variant == null) return;
+                                    if (hasReachedMaxStock) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(content: Text('Maximum stock reached'), backgroundColor: Colors.orange)
+                                      );
+                                      return;
+                                    }
+                                    cartController.increaseQuantity(product.id, variant.id);
+                                  },
+                                  child: SizedBox(
+                                    width: 36.w,
+                                    height: 36.w,
+                                    child: Center(
+                                      child: Icon(Icons.add, size: 20.w, color: accentColor),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : GestureDetector(
+                            onTap: () async {
+                              if (variant == null) return;
+                              try {
+                                final loginController = Get.find<LoginDataController>();
+                                if (loginController.currentUser.value == null || loginController.currentUser.value!.id == null) {
+                                  Constant.sendToNext(context, loginRoute);
+                                  return;
+                                }
+                                bool success = await cartController.addToCart(product.id, variant.id);
+                                if (success) {
+                                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Added to cart!'), backgroundColor: Colors.green));
+                                } else {
+                                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to add to cart'), backgroundColor: Colors.red));
+                                }
+                              } catch (e) {
+                                Constant.sendToNext(context, loginRoute);
+                              }
+                            },
+                            child: Container(
+                              padding: EdgeInsets.symmetric(vertical: 12.h),
+                              decoration: BoxDecoration(
+                                border: Border.all(color: getFontColor(context), width: 1.5),
+                                borderRadius: BorderRadius.circular(8.w),
+                              ),
+                              child: Center(
+                                child: getCustomFont("Add to Cart", 14,
+                                    getFontColor(context), 1,
+                                    fontWeight: FontWeight.w700),
+                              ),
+                            ),
                           ),
-                          child: Center(
-                            child: getCustomFont("Add to Cart", 14,
-                                getFontColor(context), 1,
-                                fontWeight: FontWeight.w700),
-                          ),
-                        ),
-                      ),
               ),
               SizedBox(width: 12.w),
               // Right: Buy Now
               Expanded(
                 child: GestureDetector(
-                  onTap: () async {
-                    VariantModel? variant = _getSelectedVariant(product);
+                  onTap: isOutOfStock ? null : () async {
                     if (variant == null) return;
                     try {
                       final loginController = Get.find<LoginDataController>();
@@ -758,13 +776,13 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
                   child: Container(
                     padding: EdgeInsets.symmetric(vertical: 12.h),
                     decoration: BoxDecoration(
-                      color: ratedColor,
+                      color: isOutOfStock ? Colors.grey.shade300 : ratedColor,
                       borderRadius: BorderRadius.circular(8.w),
                     ),
                     child: Center(
                       child: getCustomFont(
-                          "Buy at \u20B9${product.currentPrice.toStringAsFixed(0)}", 14,
-                          Colors.black, 1,
+                          isOutOfStock ? "Unavailable" : "Buy at \u20B9${product.currentPrice.toStringAsFixed(0)}", 14,
+                          isOutOfStock ? Colors.grey : Colors.black, 1,
                           fontWeight: FontWeight.w700),
                     ),
                   ),
@@ -777,4 +795,3 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
     );
   }
 }
-

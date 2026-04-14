@@ -33,10 +33,10 @@ class OrderApiService {
         body: jsonEncode(bodyData),
       );
       if (response.statusCode == 200 || response.statusCode == 201) {
+        final decoded = jsonDecode(response.body);
         return {
           'success': true,
-          'data': jsonDecode(response.body)['data'],
-          'message': jsonDecode(response.body)['message']
+          ...decoded,
         };
       } else {
         return {

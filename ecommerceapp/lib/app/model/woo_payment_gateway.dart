@@ -30,16 +30,16 @@ class WooPaymentGateway {
   Links? links;
 
   factory WooPaymentGateway.fromJson(Map<String, dynamic> json) => WooPaymentGateway(
-    id: json["id"],
-    title: json["title"],
-    description: json["description"],
-    order: (json["order"].toString().isEmpty)?null:json["order"],
+    id: json["id"]?.toString(),
+    title: json["title"]?.toString(),
+    description: json["description"]?.toString(),
+    order: json["order"] is int ? json["order"] : int.tryParse(json["order"]?.toString() ?? ''),
     enabled: json["enabled"],
-    methodTitle: json["method_title"],
-    methodDescription: json["method_description"],
-    methodSupports: List<String>.from(json["method_supports"].map((x) => x)),
+    methodTitle: json["method_title"]?.toString(),
+    methodDescription: json["method_description"]?.toString(),
+    methodSupports: json["method_supports"] != null ? List<String>.from(json["method_supports"].map((x) => x.toString())) : [],
     // settings: Map.from(json["settings"]).map((k, v) => MapEntry<String, Setting>(k, Setting.fromJson(v))),
-    links: Links.fromJson(json["_links"]),
+    links: json["_links"] != null ? Links.fromJson(json["_links"]) : null,
   );
 
   Map<String, dynamic> toJson() => {
@@ -116,7 +116,7 @@ class Setting {
   // Options? options;
 
   factory Setting.fromJson(Map<String, dynamic> json) => Setting(
-    id: json["id"],
+    id: json["id"]?.toString(),
     // label: json["label"],
     // description: json["description"],
     // type: json["type"],
@@ -156,11 +156,11 @@ class Options {
   String? authorization;
 
   factory Options.fromJson(Map<String, dynamic> json) => Options(
-    flatRate: json["flat_rate"] == null ? null : json["flat_rate"],
-    freeShipping: json["free_shipping"] == null ? null : json["free_shipping"],
-    localPickup: json["local_pickup"] == null ? null : json["local_pickup"],
-    sale: json["sale"] == null ? null : json["sale"],
-    authorization: json["authorization"] == null ? null : json["authorization"],
+    flatRate: json["flat_rate"]?.toString(),
+    freeShipping: json["free_shipping"]?.toString(),
+    localPickup: json["local_pickup"]?.toString(),
+    sale: json["sale"]?.toString(),
+    authorization: json["authorization"]?.toString(),
   );
 
   Map<String, dynamic> toJson() => {

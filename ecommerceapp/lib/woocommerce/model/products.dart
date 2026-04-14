@@ -155,78 +155,78 @@ class WooProduct {
       this.metaData);
 
   WooProduct.fromJson(Map<String, dynamic> json)
-      : id = json['id'],
-        name = json['name'],
-        slug = json['slug'],
-        permalink = json['permalink'],
-        type = json['type'],
-        status = json['status'],
+      : id = json['id'] is int ? json['id'] : int.tryParse(json['id']?.toString() ?? ''),
+        name = json['name']?.toString(),
+        slug = json['slug']?.toString(),
+        permalink = json['permalink']?.toString(),
+        type = json['type']?.toString(),
+        status = json['status']?.toString(),
         featured = json['featured'],
-        catalogVisibility = json['catalog_visibility'],
-        description = json['description'],
-        shortDescription = json['short_description'],
-        sku = json['sku'],
-        price = json['price'],
-        regularPrice = json['regular_price'],
-        salePrice = json['sale_price'],
-        priceHtml = json['price_html'],
+        catalogVisibility = json['catalog_visibility']?.toString(),
+        description = json['description']?.toString(),
+        shortDescription = json['short_description']?.toString(),
+        sku = json['sku']?.toString(),
+        price = json['price']?.toString(),
+        regularPrice = json['regular_price']?.toString(),
+        salePrice = json['sale_price']?.toString(),
+        priceHtml = json['price_html']?.toString(),
         onSale = json['on_sale'],
         purchasable = json['purchasable'],
-        totalSales = json['total_sales'],
+        totalSales = json['total_sales'] is int ? json['total_sales'] : int.tryParse(json['total_sales']?.toString() ?? ''),
         virtual = json['virtual'],
         downloadable = json['downloadable'],
-        downloads = (json['downloads'] as List)
-            .map((i) => WooProductDownload.fromJson(i))
-            .toList(),
-        downloadLimit = json['download_limit'],
-        downloadExpiry = json['download_expiry'],
-        externalUrl = json['external_url'],
-        buttonText = json['button_text'],
-        taxStatus = json['tax_status'],
-        taxClass = json['tax_class'],
+        downloads = (json['downloads'] as List?)
+            ?.map((i) => WooProductDownload.fromJson(i))
+            .toList() ?? [],
+        downloadLimit = json['download_limit'] is int ? json['download_limit'] : int.tryParse(json['download_limit']?.toString() ?? ''),
+        downloadExpiry = json['download_expiry'] is int ? json['download_expiry'] : int.tryParse(json['download_expiry']?.toString() ?? ''),
+        externalUrl = json['external_url']?.toString(),
+        buttonText = json['button_text']?.toString(),
+        taxStatus = json['tax_status']?.toString(),
+        taxClass = json['tax_class']?.toString(),
         manageStock = json['manage_stock'],
-        stockQuantity = json['stock_quantity'],
-        stockStatus = json['stock_status'],
-        backorders = json['backorders'],
+        stockQuantity = json['stock_quantity'] is int ? json['stock_quantity'] : int.tryParse(json['stock_quantity']?.toString() ?? ''),
+        stockStatus = json['stock_status']?.toString(),
+        backorders = json['backorders']?.toString(),
         backordersAllowed = json['backorders_allowed'],
         backordered = json['backordered'],
         soldIndividually = json['sold_individually'],
-        weight = json['weight'],
-        dimensions = WooProductDimension.fromJson(json['dimensions']),
+        weight = json['weight']?.toString(),
+        dimensions = WooProductDimension.fromJson(json['dimensions'] ?? {}),
         shippingRequired = json['shipping_required'],
         shippingTaxable = json['shipping_taxable'],
-        shippingClass = json['shipping_class'],
-        shippingClassId = json['shipping_class_id'],
+        shippingClass = json['shipping_class']?.toString(),
+        shippingClassId = json['shipping_class_id'] is int ? json['shipping_class_id'] : int.tryParse(json['shipping_class_id']?.toString() ?? ''),
         reviewsAllowed = json['reviews_allowed'],
-        averageRating = json['average_rating'],
-        ratingCount = json['rating_count'],
-        relatedIds = json['related_ids'].cast<int>(),
-        upsellIds = json['upsell_ids'].cast<int>(),
-        crossSellIds = json['cross_sell_ids'].cast<int>(),
-        parentId = json['parent_id'],
-        purchaseNote = json['purchase_note'],
-        categories = (json['categories'] as List)
-            .map((i) => WooProductCategory.fromJson(i))
-            .toList(),
-        tags = (json['tags'] as List)
-            .map((i) => WooProductItemTag.fromJson(i))
-            .toList(),
-        images = (json['images'] as List)
-            .map((i) => WooProductImage.fromJson(i))
-            .toList(),
-        attributes = (json['attributes'] as List)
-            .map((i) => WooProductItemAttribute.fromJson(i))
-            .toList(),
-        defaultAttributes = (json['default_attributes'] as List)
-            .map((i) => WooProductDefaultAttribute.fromJson(i))
-            .toList(),
-        variations = json['variations'].cast<int>(),
-        groupedProducts = json['grouped_products'].cast<int>(),
-        menuOrder = json['menu_order'],
-        date_created = json['date_created'],
-        metaData = (json['meta_data'] as List)
-            .map((i) => MetaData.fromJson(i))
-            .toList();
+        averageRating = json['average_rating']?.toString(),
+        ratingCount = json['rating_count'] is int ? json['rating_count'] : int.tryParse(json['rating_count']?.toString() ?? ''),
+        relatedIds = json['related_ids'] != null ? List<int>.from(json['related_ids'].map((i) => i is int ? i : int.tryParse(i.toString()) ?? 0)) : [],
+        upsellIds = json['upsell_ids'] != null ? List<int>.from(json['upsell_ids'].map((i) => i is int ? i : int.tryParse(i.toString()) ?? 0)) : [],
+        crossSellIds = json['cross_sell_ids'] != null ? List<int>.from(json['cross_sell_ids'].map((i) => i is int ? i : int.tryParse(i.toString()) ?? 0)) : [],
+        parentId = json['parent_id'] is int ? json['parent_id'] : int.tryParse(json['parent_id']?.toString() ?? ''),
+        purchaseNote = json['purchase_note']?.toString(),
+        categories = (json['categories'] as List?)
+            ?.map((i) => WooProductCategory.fromJson(i))
+            .toList() ?? [],
+        tags = (json['tags'] as List?)
+            ?.map((i) => WooProductItemTag.fromJson(i))
+            .toList() ?? [],
+        images = (json['images'] as List?)
+            ?.map((i) => WooProductImage.fromJson(i))
+            .toList() ?? [],
+        attributes = (json['attributes'] as List?)
+            ?.map((i) => WooProductItemAttribute.fromJson(i))
+            .toList() ?? [],
+        defaultAttributes = (json['default_attributes'] as List?)
+            ?.map((i) => WooProductDefaultAttribute.fromJson(i))
+            .toList() ?? [],
+        variations = json['variations'] != null ? List<int>.from(json['variations'].map((i) => i is int ? i : int.tryParse(i.toString()) ?? 0)) : [],
+        groupedProducts = json['grouped_products'] != null ? List<int>.from(json['grouped_products'].map((i) => i is int ? i : int.tryParse(i.toString()) ?? 0)) : [],
+        menuOrder = json['menu_order'] is int ? json['menu_order'] : int.tryParse(json['menu_order']?.toString() ?? ''),
+        date_created = json['date_created']?.toString(),
+        metaData = (json['meta_data'] as List?)
+            ?.map((i) => MetaData.fromJson(i))
+            .toList() ?? [];
 
 
 
@@ -258,9 +258,9 @@ class WooProductItemTag {
   WooProductItemTag(this.id, this.name, this.slug);
 
   WooProductItemTag.fromJson(Map<String, dynamic> json)
-      : id = json['id'],
-        name = json['name'],
-        slug = json['slug'];
+      : id = json['id'] is int ? json['id'] : int.tryParse(json['id']?.toString() ?? ''),
+        name = json['name']?.toString(),
+        slug = json['slug']?.toString();
 
   Map<String, dynamic> toJson() => {'id': id, 'name': name, 'slug': slug};
   @override
@@ -275,8 +275,8 @@ class MetaData {
   MetaData(this.id, this.key, this.value);
 
   MetaData.fromJson(Map<String, dynamic> json)
-      : id = json['id'],
-        key = json['key'],
+      : id = json['id'] is int ? json['id'] : int.tryParse(json['id']?.toString() ?? ''),
+        key = json['key']?.toString(),
         value = json['value'].toString();
 
   Map<String, dynamic> toJson() => {'id': id, 'key': key, 'value': value};
@@ -290,9 +290,9 @@ class WooProductDefaultAttribute {
   WooProductDefaultAttribute(this.id, this.name, this.option);
 
   WooProductDefaultAttribute.fromJson(Map<String, dynamic> json)
-      : id = json['id'],
-        name = json['name'],
-        option = json['option'];
+      : id = json['id'] is int ? json['id'] : int.tryParse(json['id']?.toString() ?? ''),
+        name = json['name']?.toString(),
+        option = json['option']?.toString();
 
   Map<String, dynamic> toJson() => {'id': id, 'name': name, 'option': option};
 }
@@ -311,14 +311,14 @@ class WooProductImage {
       this.dateCreatedGMT, this.dateModified, this.dateModifiedGMT);
 
   WooProductImage.fromJson(Map<String, dynamic> json)
-      : id = json['id'],
-        src = json['src'],
-        name = json['name'],
-        alt = json['alt'],
-        dateCreated = DateTime.parse(json['date_created']),
-        dateModifiedGMT = DateTime.parse(json['date_modified_gmt']),
-        dateModified = DateTime.parse(json['date_modified']),
-        dateCreatedGMT = DateTime.parse(json['date_created_gmt']);
+      : id = json['id'] is int ? json['id'] : int.tryParse(json['id']?.toString() ?? ''),
+        src = json['src']?.toString(),
+        name = json['name']?.toString(),
+        alt = json['alt']?.toString(),
+        dateCreated = (json['date_created'] != null) ? DateTime.parse(json['date_created'].toString()) : DateTime.now(),
+        dateModifiedGMT = (json['date_modified_gmt'] != null) ? DateTime.parse(json['date_modified_gmt'].toString()) : DateTime.now(),
+        dateModified = (json['date_modified'] != null) ? DateTime.parse(json['date_modified'].toString()) : DateTime.now(),
+        dateCreatedGMT = (json['date_created_gmt'] != null) ? DateTime.parse(json['date_created_gmt'].toString()) : DateTime.now();
 }
 
 ///
@@ -351,9 +351,9 @@ class WooProductDimension {
   WooProductDimension(this.length, this.height, this.width);
 
   WooProductDimension.fromJson(Map<String, dynamic> json)
-      : length = json['length'],
-        width = json['width'],
-        height = json['height'];
+      : length = json['length']?.toString(),
+        width = json['width']?.toString(),
+        height = json['height']?.toString();
 
   Map<String, dynamic> toJson() =>
       {'length': length, 'width': width, 'height': height};
@@ -371,12 +371,12 @@ class WooProductItemAttribute {
       this.variation, this.options);
 
   WooProductItemAttribute.fromJson(Map<String, dynamic> json)
-      : id = json['id'],
-        name = json['name'],
-        position = json['position'],
+      : id = json['id'] is int ? json['id'] : int.tryParse(json['id']?.toString() ?? ''),
+        name = json['name']?.toString(),
+        position = json['position'] is int ? json['position'] : int.tryParse(json['position']?.toString() ?? ''),
         visible = json['visible'],
         variation = json['variation'],
-        options = json['options'].cast<String>();
+        options = json['options'] != null ? List<String>.from(json['options'].map((i) => i.toString())) : [];
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -396,9 +396,9 @@ class WooProductDownload {
   WooProductDownload(this.id, this.name, this.file);
 
   WooProductDownload.fromJson(Map<String, dynamic> json)
-      : id = json['id'],
-        name = json['name'],
-        file = json['file'];
+      : id = json['id']?.toString(),
+        name = json['name']?.toString(),
+        file = json['file']?.toString();
 
   Map<String, dynamic> toJson() => {
         'id': id,

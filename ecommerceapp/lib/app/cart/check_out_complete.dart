@@ -12,6 +12,7 @@ import 'package:pet_shop/base/get/product_data.dart';
 import 'package:pet_shop/base/get/route_key.dart';
 import 'package:pet_shop/base/get/storage_controller.dart';
 import 'package:pet_shop/base/widget_utils.dart';
+import 'package:pet_shop/base/get/storage_controller.dart';
 import '../../base/get/cart_contr/cart_controller.dart';
 import '../../base/get/cart_contr/shipping_add_controller.dart';
 import '../../base/get/login_data_controller.dart';
@@ -20,6 +21,8 @@ import '../../services/address_api.dart';
 import '../../woocommerce/model/model_shipping_method.dart';
 import '../../woocommerce/model/model_tax.dart';
 import '../../app/model/api_models.dart';
+import 'package:razorpay_flutter/razorpay_flutter.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 
 class CheckOutComplete extends StatefulWidget {
@@ -35,6 +38,8 @@ class _CheckOutComplete extends State<CheckOutComplete> {
   backClick(BuildContext context) {
     Constant.sendToNext(context, homeScreenRoute);
   }
+  
+  late Razorpay _razorpay;
 
   RxBool isCouponApply = false.obs;
   String inputCoupon = '';
@@ -60,7 +65,55 @@ class _CheckOutComplete extends State<CheckOutComplete> {
   @override
   void initState() {
     super.initState();
+    _razorpay = Razorpay();
+    _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _handlePaymentSuccess);
+    _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _handlePaymentError);
+    _razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, _handleExternalWallet);
     getShippingMethods();
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
+    _razorpay.clear();
+  }
+
+  void _handlePaymentSuccess(PaymentSuccessResponse response) {
+    cartController.clearCartAction();
+    Constant.sendToNext(context, orderConfirmScreenRoute);
+  }
+
+  void _handlePaymentError(PaymentFailureResponse response) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("Payment Failed: ${response.message}"), backgroundColor: Colors.red),
+    );
+  }
+
+  void _handleExternalWallet(ExternalWalletResponse response) {
+    // Handle external wallet
+  }
+
+  void openCheckout(Map<String, dynamic> razorpayOrderData, String userEmail, String userPhone) async {
+    final razorpayKey = dotenv.env['RAZORPAY_KEY_ID'];
+    
+    var options = {
+      'key': razorpayKey,
+      'amount': razorpayOrderData['amount'],
+      'name': 'Nirvista E-commerce',
+      'order_id': razorpayOrderData['id'],
+      'description': 'Purchase from Nirvista',
+      'timeout': 300, 
+      'prefill': {
+        'contact': userPhone,
+        'email': userEmail,
+      }
+    };
+
+    try {
+      _razorpay.open(options);
+    } catch (e) {
+      debugPrint('Error opening Razorpay: $e');
+    }
   }
 
   // getTaxRates() async {
@@ -244,27 +297,30 @@ class _CheckOutComplete extends State<CheckOutComplete> {
                           return Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              buildTitleWidget(context,"Payment Method"),
+                              buildTitleWidget(context, "Payment Method"),
                               getVerSpace(12.h),
-                              Row(
-                                children: [
-                                  getSvgImage(context, "paypal.svg", 40),
-                                  getHorSpace(12.h),
-                                  Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      getCustomFont("Cash On Delivery", 14, getFontColor(context), 1,fontWeight: FontWeight.w400),
-                                      getVerSpace(6.h),
-                                      getCustomFont(
-                                          "Pay when you receive",
-                                          14,
-                                          getFontColor(context),1,
-                                          fontWeight: FontWeight.w400),
-                                    ],
-                                  ),
-                                ],
-                              ),
+                              Obx(() {
+                                bool isCod = storageController.selectedPaymentMethod.value == "cod";
+                                return Row(
+                                  children: [
+                                    Icon(isCod ? Icons.money : Icons.payment, color: getAccentColor(context), size: 40.w),
+                                    getHorSpace(12.h),
+                                    Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        getCustomFont(isCod ? "Cash On Delivery" : "Razorpay (Online)", 14, getFontColor(context), 1, fontWeight: FontWeight.w400),
+                                        getVerSpace(6.h),
+                                        getCustomFont(
+                                            isCod ? "Pay when you receive" : "Safe and secure online payment",
+                                            14,
+                                            getFontColor(context), 1,
+                                            fontWeight: FontWeight.w400),
+                                      ],
+                                    ),
+                                  ],
+                                );
+                              }),
                             ],
                           );
                         },
@@ -366,7 +422,7 @@ class _CheckOutComplete extends State<CheckOutComplete> {
                   builder: (context) => const Center(child: CircularProgressIndicator()),
                 );
 
-                String paymentMethod = "COD";
+                String paymentMethod = storageController.selectedPaymentMethod.value;
                 
                 final res = await OrderApiService.createOrder(
                    accessToken: token,
@@ -377,8 +433,18 @@ class _CheckOutComplete extends State<CheckOutComplete> {
                 Navigator.pop(context); // Dismiss loading dialog
 
                 if (res['success']) {
-                   await cartController.clearCartAction();
-                   Constant.sendToNext(context, orderConfirmScreenRoute);
+                   if (paymentMethod == "online") {
+                      // Backend returns razorpayOrder and user info might be needed
+                      // For prefill, we use existing login data
+                      openCheckout(
+                        res['razorpayOrder'],
+                        loginController.currentUser.value?.email ?? "", 
+                        loginController.currentUser.value?.phone ?? ""
+                      );
+                   } else {
+                      await cartController.clearCartAction();
+                      Constant.sendToNext(context, orderConfirmScreenRoute);
+                   }
                 } else {
                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res['message'] ?? 'Failed to place order')));
                 }
