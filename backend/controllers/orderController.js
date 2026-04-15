@@ -16,12 +16,12 @@ const razorpay = new Razorpay({
 async function reserveStock(variantId, quantity, t) {
     // Atomically increment reservedStock if enough available
     const [affectedRows] = await ProductVariant.update(
-        { reservedStock: sequelize.literal(`reservedStock + ${quantity}`) },
+        { reservedStock: sequelize.literal(`"reservedStock" + ${quantity}`) },
         {
             where: {
                 id: variantId,
                 [Op.and]: sequelize.where(
-                    sequelize.literal('stock - reservedStock'),
+                    sequelize.literal('"stock" - "reservedStock"'),
                     '>=',
                     quantity
                 )
@@ -35,7 +35,7 @@ async function reserveStock(variantId, quantity, t) {
 // --- Helper: Release Reserved Stock ---
 async function releaseReservedStock(variantId, quantity, t) {
     await ProductVariant.update(
-        { reservedStock: sequelize.literal(`reservedStock - ${quantity}`) },
+        { reservedStock: sequelize.literal(`"reservedStock" - ${quantity}`) },
         { where: { id: variantId }, transaction: t }
     );
 }
@@ -44,8 +44,8 @@ async function releaseReservedStock(variantId, quantity, t) {
 async function deductReservedStock(variantId, quantity, t) {
     await ProductVariant.update(
         {
-            stock: sequelize.literal(`stock - ${quantity}`),
-            reservedStock: sequelize.literal(`reservedStock - ${quantity}`)
+            stock: sequelize.literal(`"stock" - ${quantity}`),
+            reservedStock: sequelize.literal(`"reservedStock" - ${quantity}`)
         },
         { where: { id: variantId }, transaction: t }
     );
@@ -54,7 +54,7 @@ async function deductReservedStock(variantId, quantity, t) {
 // --- Helper: Restore Stock (on return/cancel) ---
 async function restoreStock(variantId, quantity, t) {
     await ProductVariant.update(
-        { stock: sequelize.literal(`stock + ${quantity}`) },
+        { stock: sequelize.literal(`"stock" + ${quantity}`) },
         { where: { id: variantId }, transaction: t }
     );
 }
@@ -111,7 +111,8 @@ export const createOrder = async (req, res) => {
                 productId: item.productId,
                 variantId: item.variantId,
                 quantity: item.quantity,
-                priceAtPurchase: variant.discountPrice
+                priceAtPurchase: variant.discountPrice,
+                vendorId: item.product.vendorId
             });
         }
 
@@ -134,8 +135,6 @@ export const createOrder = async (req, res) => {
             transaction: t 
         });
 
-        await t.commit();
-
         if (paymentMethod === "online") {
             const razorpayOrder = await razorpay.orders.create({
                 amount: Math.round(Number(totalAmount) * 100), // in paise
@@ -145,7 +144,8 @@ export const createOrder = async (req, res) => {
             });
             // Save razorpayOrderId to DB if you want (optional)
             order.razorpayOrderId = razorpayOrder.id;
-            await order.save();
+            await order.save({ transaction: t });
+            await t.commit();
             return res.json({
                 success: true,
                 order,
@@ -169,7 +169,9 @@ export const createOrder = async (req, res) => {
             });
         }
     } catch (error) {
-        await t.rollback();
+        if (!t.finished) {
+            await t.rollback();
+        }
         serverError(res, error.message || "Failed to create order");
     }
 };

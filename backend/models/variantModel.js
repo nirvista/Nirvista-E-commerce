@@ -12,6 +12,12 @@ const ProductVariant = sequelize.define("ProductVariant", {
         type: DataTypes.UUID,
         allowNull: false,
     },
+    sku: {
+        type: DataTypes.STRING,
+        allowNull: false,
+        unique: true,
+        comment: 'Stock Keeping Unit — unique identifier for inventory management'
+    },
     variantName: { 
         type: DataTypes.STRING 
     }, // e.g., "Red / XL"
@@ -54,6 +60,11 @@ const ProductVariant = sequelize.define("ProductVariant", {
             throw new Error('Do not set availableStock directly');
         }
     },
+    lowStockThreshold: {
+        type: DataTypes.INTEGER,
+        defaultValue: 5,
+        allowNull: false,
+    },
     approvalStatus: {
         type: DataTypes.ENUM('pending', 'approved', 'rejected'),
         defaultValue: 'pending',
@@ -61,6 +72,11 @@ const ProductVariant = sequelize.define("ProductVariant", {
 }, {
     tableName: 'ProductVariants',
     timestamps: true,
+    indexes: [
+        { fields: ['sku'] },
+        { fields: ['productId'] },
+        { fields: ['status'] },
+    ]
 });
 
 export default ProductVariant;
