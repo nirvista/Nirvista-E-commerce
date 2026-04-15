@@ -1,4 +1,5 @@
 import { Op, Sequelize } from "sequelize";
+import User from "../models/userModel.js";
 import Product from "../models/productModel.js";
 import ProductVariant from "../models/variantModel.js";
 import Tag from "../models/tagModel.js";
@@ -73,6 +74,9 @@ function getSortOrder(sort) {
 // --- Vendor: Create a new product (with variants) ---
 export const createProduct = async (req, res) => {
     try {
+        if (!req.body.vendorId) {
+            req.body.vendorId = req.user.id;
+        }
         // All variants start as pending approval
         if (req.body.variants && Array.isArray(req.body.variants)) {
             req.body.variants = req.body.variants.map(v => ({
@@ -195,6 +199,12 @@ export const getAllProducts = async (req, res) => {
                     ],
                     where: variantFilter,
                     required: false
+                }, {
+                    model: User,
+                    as: 'vendor',
+                    where: { userStatus: 'active' },
+                    required: true,
+                    attributes: []
                 }
             ],
             distinct: true
