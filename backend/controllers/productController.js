@@ -25,7 +25,7 @@ const tagInclude = {
 };
 
 // --- Helper to build separated filter objects ---
-function buildFilters(query) {
+function buildFilters(query, isAdmin=false) {
     const productFilter = {};
     const variantFilter = {};
 
@@ -50,7 +50,9 @@ function buildFilters(query) {
     if (query.size) variantFilter.size = Array.isArray(query.size) ? { [Op.in]: query.size } : query.size;
 
     // Always filter for approved variants for customers
-    variantFilter.approvalStatus = 'approved';
+    if (!isAdmin) {
+        variantFilter.approvalStatus = 'approved';
+    }
 
     return { productFilter, variantFilter };
 }
@@ -182,7 +184,7 @@ export const getProductById = async (req, res) => {
 // --- Get all products (for customers: only approved variants) ---
 export const getAllProducts = async (req, res) => {
     try {
-        const { productFilter, variantFilter } = buildFilters(req.query);
+        const { productFilter, variantFilter } = buildFilters(req.query, false);
         const sortOrder = getSortOrder(req.query.sort);
 
         const { count, rows } = await Product.findAndCountAll({
@@ -252,9 +254,13 @@ export const updateProduct = async (req, res) => {
 // --- Delete a product ---
 export const deleteProduct = async (req, res) => {
     try {
+        // Automatically delete variants explicitly to guarantee no orphans
+        await ProductVariant.destroy({ where: { productId: req.params.id } });
+
         const deletedProduct = await Product.destroy({ where: { id: req.params.id } });
         if (!deletedProduct) return notFound(res, "Product not found");
-        success(res, null, "Product deleted successfully");
+        
+        success(res, null, "Product and its variants deleted successfully");
     } catch (error) {
         serverError(res, "Server error");
     }
@@ -378,5 +384,53 @@ export const deleteVariant = async (req, res) => {
         success(res, null, "Variant deleted successfully");
     } catch (error) {
         serverError(res, "Delete failed");
+    }
+};
+
+// For Admin Dashboard
+export const getAllProductsAdmin = async (req, res) => {
+    try {
+        const { productFilter, variantFilter } = buildFilters(req.query, true);
+        const sortOrder = getSortOrder(req.query.sort);
+
+        // Dynamically build includes to prevent Sequelize crash bugs
+        const includes = [
+            {
+                model: User,
+                as: 'vendor',
+                attributes: ['id', 'name', 'email', 'userStatus'],
+                required: false // Admin needs to see products even if the vendor is missing
+            }
+        ];
+
+        // Only attach 'where' to variants if filters actually exist
+        const variantInclude = {
+            model: ProductVariant,
+            as: "variants",
+            attributes: [
+                "id", "variantName", "price", "size", "color", "sku",
+                "discountPrice", "images", "status", "stock", "reservedStock", "approvalStatus"
+            ],
+            required: Object.keys(variantFilter).length > 0
+        };
+
+        if (Object.keys(variantFilter).length > 0) {
+            variantInclude.where = variantFilter;
+        }
+        
+        includes.push(variantInclude);
+
+        // Removed tagInclude to prevent Many-To-Many association crashes
+        const { count, rows } = await Product.findAndCountAll({
+            where: productFilter,
+            order: sortOrder,
+            include: includes,
+            distinct: true
+        });
+
+        success(res, { products: rows, total: count }, "All products fetched successfully for admin");
+    } catch (error) {
+        console.error("[getAllProductsAdmin] Error:", error);
+        serverError(res, `Database error: ${error.message}`);
     }
 };

@@ -13,13 +13,22 @@ import {
     downloadInvoice,
     getOrderStatus,
     updateOrderStatus,
-    razorpayWebhook 
+    razorpayWebhook,
+    getAllOrdersAdmin,
+    getOrderByIdAdmin, 
+    updateOrderAdmin 
 } from '../controllers/orderController.js';
 import verifyToken from '../middlewares/authMiddleware.js';
 import authorizeRoles from '../middlewares/roleMiddleware.js';
 
 const router = express.Router();
 
+// --- Admin Routes ---
+router.get('/admin/all', verifyToken, authorizeRoles('admin'), getAllOrdersAdmin);
+router.get('/admin/:id', verifyToken, authorizeRoles('admin'), getOrderByIdAdmin);
+router.put('/admin/:id', verifyToken, authorizeRoles('admin'), updateOrderAdmin);
+
+// --- User Routes ---
 router.get('/', verifyToken, getUserOrders);
 router.get('/:id/invoice', verifyToken, downloadInvoice);
 router.get('/:id/status', verifyToken, getOrderStatus);
