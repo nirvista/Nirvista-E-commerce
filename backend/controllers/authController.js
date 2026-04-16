@@ -320,7 +320,7 @@ export const adminLogin = async (req, res) => {
         const token = jwt.sign(
             {id: admin.id, email: admin.email, userRole: admin.userRole}, 
             process.env.JWT_SECRET,
-            {expiresIn: "1h"},
+            {expiresIn: "10h"},
 
         );
     res.status(200).json({success: true, data: {token, user:{

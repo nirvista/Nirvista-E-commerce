@@ -69,8 +69,9 @@ WishlistItem.belongsTo(Product, { foreignKey: 'productId', as: 'product' });
 WishlistItem.belongsTo(ProductVariant, { foreignKey: 'variantId', as: 'variant' });
 
 // --- Orders ---
-User.hasMany(Order, { foreignKey: 'userId' });
-Order.belongsTo(User, { foreignKey: 'userId' });
+// FIX: Added 'as: user' and 'as: orders' aliases
+User.hasMany(Order, { foreignKey: 'userId', as: 'orders' });
+Order.belongsTo(User, { foreignKey: 'userId', as: 'user' });
 
 UserAddress.hasMany(Order, { foreignKey: 'addressId' });
 Order.belongsTo(UserAddress, { foreignKey: 'addressId', as: 'shippingAddress' });
@@ -81,7 +82,7 @@ OrderItem.belongsTo(Order, { foreignKey: 'orderId' });
 OrderItem.belongsTo(Product, { foreignKey: 'productId', as: 'product' });
 OrderItem.belongsTo(ProductVariant, { foreignKey: 'variantId', as: 'variant' });
 
-// Vendor Specific
+// Vendor Specific Aliases
 User.hasMany(OrderItem, { foreignKey: 'vendorId', as: 'vendorOrderItems' });
 OrderItem.belongsTo(User, { foreignKey: 'vendorId', as: 'vendor' });
 

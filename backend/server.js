@@ -16,6 +16,7 @@ import orderRoutes from './routes/orderRoutes.js';
 import cookieParser from 'cookie-parser';
 import adminRoutes from './routes/adminRoutes.js';
 import vendorRoutes from './routes/vendorRoutes.js';
+import dashboardRoutes from './routes/dashboardRoutes.js';
 
 const app = express();
 
@@ -36,6 +37,7 @@ app.use('/api/brands', brandRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/admin/vendors', adminRoutes);
 app.use('/api/vendor', vendorRoutes);
+app.use('/api/admin/dashboard', dashboardRoutes);
 
 app.get('/', (req, res) => {
   res.send('API is running...');

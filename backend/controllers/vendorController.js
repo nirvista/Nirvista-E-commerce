@@ -352,3 +352,80 @@ export const updateVendorStatus = async (req, res) => {
         serverError(res, "Failed to update vendor status");
     }
 };
+
+// ---------------------------------------------------------------------------
+// PUT /api/admin/vendors/:vendorId
+// Update all vendor details except vendorStatus
+// ---------------------------------------------------------------------------
+export const updateVendorDetails = async (req, res) => {
+    try {
+        const { vendorId } = req.params;
+        const {
+            // User fields
+            name,
+            email,
+            phone,
+            // Vendor profile fields (excluding vendorStatus)
+            storeName,
+            storeDescription,
+            businessEmail,
+            businessPhone,
+            businessAddress,
+            businessRegistrationNumber,
+            businessRegistrationDocUrl,
+            taxId,
+            bankAccountName,
+            bankAccountNumber,
+            bankName,
+            bankIFSC,
+            statusReason,
+            statusUpdatedAt,
+        } = req.body;
+
+        // --- Find vendor user ---
+        const user = await User.findOne({
+            where: { id: vendorId, userRole: "vendor" },
+        });
+        if (!user) return notFound(res, "Vendor not found");
+
+        // --- Find vendor profile ---
+        const vendorProfile = await VendorProfile.findOne({
+            where: { userId: vendorId }
+        });
+        if (!vendorProfile) return notFound(res, "Vendor profile not found");
+
+        // --- Update User fields ---
+        await user.update({
+            ...(name && { name }),
+            ...(email && { email }),
+            ...(phone && { phone }),
+        });
+
+        // --- Update VendorProfile fields (excluding vendorStatus) ---
+        await vendorProfile.update({
+            ...(storeName && { storeName }),
+            ...(storeDescription && { storeDescription }),
+            ...(businessEmail && { businessEmail }),
+            ...(businessPhone && { businessPhone }),
+            ...(businessAddress && { businessAddress }),
+            ...(businessRegistrationNumber && { businessRegistrationNumber }),
+            ...(businessRegistrationDocUrl && { businessRegistrationDocUrl }),
+            ...(taxId && { taxId }),
+            ...(bankAccountName && { bankAccountName }),
+            ...(bankAccountNumber && { bankAccountNumber }),
+            ...(bankName && { bankName }),
+            ...(bankIFSC && { bankIFSC }),
+            ...(statusReason && { statusReason }),
+            ...(statusUpdatedAt && { statusUpdatedAt }),
+        });
+
+        // --- Return updated data ---
+        const updatedProfile = await VendorProfile.findOne({ where: { userId: vendorId } });
+        const responseData = formatVendorResponse(user, updatedProfile, true);
+
+        success(res, responseData, "Vendor details updated successfully");
+    } catch (error) {
+        console.error("[updateVendorDetails]", error);
+        serverError(res, "Failed to update vendor details");
+    }
+};

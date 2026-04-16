@@ -2,6 +2,8 @@ import Razorpay from "razorpay";
 import crypto from "crypto";
 import sequelize from "../config/db.js";
 import { Order, OrderItem, Cart, CartItem, UserAddress, Product, ProductVariant } from "../models/association.js";
+import User from "../models/userModel.js";
+import VendorProfile from "../models/vendorProfileModel.js";
 import PDFDocument from "pdfkit";
 import { success, serverError, notFound } from "../utils/responseMessages.js";
 import { Op } from "sequelize";
@@ -684,5 +686,126 @@ export const updateOrderStatus = async (req, res) => {
     } catch (error) {
         await t.rollback();
         serverError(res, error.message || "Failed to update order status");
+    }
+};
+
+// Admin API endpoints to view and manage all orders, including filtering, sorting, and detailed views with user and vendor info.
+
+export const getAllOrdersAdmin = async (req, res) => {
+    try {
+        const { status, paymentStatus, sort } = req.query;
+        const whereClause = {};
+        
+        if (status) whereClause.orderStatus = status;
+        if (paymentStatus) whereClause.paymentStatus = paymentStatus;
+
+        let orderClause = [['createdAt', 'DESC']];
+        if (sort === 'oldest') orderClause = [['createdAt', 'ASC']];
+        if (sort === 'amount_desc') orderClause = [['totalAmount', 'DESC']];
+        if (sort === 'amount_asc') orderClause = [['totalAmount', 'ASC']];
+
+        const { count, rows } = await Order.findAndCountAll({
+            where: whereClause,
+            order: orderClause,
+            include: [
+                { model: User, as: 'user', attributes: ['name', 'email'] },
+                { 
+                    model: OrderItem, 
+                    as: 'items', 
+                    attributes: ['id', 'quantity'],
+                    // NEW: Include vendor and vendorProfile to populate the list view column
+                    include: [
+                        { 
+                            model: User, 
+                            as: 'vendor', 
+                            attributes: ['id', 'name', 'email'],
+                            include: [
+                                { 
+                                    model: VendorProfile, 
+                                    as: 'vendorProfile', 
+                                    attributes: ['storeName'] 
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ],
+            distinct: true
+        });
+
+        success(res, { orders: rows, total: count }, "All orders fetched for admin");
+    } catch (error) {
+        serverError(res, error.message || "Failed to fetch all orders");
+    }
+};
+
+export const getOrderByIdAdmin = async (req, res) => {
+    try {
+        const order = await Order.findByPk(req.params.id, {
+            include: [
+                { model: User, as: 'user', attributes: ['id', 'name', 'email', 'phone'] },
+                { model: UserAddress, as: 'shippingAddress' },
+                {
+                    model: OrderItem,
+                    as: 'items',
+                    include: [
+                        { model: Product, as: 'product', attributes: ['id', 'title'] },
+                        { model: ProductVariant, as: 'variant', attributes: ['id', 'variantName', 'sku', 'price', 'discountPrice'] },
+                        { 
+                            model: User, 
+                            as: 'vendor', 
+                            attributes: ['id', 'name', 'email', 'phone'],
+                            include: [{ model: VendorProfile, as: 'vendorProfile', attributes: ['storeName', 'businessPhone'] }]
+                        }
+                    ]
+                }
+            ]
+        });
+
+        if (!order) return notFound(res, "Order not found");
+        success(res, order, "Order fetched successfully");
+    } catch (error) {
+        serverError(res, error.message || "Failed to fetch order details");
+    }
+};
+
+export const updateOrderAdmin = async (req, res) => {
+    const t = await sequelize.transaction();
+    try {
+        const { orderStatus, paymentStatus } = req.body;
+        const order = await Order.findByPk(req.params.id, {
+            include: [{ model: OrderItem, as: 'items' }],
+            transaction: t
+        });
+
+        if (!order) {
+            await t.rollback();
+            return notFound(res, "Order not found");
+        }
+
+        // Handles Stock Logic seamlessly when updating statuses
+        if (orderStatus && orderStatus !== order.orderStatus) {
+            if (orderStatus === 'cancelled' && order.orderStatus !== 'cancelled') {
+                if (order.paymentStatus === 'paid') {
+                    for (const item of order.items) { await restoreStock(item.variantId, item.quantity, t); }
+                    if(!paymentStatus) order.paymentStatus = 'refund_initiated';
+                } else if (order.paymentStatus === 'reserved') {
+                    for (const item of order.items) { await releaseReservedStock(item.variantId, item.quantity, t); }
+                    if(!paymentStatus) order.paymentStatus = 'failed';
+                }
+            }
+            order.orderStatus = orderStatus;
+        }
+
+        if (paymentStatus && paymentStatus !== order.paymentStatus) {
+            order.paymentStatus = paymentStatus;
+        }
+
+        await order.save({ transaction: t });
+        await t.commit();
+        success(res, order, "Order updated successfully");
+    } catch (error) {
+        await t.rollback();
+        serverError(res, error.message || "Failed to update order");
     }
 };

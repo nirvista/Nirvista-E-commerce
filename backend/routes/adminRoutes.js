@@ -4,6 +4,7 @@ import {
     getVendorById,
     createVendorByAdmin,
     updateVendorStatus,
+    updateVendorDetails
 } from "../controllers/vendorController.js";
 import verifyToken from "../middlewares/authMiddleware.js";
 import authorizeRoles from "../middlewares/roleMiddleware.js";
@@ -23,6 +24,9 @@ router.get("/:vendorId", getVendorById);
 router.post("/", createVendorByAdmin);
 
 // PATCH /api/admin/vendors/:vendorId/status — Approve / suspend / reject
-router.patch("/:vendorId/status", updateVendorStatus);
+router.put("/:vendorId/status", updateVendorStatus);
+
+// PUT /api/admin/vendors/:vendorId/details — Update vendor details
+router.put("/:vendorId/details", updateVendorDetails);
 
 export default router;
