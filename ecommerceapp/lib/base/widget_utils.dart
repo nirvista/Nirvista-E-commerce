@@ -882,6 +882,7 @@ void showAddressDialog(BuildContext context, {AddressModel? address, Function? o
 
 void showAddressSelectorBottomSheet(BuildContext context) {
   final shippingAddressController = Get.find<ShippingAddressController>();
+  shippingAddressController.fetchAddresses(); // Proactively fetch fresh addresses
   
   showModalBottomSheet(
     context: context,
@@ -1022,7 +1023,10 @@ class _MyOrderScreenWidgetState extends State<_MyOrderScreenWidget> {
   @override
   void initState() {
     super.initState();
-    orderController.fetchOrders();
+    // ── FIX: Defer API call until after initial build to avoid setState() error ──
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      orderController.fetchOrders();
+    });
   }
 
   String _monthName(int month) {

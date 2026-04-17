@@ -70,7 +70,7 @@ class _CartCommonWidgetState extends State<CartCommonWidget> {
     double price = item.variant?.discountPrice != null && item.variant!.discountPrice! > 0 
            ? item.variant!.discountPrice! 
            : (item.variant?.price ?? 0.0);
-    String img = (item.variant?.images.isNotEmpty == true) ? item.variant!.images.first : (item.product?.imageUrl ?? "");
+    String img = item.displayImage;
 
     return GestureDetector(
       onTap: () => Constant.sendToNext(context, productDetailScreenRoute),
@@ -82,9 +82,22 @@ class _CartCommonWidgetState extends State<CartCommonWidget> {
             height: 100.w,
             decoration: BoxDecoration(
                borderRadius: BorderRadius.circular(8.w),
-               image: img.isNotEmpty ? DecorationImage(image: NetworkImage(img), fit: BoxFit.cover) : null,
-               color: Colors.grey.shade200,
+               color: Colors.grey.shade100,
             ),
+            clipBehavior: Clip.antiAlias,
+            child: img.isNotEmpty 
+              ? Image.network(
+                  img, 
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) => Center(
+                    child: Icon(Icons.image_not_supported_outlined, size: 30.w, color: Colors.grey),
+                  ),
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return Center(child: CircularProgressIndicator(value: loadingProgress.expectedTotalBytes != null ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes! : null));
+                  },
+                )
+              : Center(child: Icon(Icons.image_not_supported_outlined, size: 30.w, color: Colors.grey)),
           ),
           SizedBox(width: 12.w),
           Expanded(

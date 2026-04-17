@@ -1,3 +1,4 @@
+import 'package:collection/collection.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -14,6 +15,8 @@ import '../../base/get/cart_contr/cart_controller.dart';
 import '../../base/get/cart_contr/shipping_add_controller.dart';
 import '../../services/brand_api.dart';
 import 'package:pet_shop/base/get/wishlist_controller.dart';
+import 'package:pet_shop/base/pref_data.dart';
+import '../../services/product_api.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   const ProductDetailScreen({Key? key}) : super(key: key);
@@ -32,23 +35,44 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
 
   RxString selectedColor = "".obs;
   RxString selectedSize = "".obs;
+  RxString selectedVariantId = "".obs;
   RxBool isWishlisted = false.obs;
   RxString brandName = ''.obs;
   PrefData prefData = PrefData();
+  ProductModel? product;
 
   @override
   void initState() {
     super.initState();
-    ProductModel? product = storageController.selectedProductModel;
+    product = storageController.selectedProductModel;
     if (product != null) {
-      if (product.variants.isNotEmpty) {
-        var v = product.variants.first;
-        if (v.color != null) selectedColor.value = v.color!;
-        if (v.size != null) selectedSize.value = v.size!;
-      }
-      _loadWishlistStatus(product.id);
-      _fetchBrandName(product);
+      _initializeSelection(product!);
+      _loadWishlistStatus(product!.id);
+      _fetchBrandName(product!);
+      _enrichProductDetail(product!.id);
     }
+  }
+
+  void _initializeSelection(ProductModel product) {
+    if (product.variants.isNotEmpty) {
+      var v = product.variants.first;
+      selectedVariantId.value = v.id;
+      if (v.color != null) selectedColor.value = v.color!;
+      if (v.size != null) selectedSize.value = v.size!;
+    }
+  }
+
+  // --- Background enrichment (optional, non-blocking) ---
+  void _enrichProductDetail(String productId) async {
+    try {
+      final res = await ProductApiService.getProductById(productId);
+      if (res['success'] && res['data'] != null) {
+        final fullProduct = ProductModel.fromJson(res['data']);
+        setState(() {
+          product = product!.merge(fullProduct);
+        });
+      }
+    } catch (_) {}
   }
 
   void _loadWishlistStatus(String productId) async {
@@ -86,31 +110,14 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
   @override
   Widget build(BuildContext context) {
     Constant.setupSize(context);
-    ProductModel? product = storageController.selectedProductModel;
+    double margin = FetchPixels.getDefaultHorSpaceFigma(context);
 
     if (product == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text("Error")),
-        body: Center(
-          child: getCustomFont(
-              "Product not found or not mapped", 16, getFontColor(context), 1),
-        ),
+        backgroundColor: getScaffoldColor(context),
+        body: const Center(child: CircularProgressIndicator()),
       );
     }
-
-    double margin = FetchPixels.getDefaultHorSpaceFigma(context);
-
-    List<String> uniqueColors = product.variants
-        .where((v) => v.color != null && v.color!.isNotEmpty)
-        .map((v) => v.color!)
-        .toSet()
-        .toList();
-
-    List<String> uniqueSizes = product.variants
-        .where((v) => v.size != null && v.size!.isNotEmpty)
-        .map((v) => v.size!)
-        .toSet()
-        .toList();
 
     return Scaffold(
       backgroundColor: getScaffoldColor(context),
@@ -121,33 +128,51 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
             Expanded(
               child: SingleChildScrollView(
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildProductImage(context, product, margin),
+                    _buildProductImage(context, product!, margin),
                     SizedBox(height: 16.h),
-                    _buildRatingPill(context, product, margin),
+                    _buildRatingPill(context, product!, margin),
                     SizedBox(height: 16.h),
-                    if (uniqueColors.isNotEmpty)
-                      _buildColorsSection(context, product, uniqueColors, margin),
-                    if (uniqueSizes.isNotEmpty)
-                      _buildSizesSection(context, product, uniqueSizes, margin),
-                    _buildBrandAndPriceSection(context, product, margin),
-                    SizedBox(height: 16.h),
-                    _buildDeliveryDetails(context, product, margin),
+                    _buildBrandAndPriceSection(context, product!, margin),
+                    _buildOptionsSection(context, product!, margin),
+                    _buildDeliveryDetails(context, product!, margin),
                     SizedBox(height: 16.h),
                     _buildTrustBadges(context, margin),
                     SizedBox(height: 16.h),
-                    if (product.description != null &&
-                        product.description!.isNotEmpty)
-                      _buildDescriptionSection(context, product, margin),
+                    if (product!.description != null && product!.description!.isNotEmpty)
+                      _buildDescriptionSection(context, product!, margin),
                     SizedBox(height: 20.h),
                   ],
                 ),
               ),
             ),
-            _buildBottomButtons(context, product),
+            _buildBottomButtons(context, product!),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildOptionsSection(BuildContext context, ProductModel product, double margin) {
+    List<String> uniqueColors = product.variants
+        .where((v) => v.color != null && v.color!.isNotEmpty)
+        .map((v) => v.color!.trim())
+        .toSet()
+        .toList();
+    List<String> uniqueSizes = product.variants
+        .where((v) => v.size != null && v.size!.isNotEmpty)
+        .map((v) => v.size!.trim())
+        .toSet()
+        .toList();
+
+    return Column(
+      children: [
+        if (uniqueColors.isNotEmpty)
+          _buildColorsSection(context, product, uniqueColors, margin),
+        if (uniqueSizes.isNotEmpty)
+          _buildSizesSection(context, product, uniqueSizes, margin),
+      ],
     );
   }
 
@@ -168,32 +193,13 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
           ),
           SizedBox(width: 12.w),
           Expanded(
-            child: Container(
-              decoration: BoxDecoration(
-                color: getGreyCardColor(context),
-                borderRadius: BorderRadius.circular(10.w),
-              ),
-              padding: EdgeInsets.symmetric(horizontal: 12.w),
-              child: Row(
-                children: [
-                  Icon(Icons.search,
-                      color: getFontGreyColor(context), size: 18.w),
-                  SizedBox(width: 8.w),
-                  Expanded(
-                    child: TextField(
-                      style: TextStyle(color: getFontColor(context)),
-                      decoration: InputDecoration(
-                        hintText: "Search for products",
-                        hintStyle:
-                            TextStyle(color: getFontGreyColor(context)),
-                        border: InputBorder.none,
-                        contentPadding:
-                            EdgeInsets.symmetric(vertical: 8.h),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+            child: getCustomFont(
+              product!.title,
+              16,
+              getFontColor(context),
+              1,
+              fontWeight: FontWeight.w700,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
           SizedBox(width: 12.w),
@@ -221,23 +227,32 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
 
     return Stack(
       children: [
-        Container(
-          width: double.infinity,
-          height: 300.h,
-          color: getGreyCardColor(context),
-          child: ClipRRect(
-            child: CachedNetworkImage(
-              imageUrl: product.imageUrl.isNotEmpty
-                  ? product.imageUrl
-                  : "https://placehold.co/400",
-              fit: BoxFit.cover,
-              placeholder: (context, url) =>
-                  Center(child: CircularProgressIndicator(color: accentColor)),
-              errorWidget: (context, url, error) =>
-                  Icon(Icons.image_not_supported, size: 50.w),
+        Obx(() {
+          // Fix: Ensure Obx always has a listener even if variants are empty
+          selectedVariantId.value; 
+
+          // ── Reactive: picks image from the currently selected variant ──
+          final variant = _getSelectedVariant(product);
+          final String displayUrl = (variant != null && variant.images.isNotEmpty)
+              ? variant.images.first
+              : (product.imageUrl.isNotEmpty ? product.imageUrl : "https://placehold.co/400");
+
+          return Container(
+            width: double.infinity,
+            height: 300.h,
+            color: getGreyCardColor(context),
+            child: ClipRRect(
+              child: CachedNetworkImage(
+                imageUrl: displayUrl,
+                fit: BoxFit.cover,
+                placeholder: (context, url) => Center(
+                    child: CircularProgressIndicator(color: accentColor)),
+                errorWidget: (context, url, error) =>
+                    Icon(Icons.image_not_supported, size: 50.w),
+              ),
             ),
-          ),
-        ),
+          );
+        }),
 
         // ── Heart button — observes WishlistController ──
         Positioned(
@@ -345,6 +360,7 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
                 return Obx(() => GestureDetector(
                       onTap: () {
                         selectedColor.value = color;
+                        selectedVariantId.value = ""; // Reset to allow best-match search
                         storageController.setSelectedColor(color);
                       },
                       child: Container(
@@ -409,6 +425,7 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
                   return GestureDetector(
                     onTap: () {
                       selectedSize.value = size;
+                      selectedVariantId.value = ""; // Reset to allow best-match search
                       storageController.setSelectedSize(size);
                     },
                     child: Container(
@@ -530,47 +547,60 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
 
   Widget _buildDeliveryDetails(
       BuildContext context, ProductModel product, double margin) {
-    return Container(
-      margin: EdgeInsets.symmetric(horizontal: margin),
-      padding: EdgeInsets.all(12.w),
-      decoration: BoxDecoration(
-        border: Border.all(color: dividerColor),
-        borderRadius: BorderRadius.circular(8.w),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.home, color: getFontColor(context), size: 16.w),
-              SizedBox(width: 8.w),
-              Obx(() {
-                final shippingController = Get.find<ShippingAddressController>();
-                final selectedAddr = shippingController.selectedAddress.value;
-                return Expanded(
-                  child: getCustomFont(
-                    selectedAddr != null ? selectedAddr.fullAddress : "Select a shipping address",
-                    12, getFontColor(context), 1,
-                    fontWeight: FontWeight.w500,
-                    overflow: TextOverflow.ellipsis
-                  ),
-                );
-              }),
-              Icon(Icons.arrow_forward, color: getFontGreyColor(context), size: 16.w),
-            ],
-          ),
-          SizedBox(height: 12.h),
-          Row(
-            children: [
-              Icon(Icons.local_shipping,
-                  color: getFontColor(context), size: 16.w),
-              SizedBox(width: 8.w),
-              getCustomFont(
-                  "Delivery by 8 Apr, Wed", 12, getFontColor(context), 1,
-                  fontWeight: FontWeight.w500),
-            ],
-          ),
-        ],
+    return GestureDetector(
+      onTap: () {
+        showAddressSelectorBottomSheet(context);
+      },
+      child: Container(
+        margin: EdgeInsets.symmetric(horizontal: margin),
+        padding: EdgeInsets.all(12.w),
+        decoration: BoxDecoration(
+          color: getCardColor(context),
+          border: Border.all(color: dividerColor),
+          borderRadius: BorderRadius.circular(8.w),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.location_on, color: accentColor, size: 18.w),
+                SizedBox(width: 8.w),
+                Obx(() {
+                  final shippingController = Get.find<ShippingAddressController>();
+                  final selectedAddr = shippingController.selectedAddress.value;
+                  return Expanded(
+                    child: getCustomFont(
+                      selectedAddr != null ? selectedAddr.fullAddress : "Select a shipping address",
+                      12, getFontColor(context), 1,
+                      fontWeight: FontWeight.w600,
+                      overflow: TextOverflow.ellipsis
+                    ),
+                  );
+                }),
+                Icon(Icons.keyboard_arrow_right, color: getFontGreyColor(context), size: 18.w),
+              ],
+            ),
+            SizedBox(height: 12.h),
+            Row(
+              children: [
+                Icon(Icons.local_shipping_outlined,
+                    color: getFontGreyColor(context), size: 16.w),
+                SizedBox(width: 8.w),
+                getCustomFont(
+                    "Standard Delivery: 3-5 Days", 12, getFontGreyColor(context), 1,
+                    fontWeight: FontWeight.w400),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -647,14 +677,23 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
 
   VariantModel? _getSelectedVariant(ProductModel product) {
     if (product.variants.isEmpty) return null;
-    try {
-      return product.variants.firstWhere(
-        (v) => (v.color == selectedColor.value || v.color == null || v.color!.isEmpty) && 
-               (v.size == selectedSize.value || v.size == null || v.size!.isEmpty)
-      );
-    } catch (_) {
-      return product.variants.first;
-    }
+    
+    // Exact match search
+    final exactMatch = product.variants.firstWhereOrNull(
+      (v) => (v.id.trim() == (selectedVariantId.value.isEmpty ? v.id.trim() : selectedVariantId.value.trim())) && 
+             (v.color?.trim() == selectedColor.value.trim() || (v.color == null && selectedColor.value.isEmpty)) && 
+             (v.size?.trim() == selectedSize.value.trim() || (v.size == null && selectedSize.value.isEmpty))
+    );
+
+    if (exactMatch != null) return exactMatch;
+
+    // Fallback: If only color matches OR only size matches
+    final partialMatch = product.variants.firstWhereOrNull(
+      (v) => (v.color?.trim() == selectedColor.value.trim() && selectedColor.value.isNotEmpty) || 
+             (v.size?.trim() == selectedSize.value.trim() && selectedSize.value.isNotEmpty)
+    );
+
+    return partialMatch ?? product.variants.first;
   }
 
   int _getCartQuantity(ProductModel product) {
@@ -685,7 +724,7 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
           bool isInCart = cartQty > 0;
           
           VariantModel? variant = _getSelectedVariant(product);
-          bool isOutOfStock = variant != null && variant.availableStock <= 0;
+          bool isOutOfStock = false; // Always active as requested
           bool hasReachedMaxStock = variant != null && cartQty >= variant.availableStock;
 
           return Row(
@@ -757,7 +796,14 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
                           )
                         : GestureDetector(
                             onTap: () async {
-                              if (variant == null) return;
+                              if (variant == null) {
+                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select valid options'), backgroundColor: Colors.orange));
+                                return;
+                              }
+                              // if (variant.availableStock <= 0) {
+                              //   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Selected variant is out of stock'), backgroundColor: Colors.red));
+                              //   return;
+                              // }
                               try {
                                 final loginController = Get.find<LoginDataController>();
                                 if (loginController.currentUser.value == null || loginController.currentUser.value!.id == null) {
@@ -793,7 +839,10 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
               Expanded(
                 child: GestureDetector(
                   onTap: isOutOfStock ? null : () async {
-                    if (variant == null) return;
+                    if (variant == null) {
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select valid options'), backgroundColor: Colors.orange));
+                      return;
+                    }
                     try {
                       final loginController = Get.find<LoginDataController>();
                       if (loginController.currentUser.value == null || loginController.currentUser.value!.id == null) {

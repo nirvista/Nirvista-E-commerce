@@ -177,6 +177,29 @@ class WishlistItem {
     required this.variant,
   });
 
+  /// NEW: Helper to convert back to ProductModel for UI reuse
+  dynamic toProductModel() {
+    return {
+      'id': productId,
+      'title': product.title,
+      'originalPrice': variant.price,
+      'salePrice': variant.price,
+      'price': variant.price,
+      'images': variant.images,
+      'variants': [
+        {
+          'id': variantId,
+          'originalPrice': variant.price,
+          'salePrice': variant.price,
+          'price': variant.price,
+          'images': variant.images,
+          'status': variant.status,
+          'name': variant.variantName,
+        }
+      ]
+    };
+  }
+
   factory WishlistItem.fromJson(Map<String, dynamic> json) {
     return WishlistItem(
       id: json['id'] ?? '',
@@ -227,7 +250,9 @@ class WishlistVariant {
     return WishlistVariant(
       id: json['id'] ?? '',
       variantName: json['variantName'] ?? '',
-      price: (json['price'] ?? 0).toDouble(),
+      price: json['price'] != null 
+          ? (json['price'] is num ? (json['price'] as num).toDouble() : double.tryParse(json['price'].toString().replaceAll(',', '')) ?? 0.0)
+          : 0.0,
       images: (json['images'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??

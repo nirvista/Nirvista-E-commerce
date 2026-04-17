@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
 class ProductModel {
   final String id;
   final String title;
@@ -7,7 +10,12 @@ class ProductModel {
   final String brandName;
   final String? material;
   final double rating;
-  final List<VariantModel> variants;
+  List<VariantModel> variants;
+  final List<String> images;
+  final String? thumbnail;
+  final double? basePrice;
+  final double? salePrice;
+
 
   ProductModel({
     required this.id,
@@ -19,13 +27,19 @@ class ProductModel {
     this.material,
     required this.rating,
     this.variants = const [],
+    this.images = const [],
+    this.thumbnail,
+    this.basePrice,
+    this.salePrice,
   });
 
+
+
   factory ProductModel.fromJson(Map<String, dynamic> json) {
-    // Try to get brand name from nested 'brand' object if available
-    String parsedBrandName = '';
-    if (json['brand'] != null && json['brand'] is Map) {
-      parsedBrandName = json['brand']['name'] ?? '';
+    // Try to get brand name from nested 'brand' object or root-level 'brandName'
+    String parsedBrandName = json['brandName']?.toString() ?? '';
+    if (parsedBrandName.isEmpty && json['brand'] != null && json['brand'] is Map) {
+      parsedBrandName = json['brand']['name']?.toString() ?? '';
     }
     return ProductModel(
       id: json['id']?.toString() ?? '',
@@ -36,33 +50,115 @@ class ProductModel {
       brandName: parsedBrandName,
       material: json['material']?.toString(),
       rating: json['rating'] != null 
-          ? (json['rating'] is num ? (json['rating'] as num).toDouble() : double.tryParse(json['rating'].toString()) ?? 0.0)
+          ? (json['rating'] is num ? (json['rating'] as num).toDouble() : double.tryParse(json['rating'].toString().replaceAll(',', '')) ?? 0.0)
           : 0.0,
-      variants: json['variants'] != null
+      variants: (json['variants'] != null && json['variants'] is List)
           ? (json['variants'] as List).map((i) => VariantModel.fromJson(i)).toList()
           : [],
+      images: json['images'] != null
+          ? (json['images'] is List 
+              ? (json['images'] as List).map((i) => _parseImage(i) ?? '').where((s) => s.isNotEmpty).toList()
+              : [_parseImage(json['images']) ?? ''].where((s) => s.isNotEmpty).toList())
+          : [],
+      thumbnail: _parseImage(json['image'] ?? json['thumbnail'] ?? json['productImage'] ?? json['imageUrl'] ?? json['mainImage'] ?? json['featuredImage'] ?? json['image_url'] ?? json['img_url']),
+      basePrice: _parseNum(json['price'] ?? json['originalPrice'] ?? json['basePrice'] ?? json['mrp'] ?? json['actual_price']),
+      salePrice: _parseNum(json['discountPrice'] ?? json['salePrice'] ?? json['discount_price'] ?? json['sale_price'] ?? json['selling_price']),
     );
   }
 
+  static double? _parseNum(dynamic v) {
+    if (v == null) return null;
+    if (v is num) return v.toDouble();
+    if (v is Map) {
+      // Handle cases like {"amount": 100, "original_price": 120}
+      final nested = v['amount'] ?? v['price'] ?? v['value'] ?? v['mrp'] ?? v['current'];
+      if (nested != null) return _parseNum(nested);
+    }
+    String s = v.toString().replaceAll(RegExp(r'[^0-9.]'), '');
+    return double.tryParse(s);
+  }
+
+  static String? _parseImage(dynamic e) {
+    if (e == null) return null;
+    final String baseUrl = dotenv.env['BASE_URL'] ?? '';
+    
+    String? path;
+    if (e is Map) {
+      // Handle image objects common in Express/Node backends
+      path = (e['url'] ?? e['src'] ?? e['image'] ?? e['path'] ?? e['file'] ?? e['imageUrl'] ?? e['image_url'] ?? e['img_url'] ?? e['thumb'] ?? e['thumbnail'])?.toString();
+      
+      // Deep fallback: if still null, look for ANY string that looks like an image path
+      if (path == null) {
+        for (var val in e.values) {
+          if (val is String && (val.endsWith('.jpg') || val.endsWith('.png') || val.endsWith('.jpeg') || val.endsWith('.webp') || val.contains('/uploads/'))) {
+             path = val;
+             break;
+          }
+        }
+      }
+    } else {
+      path = e.toString();
+    }
+
+    if (path == null || path.trim().isEmpty) return null;
+    
+    String cleanPath = path.trim().replaceAll('\\', '/');
+    if (cleanPath.isNotEmpty && !cleanPath.startsWith('http')) {
+      return "$baseUrl${cleanPath.startsWith('/') ? '' : '/'}$cleanPath";
+    }
+    return cleanPath;
+  }
+
+
+
   // Helpers for UI
   double get currentPrice {
-    if (variants.isEmpty) return 0.0;
-    var v = variants.first;
-    return v.discountPrice != null && v.discountPrice! > 0 ? v.discountPrice! : v.price;
+    if (variants.isNotEmpty) {
+      var v = variants.first;
+      return v.discountPrice != null && v.discountPrice! > 0 ? v.discountPrice! : v.price;
+    }
+    return salePrice ?? basePrice ?? 0.0;
   }
 
   double get originalPrice {
-    if (variants.isEmpty) return 0.0;
-    return variants.first.price;
+    if (variants.isNotEmpty) {
+      return variants.first.price;
+    }
+    return basePrice ?? 0.0;
   }
 
   String get imageUrl {
-    if (variants.isNotEmpty && variants.first.images.isNotEmpty) {
-      return variants.first.images.first;
+    if (thumbnail != null && thumbnail!.isNotEmpty) return thumbnail!;
+    if (images.isNotEmpty) return images.first;
+    for (var v in variants) {
+      if (v.images.isNotEmpty) return v.images.first;
     }
     return '';
   }
+
+  ProductModel merge(ProductModel other) {
+    return ProductModel(
+      id: id,
+      title: other.title.isNotEmpty ? other.title : title,
+      description: (other.description?.isNotEmpty ?? false) ? other.description : description,
+      categoryId: other.categoryId.isNotEmpty ? other.categoryId : categoryId,
+      brandId: other.brandId.isNotEmpty ? other.brandId : brandId,
+      brandName: other.brandName.isNotEmpty ? other.brandName : brandName,
+      material: (other.material?.isNotEmpty ?? false) ? other.material : material,
+      rating: other.rating > 0 ? other.rating : rating,
+      variants: other.variants.isNotEmpty ? other.variants : variants,
+      images: other.images.isNotEmpty ? other.images : images,
+      thumbnail: (other.thumbnail?.isNotEmpty ?? false) ? other.thumbnail : thumbnail,
+      basePrice: (other.basePrice ?? 0) > 0 ? other.basePrice : basePrice,
+      salePrice: (other.salePrice ?? 0) > 0 ? other.salePrice : salePrice,
+    );
+  }
+
+  void copyFrom(ProductModel other) {
+    variants = other.variants;
+  }
 }
+
 
 class VariantModel {
   final String id;
@@ -96,26 +192,70 @@ class VariantModel {
   });
 
   factory VariantModel.fromJson(Map<String, dynamic> json) {
+    // Clean price strings (remove commas, currency symbols etc)
+    double parseDouble(dynamic value) {
+      if (value == null) return 0.0;
+      if (value is num) return value.toDouble();
+      String s = value.toString().replaceAll(RegExp(r'[^0-9.]'), '');
+      return double.tryParse(s) ?? 0.0;
+    }
+
+    // Helper for stock parsing
+    int parseInt(dynamic value) {
+      if (value == null) return 0;
+      if (value is num) return value.toInt();
+      return int.tryParse(value.toString()) ?? 0;
+    }
+
+    // Parse images list directly — uses toString() so full URLs from the backend
+    // are preserved without modification (fixes cart images not showing).
+    double price = parseDouble(json['price'] ?? json['originalPrice'] ?? json['basePrice'] ?? json['mrp'] ?? json['actual_price']);
+    double? discountPrice = (json['discountPrice'] ?? json['salePrice'] ?? json['discount_price'] ?? json['sale_price'] ?? json['selling_price']) != null 
+        ? parseDouble(json['discountPrice'] ?? json['salePrice'] ?? json['discount_price'] ?? json['sale_price'] ?? json['selling_price']) 
+        : null;
+    
+    // Parse images list using _parseImage for each item
+    final List<String> parsedImages = [];
+    dynamic imagesRaw = json['images'];
+    if (imagesRaw is String && imagesRaw.isNotEmpty) {
+      try {
+        imagesRaw = jsonDecode(imagesRaw);
+      } catch (e) {
+        // Not a JSON string, handle as single image or ignore
+      }
+    }
+
+    if (imagesRaw != null && imagesRaw is List) {
+      for (var item in imagesRaw) {
+        final img = ProductModel._parseImage(item);
+        if (img != null) parsedImages.add(img);
+      }
+    }
+    
+    // Fallback: if no images list, try single-image fields
+    if (parsedImages.isEmpty) {
+      final String? img = ProductModel._parseImage(
+          json['image'] ?? json['thumbnail'] ?? json['variantImage'] ?? json['imageUrl'] ?? json['src'] ?? json['image_url'] ?? json['img_url'] ?? json['path']);
+      if (img != null && img.isNotEmpty) parsedImages.add(img);
+    }
+    
+    int stock = parseInt(json['stock']);
+    int reserved = parseInt(json['reservedStock'] ?? json['reservedstock']);
+    int avail = json['availableStock'] != null ? parseInt(json['availableStock']) : (stock - reserved);
+
     return VariantModel(
       id: json['id']?.toString() ?? '',
       productId: json['productId']?.toString() ?? '',
       variantName: json['variantName']?.toString(),
-      price: json['price'] != null 
-    ? (json['price'] is num ? (json['price'] as num).toDouble() : double.tryParse(json['price'].toString()) ?? 0.0)
-      : 0.0,
-      discountPrice: json['discountPrice'] != null 
-    ? (json['discountPrice'] is num ? (json['discountPrice'] as num).toDouble() : double.tryParse(json['discountPrice'].toString()))
-    : null,
-
-      images: json['images'] != null ? List<String>.from(json['images'].map((i) => i.toString())) : [],
+      price: price,
+      discountPrice: discountPrice,
+      images: parsedImages,
       color: json['color']?.toString(),
       size: json['size']?.toString(),
       status: json['status']?.toString() ?? 'in-stock',
-      stock: json['stock'] != null ? (json['stock'] is num ? (json['stock'] as num).toInt() : int.tryParse(json['stock'].toString()) ?? 0) : 0,
-      reservedstock: json['reservedstock'] != null ? (json['reservedstock'] is num ? (json['reservedstock'] as num).toInt() : int.tryParse(json['reservedstock'].toString()) ?? 0) : (json['reservedStock'] != null ? (json['reservedStock'] is num ? (json['reservedStock'] as num).toInt() : int.tryParse(json['reservedStock'].toString()) ?? 0) : 0),
-      availableStock: json['availableStock'] != null 
-    ? (json['availableStock'] is num ? (json['availableStock'] as num).toInt() : int.tryParse(json['availableStock'].toString()) ?? 0)
-    : (int.tryParse(json['stock']?.toString() ?? '0') ?? 0) - (int.tryParse(json['reservedstock']?.toString() ?? json['reservedStock']?.toString() ?? '0') ?? 0),
+      stock: stock,
+      reservedstock: reserved,
+      availableStock: avail,
       approvalStatus: json['approvalStatus']?.toString() ?? 'pending',
     );
   }
@@ -183,6 +323,8 @@ class CartItemModel {
   final int quantity;
   final ProductModel? product;
   final VariantModel? variant;
+  final String? image;
+
 
   CartItemModel({
     this.id,
@@ -192,7 +334,9 @@ class CartItemModel {
     required this.quantity,
     this.product,
     this.variant,
+    this.image,
   });
+
 
   factory CartItemModel.fromJson(Map<String, dynamic> json) {
     return CartItemModel(
@@ -203,8 +347,35 @@ class CartItemModel {
       quantity: json['quantity'] != null ? (json['quantity'] is num ? (json['quantity'] as num).toInt() : int.tryParse(json['quantity'].toString()) ?? 0) : 0,
       product: json['product'] != null ? ProductModel.fromJson(json['product']) : null,
       variant: json['variant'] != null ? VariantModel.fromJson(json['variant']) : null,
+      image: ProductModel._parseImage(
+          json['image'] ?? 
+          json['thumbnail'] ?? 
+          json['productImage'] ?? 
+          json['imageUrl'] ?? 
+          json['mainImage'] ?? 
+          json['variantImage'] ?? 
+          json['src'] ??
+          (json['variant'] != null && json['variant']['images'] != null && (json['variant']['images'] is List) && (json['variant']['images'] as List).isNotEmpty 
+              ? (json['variant']['images'] as List).first 
+              : null)
+      ),
     );
   }
+
+
+  String get displayImage {
+    if (variant != null && variant!.images.isNotEmpty) {
+      return variant!.images.first;
+    }
+    if (product != null && product!.imageUrl.isNotEmpty) {
+      return product!.imageUrl;
+    }
+    if (image != null && image!.isNotEmpty) {
+      return image!;
+    }
+    return '';
+  }
+
 }
 
 class CartModel {
@@ -240,6 +411,8 @@ class OrderItemModel {
   final int returnedQuantity;
   final ProductModel? product;
   final VariantModel? variant;
+  final String? image;
+
 
   OrderItemModel({
     required this.id,
@@ -252,7 +425,9 @@ class OrderItemModel {
     this.returnedQuantity = 0,
     this.product,
     this.variant,
+    this.image,
   });
+
 
   factory OrderItemModel.fromJson(Map<String, dynamic> json) {
     return OrderItemModel(
@@ -268,8 +443,24 @@ class OrderItemModel {
       returnedQuantity: json['returnedQuantity'] != null ? (json['returnedQuantity'] is num ? (json['returnedQuantity'] as num).toInt() : int.tryParse(json['returnedQuantity'].toString()) ?? 0) : 0,
       product: json['product'] != null ? ProductModel.fromJson(json['product']) : null,
       variant: json['variant'] != null ? VariantModel.fromJson(json['variant']) : null,
+      image: ProductModel._parseImage(json['image'] ?? json['thumbnail'] ?? json['productImage'] ?? json['imageUrl'] ?? json['mainImage'] ?? json['variantImage'] ?? json['src']),
     );
   }
+
+
+  String get displayImage {
+    if (variant != null && variant!.images.isNotEmpty) {
+      return variant!.images.first;
+    }
+    if (product != null && product!.imageUrl.isNotEmpty) {
+      return product!.imageUrl;
+    }
+    if (image != null && image!.isNotEmpty) {
+      return image!;
+    }
+    return '';
+  }
+
 }
 
 class OrderModel {
@@ -367,7 +558,7 @@ class AddressModel {
       addressLine2: json['addressLine2']?.toString(),
       city: json['city']?.toString() ?? '',
       state: json['state']?.toString() ?? '',
-      postalCode: json['postal_code']?.toString() ?? '',
+      postalCode: (json['postal_code'] ?? json['postalCode'])?.toString() ?? '',
       country: json["country"]?.toString() ?? '',
       isDefaultBilling: json['isDefaultBilling'] == true || json['isDefaultBilling'] == 1,
       isDefaultShipping: json['isDefaultShipping'] == true || json['isDefaultShipping'] == 1,
@@ -410,5 +601,15 @@ class WishlistItemModel {
       product: json['product'] != null ? ProductModel.fromJson(json['product']) : null,
       variant: json['variant'] != null ? VariantModel.fromJson(json['variant']) : null,
     );
+  }
+
+  String get displayImage {
+    if (variant != null && variant!.images.isNotEmpty) {
+      return variant!.images.first;
+    }
+    if (product != null && product!.imageUrl.isNotEmpty) {
+      return product!.imageUrl;
+    }
+    return '';
   }
 }

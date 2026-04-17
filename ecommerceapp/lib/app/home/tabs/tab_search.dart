@@ -12,7 +12,8 @@ import 'package:pet_shop/base/widget_utils.dart';
 import 'package:pet_shop/services/product_api.dart';
 import 'package:pet_shop/services/brand_api.dart';
 import 'package:pet_shop/services/category_api.dart';
-import '../../model/api_models.dart';
+import 'package:pet_shop/services/enrichment_service.dart';
+import 'package:pet_shop/app/model/api_models.dart';
 
 // ─────────────────────────────────────────────
 //  Filter Model
@@ -69,7 +70,12 @@ class SearchFilters {
 
   Map<String, dynamic> toQueryParams(String keyword) {
     final params = <String, dynamic>{};
-    if (keyword.isNotEmpty) params['keyword'] = keyword;
+    if (keyword.isNotEmpty) {
+      params['keyword'] = keyword;
+      params['search'] = keyword;
+      params['q'] = keyword;
+      params['name'] = keyword;
+    }
     if (categoryIds.isNotEmpty) params['categoryId'] = categoryIds;
     if (brandIds.isNotEmpty) params['brandId'] = brandIds;
     if (materials.isNotEmpty) params['material'] = materials;
@@ -97,14 +103,15 @@ class SearchFilters {
 // ─────────────────────────────────────────────
 //  Search Page
 // ─────────────────────────────────────────────
-class SearchPage extends StatefulWidget {
-  const SearchPage({Key? key}) : super(key: key);
+class TabSearch extends StatefulWidget {
+  final bool showBack;
+  const TabSearch({Key? key, this.showBack = true}) : super(key: key);
 
   @override
-  State<SearchPage> createState() => _SearchPageState();
+  State<TabSearch> createState() => _TabSearchState();
 }
 
-class _SearchPageState extends State<SearchPage> {
+class _TabSearchState extends State<TabSearch> {
   final StorageController storeController = Get.find<StorageController>();
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _focusNode = FocusNode();
@@ -187,17 +194,29 @@ class _SearchPageState extends State<SearchPage> {
       if (!mounted) return;
 
       if (res['success'] == true) {
-        List<dynamic> data = [];
-        final resData = res['data'];
-        if (resData is List) {
-          data = resData;
-        } else if (resData is Map && resData['products'] is List) {
-          data = resData['products'];
+        dynamic rawData = res['data'];
+        List<dynamic> productList = [];
+        
+        if (rawData is List) {
+          productList = rawData;
+        } else if (rawData is Map) {
+          // If the API returned a nested object, try to find the list inside
+          final nested = rawData['data'] ?? rawData['products'] ?? rawData['results'] ?? rawData['items'];
+          if (nested is List) {
+            productList = nested;
+          }
         }
+
         setState(() {
-          _results = data.map((e) => ProductModel.fromJson(e)).toList();
+          _results = productList.map((e) => ProductModel.fromJson(e)).toList();
           _isLoading = false;
         });
+
+        // ── NEW: Background enrichment ──
+        EnrichmentService.enrichProducts(_results, onUpdate: () {
+          if (mounted) setState(() {});
+        });
+        // ───────────────────────────────
       } else {
         setState(() {
           _results = [];
@@ -205,11 +224,14 @@ class _SearchPageState extends State<SearchPage> {
           _errorMessage = res['message'] ?? 'Search failed';
         });
       }
-    } catch (e) {
+    } catch (e, stack) {
+      print('=== SEARCH PARSE ERROR ===');
+      print(e);
+      print(stack);
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _errorMessage = 'Something went wrong. Please try again.';
+          _errorMessage = 'Error parsing search results. Check logs.';
         });
       }
     }
@@ -271,12 +293,14 @@ class _SearchPageState extends State<SearchPage> {
           padding: EdgeInsets.symmetric(horizontal: margin, vertical: 10.h),
           child: Row(
             children: [
-              GestureDetector(
-                onTap: () => Navigator.of(context).pop(),
-                child: Icon(Icons.arrow_back_ios_new,
-                    color: getFontColor(context), size: 20.w),
-              ),
-              SizedBox(width: 12.w),
+              if (widget.showBack) ...[
+                GestureDetector(
+                  onTap: () => Navigator.of(context).pop(),
+                  child: Icon(Icons.arrow_back_ios_new,
+                      color: getFontColor(context), size: 20.w),
+                ),
+                SizedBox(width: 12.w),
+              ],
               Expanded(
                 child: Container(
                   height: 42.h,
@@ -583,7 +607,7 @@ class _SearchPageState extends State<SearchPage> {
               ),
             ),
             SizedBox(height: 8.h),
-            getCustomFont(product.brandId, 11, getFontGreyColor(context), 1,
+            getCustomFont(product.brandName, 11, getFontGreyColor(context), 1,
                 fontWeight: FontWeight.w500),
             SizedBox(height: 4.h),
             getCustomFont(product.title, 12, getFontColor(context), 2,

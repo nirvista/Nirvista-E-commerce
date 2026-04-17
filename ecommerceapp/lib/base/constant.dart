@@ -1,5 +1,6 @@
 import 'dart:async';
-import 'dart:io';
+import 'dart:io' show Platform, exit;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:currency_formatter/currency_formatter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
@@ -219,17 +220,17 @@ class Constant {
   static formatTime(Duration d) =>
       d.toString().split('.').first.padLeft(8, "0");
 
-  static closeApp() {
-    // Get.close(times)close();
+  static void closeApp() {
     Future.delayed(const Duration(milliseconds: 1000), () {
-      // exit(0);
+      if (kIsWeb) {
+        // Cannot close browser tab easily, maybe navigate to home or show message
+        return;
+      }
       if (Platform.isAndroid) {
         SystemChannels.platform.invokeMethod('SystemNavigator.pop');
       } else {
         exit(0);
       }
-
-      // SystemChannels.platform.invokeMethod('SystemNavigator.pop');
     });
   }
 }

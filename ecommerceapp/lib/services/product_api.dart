@@ -149,28 +149,69 @@ class ProductApiService {
   static Future<Map<String, dynamic>> searchProducts(
       Map<String, dynamic> queryParams) async {
     try {
-      // Build query parameters — handles both single values and lists (multi-select)
       final Map<String, dynamic> flatParams = {};
       queryParams.forEach((key, value) {
         if (value is List) {
-          // Uri supports repeated keys for lists e.g. ?color=Red&color=Blue
           flatParams[key] = value.map((v) => v.toString()).toList();
         } else {
           flatParams[key] = value.toString();
         }
       });
 
-      final uri = Uri.parse('$baseUrl/api/products/search')
+      // Try the primary search endpoint first
+      var uri = Uri.parse('$baseUrl/api/products/search')
           .replace(queryParameters: flatParams);
+      
+      print('=== SEARCH ATTEMPT 1 (/search) ===');
+      print('URL: $uri');
+      
+      var response = await http.get(uri);
+      
+      // DEBUG: Log focused first-result data
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        final results = decoded['data'] ?? decoded['products'] ?? decoded['results'];
+        if (results is List && results.isNotEmpty) {
+          print('=== SEARCH RESULT PREVIEW (FIRST ITEM) ===');
+          print(jsonEncode(results.first));
+        } else {
+          print('=== SEARCH RESPONSE BODY ===');
+          print(response.body);
+        }
+      }
+      // as many backends use the same endpoint for listing and filtering.
+      bool useFallback = false;
+      if (response.statusCode != 200) {
+        useFallback = true;
+      } else {
+        final data = jsonDecode(response.body);
+        final results = data['data'] ?? data['products'] ?? data['results'];
+        if (results == null || (results is List && results.isEmpty)) {
+            useFallback = true;
+        }
+      }
 
-      final response = await http.get(uri);
+      if (useFallback) {
+        print('=== SEARCH ATTEMPT 2 (/products fallback) ===');
+        uri = Uri.parse('$baseUrl/api/products').replace(queryParameters: flatParams);
+        print('URL: $uri');
+        response = await http.get(uri);
+      }
 
       if (response.statusCode == 200) {
         final decodedResponse = jsonDecode(response.body);
+        
+        dynamic results;
+        if (decodedResponse is List) {
+          results = decodedResponse;
+        } else if (decodedResponse is Map) {
+          results = decodedResponse['data'] ?? decodedResponse['products'] ?? decodedResponse['results'] ?? decodedResponse;
+        }
+
         return {
           'success': true,
-          'data': decodedResponse['data'],
-          'message': decodedResponse['message'],
+          'data': results,
+          'message': decodedResponse is Map ? decodedResponse['message'] : null,
         };
       } else {
         return {
@@ -180,6 +221,8 @@ class ProductApiService {
         };
       }
     } catch (e) {
+      print('=== SEARCH API CRASH ===');
+      print(e);
       return {'success': false, 'message': 'Error: $e'};
     }
   }

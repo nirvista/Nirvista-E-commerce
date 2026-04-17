@@ -11,8 +11,26 @@ class CartController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    // Auto-fetch if user is logged in
-    fetchCart();
+    _setupUserListener();
+  }
+
+  void _setupUserListener() {
+    final loginController = Get.find<LoginDataController>();
+    ever(loginController.currentUser, (user) {
+      if (user != null) {
+        // Fresh login or user update - fetch new cart
+        fetchCart();
+      } else {
+        // Logout - clear cart
+        cartModel.value = null;
+        update();
+      }
+    });
+
+    // Initial fetch if already logged in
+    if (loginController.currentUser.value != null) {
+      fetchCart();
+    }
   }
 
   Future<void> fetchCart() async {

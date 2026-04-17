@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -119,7 +120,7 @@ class ProgressDialog {
                 padding: const EdgeInsets.all(20),
                 child:
                     Column(mainAxisSize: MainAxisSize.min, children: <Widget>[
-                  Platform.isIOS
+                  (!kIsWeb && Platform.isIOS)
                       ? CupertinoActivityIndicator(
                           radius: 15,
                         )

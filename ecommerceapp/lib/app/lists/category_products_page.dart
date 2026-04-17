@@ -227,7 +227,7 @@ class _CategoryProductsPageState extends State<CategoryProductsPage> {
             child: getCustomFont(categoryTitle, 16, Colors.white, 1,
                 fontWeight: FontWeight.w700),
           ),
-          Icon(Icons.search, color: Colors.white, size: 24.w),
+          SizedBox(width: 24.w), // Replaced search icon with spacer for alignment
         ],
       ),
     );

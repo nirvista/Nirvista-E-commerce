@@ -1,7 +1,9 @@
 import 'package:get/get.dart';
+import 'package:collection/collection.dart';
 import '../../app/model/api_models.dart';
 import '../../services/order_api.dart';
 import 'login_data_controller.dart';
+import '../../services/product_api.dart';
 
 class GlobalOrderController extends GetxController {
   var userOrders = <OrderModel>[].obs;
@@ -21,7 +23,7 @@ class GlobalOrderController extends GetxController {
       }
       final res = await OrderApiService.getUserOrders(token);
       if (res['success'] && res['data'] != null) {
-        final list = (res['data'] as List).map((e) => OrderModel.fromJson(e)).toList();
+        final List<OrderModel> list = (res['data'] as List).map((e) => OrderModel.fromJson(e)).toList();
         userOrders.value = list;
       } else {
         errorMessage.value = res['message'] ?? "Failed to fetch orders";

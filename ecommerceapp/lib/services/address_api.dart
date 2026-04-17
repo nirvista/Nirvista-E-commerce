@@ -16,7 +16,11 @@ class AddressApiService {
     try {
       final response = await http.get(
         Uri.parse('$baseUrl/api/address'),
-        headers: {'Authorization': 'Bearer $accessToken'},
+        headers: {
+          'Authorization': 'Bearer $accessToken',
+          'Content-Type': 'application/json',
+          'x-client-type': 'mobile',
+        },
       );
       if (response.statusCode == 200 || response.statusCode == 201) {
         final decoded = jsonDecode(response.body);
@@ -68,6 +72,7 @@ class AddressApiService {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $accessToken',
+          'x-client-type': 'mobile',
         },
         body: jsonEncode(body),
       );
@@ -120,6 +125,7 @@ class AddressApiService {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $accessToken',
+          'x-client-type': 'mobile',
         },
         body: jsonEncode(body),
       );
@@ -139,7 +145,11 @@ class AddressApiService {
     try {
       final response = await http.delete(
         Uri.parse('$baseUrl/api/address/$addressId'),
-        headers: {'Authorization': 'Bearer $accessToken'},
+        headers: {
+          'Authorization': 'Bearer $accessToken',
+          'Content-Type': 'application/json',
+          'x-client-type': 'mobile',
+        },
       );
       if (response.statusCode == 200 || response.statusCode == 201) {
         return {'success': true, 'message': jsonDecode(response.body)['message']};
@@ -156,7 +166,11 @@ class AddressApiService {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/api/address/$addressId/default'),
-        headers: {'Authorization': 'Bearer $accessToken'},
+        headers: {
+          'Authorization': 'Bearer $accessToken',
+          'Content-Type': 'application/json',
+          'x-client-type': 'mobile',
+        },
       );
       if (response.statusCode == 200 || response.statusCode == 201) {
         final decoded = jsonDecode(response.body);

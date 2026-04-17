@@ -15,7 +15,26 @@ class ShippingAddressController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    fetchAddresses();
+    _setupUserListener();
+  }
+
+  void _setupUserListener() {
+    final loginController = Get.find<LoginDataController>();
+    ever(loginController.currentUser, (user) {
+      if (user != null) {
+        // Fresh login or user update - fetch new addresses
+        fetchAddresses();
+      } else {
+        // Logout - clear everything
+        addresses.clear();
+        selectedAddress.value = null;
+      }
+    });
+
+    // Initial fetch if already logged in
+    if (loginController.isLoggedIn) {
+      fetchAddresses();
+    }
   }
 
   Future<void> fetchAddresses() async {

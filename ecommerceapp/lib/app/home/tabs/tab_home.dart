@@ -10,15 +10,16 @@ import 'package:pet_shop/base/get/route_key.dart';
 import 'package:pet_shop/base/get/storage_controller.dart';
 import 'package:pet_shop/base/widget_utils.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:pet_shop/services/product_api.dart';
+import 'package:pet_shop/services/brand_api.dart';
+import 'package:pet_shop/services/category_api.dart';
+import 'package:pet_shop/services/enrichment_service.dart';
 
 import '../../../base/get/bottom_selection_controller.dart';
 import '../../../base/get/home_controller.dart';
 import '../../../base/get/product_data.dart';
 import '../../model/api_models.dart';
-import '../../../services/product_api.dart';
-import '../../../services/brand_api.dart';
-import '../../../services/category_api.dart';
-import '../../../services/address_api.dart';
+import '../../../base/get/cart_contr/shipping_add_controller.dart';
 import '../../../base/get/login_data_controller.dart';
 
 class TabHome extends StatefulWidget {
@@ -35,7 +36,10 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
   final controller = Get.find<BottomItemSelectionController>();
   final loginController = Get.find<LoginDataController>();
 
-  RxString userCity = "Set Location".obs;
+  // Replaced local userCity with ShippingAddressController observation
+  final shippingController = Get.isRegistered<ShippingAddressController>()
+      ? Get.find<ShippingAddressController>()
+      : Get.put(ShippingAddressController());
   
   // Reactive product lists
   RxList<ProductModel> bestSellingList = <ProductModel>[].obs;
@@ -53,67 +57,54 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
-    _refreshAllSections();
-    brandsFuture = _fetchBrands();
-    categoriesFuture = _fetchCategories();
-    _fetchUserLocation();
+    // Added a small delay for the initial load to resolve race conditions 
+    // during page transitions (especially on emulators).
+    Future.delayed(const Duration(milliseconds: 200), () {
+      if (mounted) {
+        _refreshAllSections();
+        setState(() {
+          brandsFuture = _fetchBrands();
+          categoriesFuture = _fetchCategories();
+        });
+      }
+    });
   }
 
   Future<void> _refreshAllSections() async {
     isSectionLoading.value = true;
     try {
-      // Step 1: Fetch categories first to use them for scraping 'For You' products
-      final catRes = await CategoryApiService.getAllCategories();
-      List<CategoryModel> cats = [];
-      if (catRes['success']) {
-        cats = (catRes['data'] as List).map((e) => CategoryModel.fromJson(e)).toList();
-      }
+      // 1. Fetch products from specialized APIs
+      final results = await Future.wait([
+        _fetchProducts(ProductApiService.getAllProducts()),
+        _fetchProducts(ProductApiService.getTopRatedProducts()),
+        _fetchProducts(ProductApiService.getNewArrivals()),
+      ]);
 
-      if (cats.isEmpty) {
-        // Fallback to restricted API if categories are empty
-        final results = await Future.wait([
-          _fetchProducts(ProductApiService.getAllProducts()),
-          _fetchProducts(ProductApiService.getTopRatedProducts()),
-          _fetchProducts(ProductApiService.getNewArrivals()),
-        ]);
-        bestSellingList.value = results[0];
-        topDealsList.value = results[1];
-        popularPicksList.value = results[2];
-        return;
-      }
+      // 2. Assign to reactive lists
+      bestSellingList.value = results[0];
+      topDealsList.value = results[1];
+      popularPicksList.value = results[2];
 
-      // Step 2: Scrape products from the first 3 categories (bypass restricted Product API)
-      final scrapeResults = await Future.wait(
-        cats.take(3).map((c) => CategoryApiService.getProductsByCategory(c.id))
-      );
+      // 3. Proactively fetch user address if missing
+      shippingController.fetchAddresses();
 
-      List<ProductModel> allScraped = [];
-      for (var res in scrapeResults) {
-        if (res['success']) {
-          List<dynamic> data = res['data'];
-          allScraped.addAll(data.map((e) => ProductModel.fromJson(e)).toList());
-        }
-      }
-
-      // Deduplicate by ID
-      final Map<String, ProductModel> uniqueProds = {for (var p in allScraped) p.id: p};
-      final mergedProducts = uniqueProds.values.toList();
-
-      if (mergedProducts.isEmpty) {
-        // Ultimate fallback
-        bestSellingList.clear();
-        topDealsList.clear();
-        popularPicksList.clear();
-      } else {
-        bestSellingList.value = mergedProducts;
-        topDealsList.value = mergedProducts.where((p) => p.variants.any((v) => v.discountPrice != null && v.discountPrice! > 0)).toList();
-        popularPicksList.value = mergedProducts;
-      }
+      // 4. Apply background enrichment to fix potential lightweight API data (images/prices)
+      _enrichHomeSections();
 
     } catch (e) {
       print("Error refreshing sections: $e");
     } finally {
       isSectionLoading.value = false;
+    }
+  }
+
+  void _enrichHomeSections() {
+    // Enrich each list asynchronously
+    final listsToEnrich = [bestSellingList, topDealsList, popularPicksList];
+    for (var list in listsToEnrich) {
+      EnrichmentService.enrichProducts(list, onUpdate: () {
+        list.refresh();
+      });
     }
   }
 
@@ -144,23 +135,7 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
     }
   }
 
-  Future<void> _fetchUserLocation() async {
-    final token = loginController.accessToken;
-    if (token != null && token.isNotEmpty) {
-      try {
-        final res = await AddressApiService.getUserAddresses(token);
-        if (res['success'] && res['data'] != null && (res['data'] as List).isNotEmpty) {
-          final addresses = (res['data'] as List).map((e) => AddressModel.fromJson(e)).toList();
-          final defaultAddr = addresses.where((a) => a.isDefaultShipping).toList();
-          if (defaultAddr.isNotEmpty) {
-            userCity.value = defaultAddr.first.city;
-          } else {
-            userCity.value = addresses.first.city;
-          }
-        }
-      } catch (_) {}
-    }
-  }
+  // Removed _fetchUserLocation as it is now handled by ShippingAddressController
 
   Future<List<ProductModel>> _fetchProducts(Future<Map<String, dynamic>> apiCall) async {
     final res = await apiCall;
@@ -260,7 +235,11 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
               children: [
                 Icon(Icons.location_on, color: accentColor, size: 20.w),
                 SizedBox(width: 8.w),
-                Obx(() => getCustomFont(userCity.value.toUpperCase(), 14, getFontColor(context), 1,
+                Obx(() => getCustomFont(
+                    shippingController.selectedAddress.value?.city.toUpperCase() ?? "SET LOCATION",
+                    14,
+                    getFontColor(context),
+                    1,
                     fontWeight: FontWeight.w700)),
                 Spacer(),
                 Icon(Icons.expand_more, color: getFontGreyColor(context), size: 20.w),
@@ -272,7 +251,7 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
           GestureDetector(
             onTap: () {
               Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const SearchPage()),
+                MaterialPageRoute(builder: (_) => const TabSearch()),
               );
             },
             child: AbsorbPointer(

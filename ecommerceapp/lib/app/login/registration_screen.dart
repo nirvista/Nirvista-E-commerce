@@ -51,8 +51,10 @@ class _RegistrationScreen extends State<RegistrationScreen> {
                 .marginSymmetric(horizontal: horSpace),
             8.h.verticalSpace,
             getDefaultTextFiled(context, "Enter your name", nameController,
-                getFontColor(context), (value) {}, validator: (email) {
-                  if (email!.isNotEmpty) {
+                getFontColor(context), (value) {}, 
+                keyboardType: TextInputType.name,
+                validator: (values) {
+                  if (values!.isNotEmpty) {
                     return null;
                   } else {
                     return 'Please enter full name';
@@ -64,7 +66,9 @@ class _RegistrationScreen extends State<RegistrationScreen> {
                 .marginSymmetric(horizontal: horSpace),
             8.h.verticalSpace,
             getDefaultTextFiled(context, "Enter Email Address", emailController,
-                getFontColor(context), (value) {}, validator: (email) {
+                getFontColor(context), (value) {}, 
+                keyboardType: TextInputType.emailAddress,
+                validator: (email) {
                   if (email!.isNotEmpty) {
                     return null;
                   } else {
@@ -77,7 +81,9 @@ class _RegistrationScreen extends State<RegistrationScreen> {
                 .marginSymmetric(horizontal: horSpace),
             8.h.verticalSpace,
             getDefaultTextFiled(context, "Enter Phone Number", numberController,
-                getFontColor(context), (value) {}, validator: (phone) {
+                getFontColor(context), (value) {}, 
+                keyboardType: TextInputType.phone,
+                validator: (phone) {
                   if (phone!.isNotEmpty) {
                     return null;
                   } else {
@@ -222,23 +228,24 @@ class _RegistrationScreen extends State<RegistrationScreen> {
                     return;
                   }
                   
-                  if (emailController.text.isEmpty) {
+                  final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+                  if (!emailRegex.hasMatch(emailController.text.trim())) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text("Please enter email address"))
+                      SnackBar(content: Text("Please enter a valid email address"))
                     );
                     return;
                   }
                   
-                  if (numberController.text.isEmpty) {
+                  if (numberController.text.trim().length != 10) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text("Please enter phone number"))
+                      SnackBar(content: Text("Phone number must be exactly 10 digits"))
                     );
                     return;
                   }
                   
-                  if (passController.text.isEmpty) {
+                  if (passController.text.length < 6) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text("Please enter password"))
+                      SnackBar(content: Text("Password must be at least 6 characters"))
                     );
                     return;
                   }

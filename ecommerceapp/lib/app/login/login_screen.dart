@@ -192,6 +192,22 @@ class _LoginScreen extends State<LoginScreen> {
                       final accessToken = result['data']['accessToken'];
                       final refreshToken = result['data']['refreshToken'];
 
+                      // ── ROLE VERIFICATION ──
+                      // Compare the role returned by server with the selection in UI
+                      final serverRole = userData['userRole'].toString().toLowerCase();
+                      final selectedRole = userType!.toLowerCase();
+                      
+                      if (serverRole != selectedRole) {
+                        isLoading.value = false;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text("Access denied: This account is registered as a $serverRole. Please select the correct user type."),
+                            backgroundColor: Colors.orange.shade800,
+                          )
+                        );
+                        return;
+                      }
+
                       User LoggedInUser =User(
                         id :userData['id'],
                         name:userData['name'],

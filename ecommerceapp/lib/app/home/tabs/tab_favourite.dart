@@ -9,6 +9,9 @@ import 'package:pet_shop/base/widget_utils.dart';
 import '../../../base/fetch_pixels.dart';
 import 'package:pet_shop/services/wishlist_api.dart';
 import 'package:pet_shop/base/get/wishlist_controller.dart';
+import 'package:pet_shop/base/get/storage_controller.dart';
+import 'package:pet_shop/app/model/api_models.dart';
+import 'package:pet_shop/base/get/route_key.dart';
 
 class TabFavourite extends StatelessWidget {
   const TabFavourite({Key? key}) : super(key: key);
@@ -142,7 +145,16 @@ class TabFavourite extends StatelessWidget {
           // FIX: guard against index out of range if list shrinks mid-scroll
           if (index >= items.length) return const SizedBox.shrink();
           final item = items[index];
-          return _buildWishlistCard(context, item, index, ctrl);
+          return GestureDetector(
+            onTap: () {
+              final storageController = Get.find<StorageController>();
+              storageController.setSelectedProductModel(
+                ProductModel.fromJson(item.toProductModel() as Map<String, dynamic>)
+              );
+              Constant.sendToNext(context, productDetailScreenRoute);
+            },
+            child: _buildWishlistCard(context, item, index, ctrl)
+          );
         },
       ),
     );
