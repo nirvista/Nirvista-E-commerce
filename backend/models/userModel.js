@@ -31,7 +31,15 @@ const User = sequelize.define("User", {
   userStatus: {
     type: DataTypes.ENUM('active', 'pending', 'suspended', 'deleted'),
     defaultValue: 'pending',
-  }
+  },
+  resetPasswordToken: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  resetPasswordExpire: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
 },{
   timestamps: true,
   last_login_at: {
