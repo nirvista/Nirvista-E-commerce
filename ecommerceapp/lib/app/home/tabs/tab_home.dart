@@ -2,7 +2,7 @@ import 'package:carousel_slider/carousel_slider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
-import 'package:pet_shop/app/home/tabs/tab_search.dart'; 
+import 'package:pet_shop/app/home/tabs/tab_search.dart';
 import 'package:pet_shop/base/color_data.dart';
 import 'package:pet_shop/base/constant.dart';
 import 'package:pet_shop/base/fetch_pixels.dart';
@@ -63,9 +63,14 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
     if (token != null && token.isNotEmpty) {
       try {
         final res = await AddressApiService.getUserAddresses(token);
-        if (res['success'] && res['data'] != null && (res['data'] as List).isNotEmpty) {
-          final addresses = (res['data'] as List).map((e) => AddressModel.fromJson(e)).toList();
-          final defaultAddr = addresses.where((a) => a.isDefaultShipping).toList();
+        if (res['success'] &&
+            res['data'] != null &&
+            (res['data'] as List).isNotEmpty) {
+          final addresses = (res['data'] as List)
+              .map((e) => AddressModel.fromJson(e))
+              .toList();
+          final defaultAddr =
+              addresses.where((a) => a.isDefaultShipping).toList();
           if (defaultAddr.isNotEmpty) {
             userCity.value = defaultAddr.first.city;
           } else {
@@ -76,7 +81,8 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
     }
   }
 
-  Future<List<ProductModel>> _fetchProducts(Future<Map<String, dynamic>> apiCall) async {
+  Future<List<ProductModel>> _fetchProducts(
+      Future<Map<String, dynamic>> apiCall) async {
     final res = await apiCall;
     if (res['success']) {
       dynamic data = res['data'];
@@ -128,7 +134,7 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
             child: SingleChildScrollView(
               child: Column(
                 children: [
-                   // Category Tabs
+                  // Category Tabs
                   _buildCategoryTabs(context, margin),
                   SizedBox(height: 20.h),
                   // Banner Carousel
@@ -174,10 +180,23 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
               children: [
                 Icon(Icons.location_on, color: accentColor, size: 20.w),
                 SizedBox(width: 8.w),
-                Obx(() => getCustomFont(userCity.value.toUpperCase(), 14, getFontColor(context), 1,
-                    fontWeight: FontWeight.w700)),
-                Spacer(),
-                Icon(Icons.expand_more, color: getFontGreyColor(context), size: 20.w),
+                Expanded(
+                  child: Obx(
+                    () => Text(
+                      userCity.value.toUpperCase(),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: getFontColor(context),
+                        fontSize: 14.sp,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+                SizedBox(width: 8.w),
+                Icon(Icons.expand_more,
+                    color: getFontGreyColor(context), size: 20.w),
               ],
             ),
           ),
@@ -206,10 +225,11 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
                         style: TextStyle(color: getFontColor(context)),
                         decoration: InputDecoration(
                           hintText: "Search for products",
-                          hintStyle: TextStyle(color: getFontGreyColor(context)),
+                          hintStyle:
+                              TextStyle(color: getFontGreyColor(context)),
                           border: InputBorder.none,
-                          contentPadding:
-                              EdgeInsets.symmetric(vertical: 10.h, horizontal: 8.w),
+                          contentPadding: EdgeInsets.symmetric(
+                              vertical: 10.h, horizontal: 8.w),
                         ),
                       ),
                     ),
@@ -231,40 +251,42 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
       color: getCardColor(context),
       padding: EdgeInsets.symmetric(horizontal: margin, vertical: 12.h),
       child: FutureBuilder<List<CategoryModel>>(
-        future: categoriesFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(child: CircularProgressIndicator(color: accentColor));
-          }
-          if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
-            return SizedBox(); // fallback if no categories
-          }
+          future: categoriesFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return Center(
+                  child: CircularProgressIndicator(color: accentColor));
+            }
+            if (snapshot.hasError ||
+                !snapshot.hasData ||
+                snapshot.data!.isEmpty) {
+              return SizedBox(); // fallback if no categories
+            }
 
-          List<CategoryModel> apiCategories = snapshot.data!;
-          
-          return SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Obx(
-              () => Row(
-                children: [
+            List<CategoryModel> apiCategories = snapshot.data!;
+
+            return SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Obx(
+                () => Row(children: [
                   // Default 'For You' option
                   _buildSingleCategoryTab(context, 'for_you', 'For You'),
                   ...List.generate(
                     apiCategories.length,
                     (index) {
-                      return _buildSingleCategoryTab(context, apiCategories[index].id, apiCategories[index].name);
+                      return _buildSingleCategoryTab(context,
+                          apiCategories[index].id, apiCategories[index].name);
                     },
                   ),
-                ]
+                ]),
               ),
-            ),
-          );
-        }
-      ),
+            );
+          }),
     );
   }
 
-  Widget _buildSingleCategoryTab(BuildContext context, String catId, String catName) {
+  Widget _buildSingleCategoryTab(
+      BuildContext context, String catId, String catName) {
     bool isSelected = selectedCategory.value == catId;
     return InkWell(
       onTap: () {
@@ -420,44 +442,52 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
           ),
           SizedBox(height: 16.h),
           SizedBox(
-            height: 200.w,
-            child: FutureBuilder<List<ProductModel>>(
-              future: bestSellingFuture,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return Center(child: CircularProgressIndicator(color: accentColor));
-                }
-                if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
-                  return Center(child: getCustomFont("No products available", 14, getFontGreyColor(context), 1));
-                }
-                
-                var allProducts = snapshot.data!;
-                return Obx(() {
-                  var currentCat = selectedCategory.value;
-                  var products = currentCat == 'for_you'
-                      ? allProducts
-                      : allProducts.where((p) => p.categoryId == currentCat).toList();
-
-                  if (products.isEmpty) {
-                    return Center(child: getCustomFont("No products available", 14, getFontGreyColor(context), 1));
+              height: 200.w,
+              child: FutureBuilder<List<ProductModel>>(
+                future: bestSellingFuture,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return Center(
+                        child: CircularProgressIndicator(color: accentColor));
+                  }
+                  if (snapshot.hasError ||
+                      !snapshot.hasData ||
+                      snapshot.data!.isEmpty) {
+                    return Center(
+                        child: getCustomFont("No products available", 14,
+                            getFontGreyColor(context), 1));
                   }
 
-                  return ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    padding: EdgeInsets.symmetric(horizontal: margin),
-                    itemCount: products.length,
-                    itemBuilder: (context, index) {
-                      return _buildProductCard(
-                        context,
-                        products[index],
-                        width: 150.w,
-                      );
-                    },
-                  );
-                });
-              },
-            )
-          ),
+                  var allProducts = snapshot.data!;
+                  return Obx(() {
+                    var currentCat = selectedCategory.value;
+                    var products = currentCat == 'for_you'
+                        ? allProducts
+                        : allProducts
+                            .where((p) => p.categoryId == currentCat)
+                            .toList();
+
+                    if (products.isEmpty) {
+                      return Center(
+                          child: getCustomFont("No products available", 14,
+                              getFontGreyColor(context), 1));
+                    }
+
+                    return ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      padding: EdgeInsets.symmetric(horizontal: margin),
+                      itemCount: products.length,
+                      itemBuilder: (context, index) {
+                        return _buildProductCard(
+                          context,
+                          products[index],
+                          width: 150.w,
+                        );
+                      },
+                    );
+                  });
+                },
+              )),
         ],
       ),
     );
@@ -489,44 +519,52 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
           ),
           SizedBox(height: 16.h),
           SizedBox(
-            height: 200.w,
-            child: FutureBuilder<List<ProductModel>>(
-              future: topDealsFuture,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return Center(child: CircularProgressIndicator(color: accentColor));
-                }
-                if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
-                  return Center(child: getCustomFont("No top deals available", 14, getFontGreyColor(context), 1));
-                }
-                
-                var allProducts = snapshot.data!;
-                return Obx(() {
-                  var currentCat = selectedCategory.value;
-                  var products = currentCat == 'for_you'
-                      ? allProducts
-                      : allProducts.where((p) => p.categoryId == currentCat).toList();
-
-                  if (products.isEmpty) {
-                    return Center(child: getCustomFont("No top deals available", 14, getFontGreyColor(context), 1));
+              height: 200.w,
+              child: FutureBuilder<List<ProductModel>>(
+                future: topDealsFuture,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return Center(
+                        child: CircularProgressIndicator(color: accentColor));
+                  }
+                  if (snapshot.hasError ||
+                      !snapshot.hasData ||
+                      snapshot.data!.isEmpty) {
+                    return Center(
+                        child: getCustomFont("No top deals available", 14,
+                            getFontGreyColor(context), 1));
                   }
 
-                  return ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    padding: EdgeInsets.symmetric(horizontal: margin),
-                    itemCount: products.length,
-                    itemBuilder: (context, index) {
-                      return _buildProductCard(
-                        context,
-                        products[index],
-                        width: 150.w,
-                      );
-                    },
-                  );
-                });
-              },
-            )
-          ),
+                  var allProducts = snapshot.data!;
+                  return Obx(() {
+                    var currentCat = selectedCategory.value;
+                    var products = currentCat == 'for_you'
+                        ? allProducts
+                        : allProducts
+                            .where((p) => p.categoryId == currentCat)
+                            .toList();
+
+                    if (products.isEmpty) {
+                      return Center(
+                          child: getCustomFont("No top deals available", 14,
+                              getFontGreyColor(context), 1));
+                    }
+
+                    return ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      padding: EdgeInsets.symmetric(horizontal: margin),
+                      itemCount: products.length,
+                      itemBuilder: (context, index) {
+                        return _buildProductCard(
+                          context,
+                          products[index],
+                          width: 150.w,
+                        );
+                      },
+                    );
+                  });
+                },
+              )),
         ],
       ),
     );
@@ -546,93 +584,117 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
           ),
           SizedBox(height: 16.h),
           SizedBox(
-            height: 40.h,
-            child: FutureBuilder<List<BrandModel>>(
-              future: brandsFuture,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return SizedBox();
-                }
-                if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
-                  return SizedBox();
-                }
-                var apiBrands = snapshot.data!;
-                var brands = [
-                  BrandModel(id: 'all', name: 'All', logoUrl: ''),
-                  ...apiBrands
-                ];
-                return ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  padding: EdgeInsets.symmetric(horizontal: margin),
-                  itemCount: brands.length,
-                  itemBuilder: (context, index) {
-                    return Obx(() {
-                      bool isSelected = selectedBrand.value == brands[index].id;
-                      return InkWell(
-                        onTap: () {
-                          selectedBrand.value = brands[index].id;
-                        },
-                        child: Container(
-                          margin: EdgeInsets.only(right: 10.w),
-                          padding: EdgeInsets.symmetric(horizontal: 16.w),
-                          decoration: BoxDecoration(
-                            color: isSelected ? accentColor : getGreyCardColor(context),
-                            borderRadius: BorderRadius.circular(20.w),
-                            border: Border.all(color: isSelected ? accentColor : dividerColor, width: isSelected ? 1 : 0.5),
-                          ),
-                          child: Center(
-                            child: getCustomFont(brands[index].name, 13, isSelected ? Colors.white : getFontColor(context),
-                                1,
-                                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600),
-                          ),
-                        ),
-                      );
-                    });
-                  },
-                );
-              }
-            )
-          ),
+              height: 40.h,
+              child: FutureBuilder<List<BrandModel>>(
+                  future: brandsFuture,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return SizedBox();
+                    }
+                    if (snapshot.hasError ||
+                        !snapshot.hasData ||
+                        snapshot.data!.isEmpty) {
+                      return SizedBox();
+                    }
+                    var apiBrands = snapshot.data!;
+                    var brands = [
+                      BrandModel(id: 'all', name: 'All', logoUrl: ''),
+                      ...apiBrands
+                    ];
+                    return ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      padding: EdgeInsets.symmetric(horizontal: margin),
+                      itemCount: brands.length,
+                      itemBuilder: (context, index) {
+                        return Obx(() {
+                          bool isSelected =
+                              selectedBrand.value == brands[index].id;
+                          return InkWell(
+                            onTap: () {
+                              selectedBrand.value = brands[index].id;
+                            },
+                            child: Container(
+                              margin: EdgeInsets.only(right: 10.w),
+                              padding: EdgeInsets.symmetric(horizontal: 16.w),
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? accentColor
+                                    : getGreyCardColor(context),
+                                borderRadius: BorderRadius.circular(20.w),
+                                border: Border.all(
+                                    color:
+                                        isSelected ? accentColor : dividerColor,
+                                    width: isSelected ? 1 : 0.5),
+                              ),
+                              child: Center(
+                                child: getCustomFont(
+                                    brands[index].name,
+                                    13,
+                                    isSelected
+                                        ? Colors.white
+                                        : getFontColor(context),
+                                    1,
+                                    fontWeight: isSelected
+                                        ? FontWeight.w700
+                                        : FontWeight.w600),
+                              ),
+                            ),
+                          );
+                        });
+                      },
+                    );
+                  })),
           SizedBox(height: 16.h),
           // Products for Selected Brand
           Obx(() {
             if (selectedBrand.value.isEmpty) return SizedBox();
             return SizedBox(
-              height: 200.w,
-              child: FutureBuilder<Map<String, dynamic>>(
-                future: selectedBrand.value == 'all' 
-                    ? ProductApiService.getAllProducts() 
-                    : BrandApiService.getProductsByBrand(selectedBrand.value),
-                builder: (context, prodSnapshot) {
-                   if (prodSnapshot.connectionState == ConnectionState.waiting) {
-                      return Center(child: CircularProgressIndicator(color: accentColor));
-                   }
-                   if (!prodSnapshot.hasData || prodSnapshot.data!['success'] == false) {
-                     return Center(child: getCustomFont("No products available", 14, getFontGreyColor(context), 1));
-                   }
-                   
-                   List<dynamic> productsList = [];
-                   var resData = prodSnapshot.data!['data'];
-                   if (resData is List) productsList = resData;
-                   else if (resData is Map && resData['products'] is List) productsList = resData['products'];
-                   
-                   var products = productsList.map((e) => ProductModel.fromJson(e)).toList();
-                   
-                   if (products.isEmpty) {
-                     return Center(child: getCustomFont("No products available", 14, getFontGreyColor(context), 1));
-                   }
-                   
-                   return ListView.builder(
-                     scrollDirection: Axis.horizontal,
-                     padding: EdgeInsets.symmetric(horizontal: margin),
-                     itemCount: products.length,
-                     itemBuilder: (context, index) {
-                       return _buildProductCard(context, products[index], width: 150.w);
-                     }
-                   );
-                }
-              )
-            );
+                height: 200.w,
+                child: FutureBuilder<Map<String, dynamic>>(
+                    future: selectedBrand.value == 'all'
+                        ? ProductApiService.getAllProducts()
+                        : BrandApiService.getProductsByBrand(
+                            selectedBrand.value),
+                    builder: (context, prodSnapshot) {
+                      if (prodSnapshot.connectionState ==
+                          ConnectionState.waiting) {
+                        return Center(
+                            child:
+                                CircularProgressIndicator(color: accentColor));
+                      }
+                      if (!prodSnapshot.hasData ||
+                          prodSnapshot.data!['success'] == false) {
+                        return Center(
+                            child: getCustomFont("No products available", 14,
+                                getFontGreyColor(context), 1));
+                      }
+
+                      List<dynamic> productsList = [];
+                      var resData = prodSnapshot.data!['data'];
+                      if (resData is List)
+                        productsList = resData;
+                      else if (resData is Map && resData['products'] is List)
+                        productsList = resData['products'];
+
+                      var products = productsList
+                          .map((e) => ProductModel.fromJson(e))
+                          .toList();
+
+                      if (products.isEmpty) {
+                        return Center(
+                            child: getCustomFont("No products available", 14,
+                                getFontGreyColor(context), 1));
+                      }
+
+                      return ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          padding: EdgeInsets.symmetric(horizontal: margin),
+                          itemCount: products.length,
+                          itemBuilder: (context, index) {
+                            return _buildProductCard(context, products[index],
+                                width: 150.w);
+                          });
+                    }));
           }),
         ],
       ),
@@ -663,46 +725,54 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
           ),
           SizedBox(height: 16.h),
           FutureBuilder<List<ProductModel>>(
-            future: popularPicksFuture,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return Center(child: CircularProgressIndicator(color: accentColor));
-              }
-              if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
-                return Center(child: getCustomFont("No picks available", 14, getFontGreyColor(context), 1));
-              }
-              var allProducts = snapshot.data!;
-              return Obx(() {
-                var currentCat = selectedCategory.value;
-                var popularProducts = currentCat == 'for_you'
-                    ? allProducts
-                    : allProducts.where((p) => p.categoryId == currentCat).toList();
-
-                if (popularProducts.isEmpty) {
-                  return Center(child: getCustomFont("No picks available", 14, getFontGreyColor(context), 1));
+              future: popularPicksFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return Center(
+                      child: CircularProgressIndicator(color: accentColor));
                 }
+                if (snapshot.hasError ||
+                    !snapshot.hasData ||
+                    snapshot.data!.isEmpty) {
+                  return Center(
+                      child: getCustomFont("No picks available", 14,
+                          getFontGreyColor(context), 1));
+                }
+                var allProducts = snapshot.data!;
+                return Obx(() {
+                  var currentCat = selectedCategory.value;
+                  var popularProducts = currentCat == 'for_you'
+                      ? allProducts
+                      : allProducts
+                          .where((p) => p.categoryId == currentCat)
+                          .toList();
 
-                return GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 12.w,
-                    mainAxisSpacing: 12.w,
-                    childAspectRatio: 0.75,
-                  ),
-                  itemCount: popularProducts.take(4).length,
-                  itemBuilder: (context, index) {
-                    return _buildProductCard(
-                      context,
-                      popularProducts[index],
-                      width: double.infinity,
-                    );
-                  },
-                );
-              });
-            }
-          )
+                  if (popularProducts.isEmpty) {
+                    return Center(
+                        child: getCustomFont("No picks available", 14,
+                            getFontGreyColor(context), 1));
+                  }
+
+                  return GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      crossAxisSpacing: 12.w,
+                      mainAxisSpacing: 12.w,
+                      childAspectRatio: 0.75,
+                    ),
+                    itemCount: popularProducts.take(4).length,
+                    itemBuilder: (context, index) {
+                      return _buildProductCard(
+                        context,
+                        popularProducts[index],
+                        width: double.infinity,
+                      );
+                    },
+                  );
+                });
+              })
         ],
       ),
     );
@@ -713,9 +783,10 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
     double basePrice = product.originalPrice;
     double currentPrice = product.currentPrice;
     double discountPercent = 0.0;
-    
+
     if (basePrice > 0 && currentPrice > 0 && basePrice > currentPrice) {
-      discountPercent = (((basePrice - currentPrice) / basePrice) * 100).toDouble();
+      discountPercent =
+          (((basePrice - currentPrice) / basePrice) * 100).toDouble();
     } else {
       basePrice = currentPrice;
     }
@@ -748,16 +819,18 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(10.w),
                     child: CachedNetworkImage(
-                      imageUrl: product.imageUrl.isNotEmpty ? product.imageUrl : 'https://placehold.co/400',
+                      imageUrl: product.imageUrl.isNotEmpty
+                          ? product.imageUrl
+                          : 'https://placehold.co/400',
                       fit: BoxFit.cover,
                       placeholder: (context, url) => Center(
                         child: CircularProgressIndicator(
                           color: accentColor,
                         ),
                       ),
-                      errorWidget: (context, url, error) =>
-                          Icon(Icons.image_not_supported,
-                              color: getFontGreyColor(context)),
+                      errorWidget: (context, url, error) => Icon(
+                          Icons.image_not_supported,
+                          color: getFontGreyColor(context)),
                     ),
                   ),
                 ),
@@ -769,19 +842,15 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
               SizedBox(height: 4.h),
               // Product Name
               getCustomFont(product.title, 12, getFontColor(context), 2,
-                  fontWeight: FontWeight.w600,
-                  overflow: TextOverflow.ellipsis),
+                  fontWeight: FontWeight.w600, overflow: TextOverflow.ellipsis),
               SizedBox(height: 4.h),
               // Rating
               Row(
                 children: [
                   Icon(Icons.star, color: ratedColor, size: 12.w),
                   SizedBox(width: 4.w),
-                  getCustomFont(
-                      product.rating.toStringAsFixed(1),
-                      11,
-                      getFontColor(context),
-                      1,
+                  getCustomFont(product.rating.toStringAsFixed(1), 11,
+                      getFontColor(context), 1,
                       fontWeight: FontWeight.w500),
                 ],
               ),
@@ -790,18 +859,12 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
               Row(
                 children: [
                   getCustomFont(
-                      "₹${currentPrice.toStringAsFixed(0)}",
-                      13,
-                      accentColor,
-                      1,
+                      "₹${currentPrice.toStringAsFixed(0)}", 13, accentColor, 1,
                       fontWeight: FontWeight.w700),
                   SizedBox(width: 6.w),
                   if (discountPercent > 0)
-                    getCustomFont(
-                        "₹${basePrice.toStringAsFixed(0)}",
-                        11,
-                        getFontGreyColor(context),
-                        1,
+                    getCustomFont("₹${basePrice.toStringAsFixed(0)}", 11,
+                        getFontGreyColor(context), 1,
                         fontWeight: FontWeight.w500,
                         decoration: TextDecoration.lineThrough),
                 ],
@@ -810,8 +873,7 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
               if (discountPercent > 0)
                 Container(
                   margin: EdgeInsets.only(top: 6.h),
-                  padding:
-                      EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
+                  padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
                   decoration: BoxDecoration(
                     color: redColor,
                     borderRadius: BorderRadius.circular(4.w),

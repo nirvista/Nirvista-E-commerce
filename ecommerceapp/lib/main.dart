@@ -29,6 +29,7 @@ import 'package:pet_shop/app/profile/edit_profile.dart';
 import 'package:pet_shop/app/profile/more_screen.dart';
 import 'package:pet_shop/app/profile/my_favourite.dart';
 import 'package:pet_shop/app/profile/my_profile_screen.dart';
+import 'package:pet_shop/app/vendor/vendor_dashboard_screen.dart';
 import 'app/cart/order_confirm_screen.dart';
 import 'app/intro/splash_screen.dart';
 import 'app/lists/blog_datail.dart';
@@ -164,6 +165,7 @@ class MyApp extends StatelessWidget {
         paymentMethodScreenRoute: (context) => const PaymentMethodScreen(),
         categoryProductsPageRoute: (context) => const CategoryProductsPage(),
         customerCareScreenRoute: (context) => const CustomerCareScreen(),
+        vendorDashboardScreenRoute: (context) => const VendorDashboardScreen(),
         // stripPaymentScreenRoute: (context) => NoWebhookPaymentScreen(),
       },
     );

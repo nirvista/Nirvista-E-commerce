@@ -4,13 +4,16 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class ProductApiService {
   static String get baseUrl {
-    final url = dotenv.env['BASE_URL']?.trim();
-    if (url == null || url.isEmpty) {
+    final rawUrl = dotenv.env['BASE_URL']?.trim();
+    if (rawUrl == null || rawUrl.isEmpty) {
       throw Exception('BASE_URL not found in .env file');
     }
-    return url;
+    final withoutTrailingSlash = rawUrl.replaceAll(RegExp(r'/+$'), '');
+    if (withoutTrailingSlash.endsWith('/api')) {
+      return withoutTrailingSlash.substring(0, withoutTrailingSlash.length - 4);
+    }
+    return withoutTrailingSlash;
   }
-
 
   // Get All Products
   static Future<Map<String, dynamic>> getAllProducts() async {
@@ -26,7 +29,8 @@ class ProductApiService {
       } else {
         return {
           'success': false,
-          'message': jsonDecode(response.body)['message'] ?? 'Failed to fetch products',
+          'message': jsonDecode(response.body)['message'] ??
+              'Failed to fetch products',
         };
       }
     } catch (e) {
@@ -48,7 +52,8 @@ class ProductApiService {
       } else {
         return {
           'success': false,
-          'message': jsonDecode(response.body)['message'] ?? 'Failed to fetch product',
+          'message':
+              jsonDecode(response.body)['message'] ?? 'Failed to fetch product',
         };
       }
     } catch (e) {
@@ -59,7 +64,8 @@ class ProductApiService {
   // Get New Arrivals
   static Future<Map<String, dynamic>> getNewArrivals() async {
     try {
-      final response = await http.get(Uri.parse('$baseUrl/api/products/new-arrivals'));
+      final response =
+          await http.get(Uri.parse('$baseUrl/api/products/new-arrivals'));
       if (response.statusCode == 200) {
         final decodedResponse = jsonDecode(response.body);
         return {
@@ -70,7 +76,8 @@ class ProductApiService {
       } else {
         return {
           'success': false,
-          'message': jsonDecode(response.body)['message'] ?? 'Failed to fetch new arrivals',
+          'message': jsonDecode(response.body)['message'] ??
+              'Failed to fetch new arrivals',
         };
       }
     } catch (e) {
@@ -81,7 +88,8 @@ class ProductApiService {
   // Get Top Rated Products
   static Future<Map<String, dynamic>> getTopRatedProducts() async {
     try {
-      final response = await http.get(Uri.parse('$baseUrl/api/products/top-rated'));
+      final response =
+          await http.get(Uri.parse('$baseUrl/api/products/top-rated'));
       if (response.statusCode == 200) {
         final decodedResponse = jsonDecode(response.body);
         return {
@@ -92,7 +100,8 @@ class ProductApiService {
       } else {
         return {
           'success': false,
-          'message': jsonDecode(response.body)['message'] ?? 'Failed to fetch top rated products',
+          'message': jsonDecode(response.body)['message'] ??
+              'Failed to fetch top rated products',
         };
       }
     } catch (e) {
@@ -103,7 +112,8 @@ class ProductApiService {
   // Get Related Products
   static Future<Map<String, dynamic>> getRelatedProducts(String id) async {
     try {
-      final response = await http.get(Uri.parse('$baseUrl/api/products/$id/related'));
+      final response =
+          await http.get(Uri.parse('$baseUrl/api/products/$id/related'));
       if (response.statusCode == 200) {
         final decodedResponse = jsonDecode(response.body);
         return {
@@ -114,7 +124,8 @@ class ProductApiService {
       } else {
         return {
           'success': false,
-          'message': jsonDecode(response.body)['message'] ?? 'Failed to fetch related products',
+          'message': jsonDecode(response.body)['message'] ??
+              'Failed to fetch related products',
         };
       }
     } catch (e) {
@@ -125,7 +136,8 @@ class ProductApiService {
   // Get Product Variants
   static Future<Map<String, dynamic>> getProductVariants(String id) async {
     try {
-      final response = await http.get(Uri.parse('$baseUrl/api/products/$id/variants'));
+      final response =
+          await http.get(Uri.parse('$baseUrl/api/products/$id/variants'));
       if (response.statusCode == 200) {
         final decodedResponse = jsonDecode(response.body);
         return {
@@ -136,7 +148,8 @@ class ProductApiService {
       } else {
         return {
           'success': false,
-          'message': jsonDecode(response.body)['message'] ?? 'Failed to fetch product variants',
+          'message': jsonDecode(response.body)['message'] ??
+              'Failed to fetch product variants',
         };
       }
     } catch (e) {

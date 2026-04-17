@@ -6,6 +6,7 @@ import 'package:pet_shop/base/color_data.dart';
 import 'package:pet_shop/base/constant.dart';
 import 'package:pet_shop/base/fetch_pixels.dart';
 import 'package:pet_shop/base/get/storage_controller.dart';
+import 'package:pet_shop/base/pref_data.dart';
 import 'package:pet_shop/base/widget_utils.dart';
 import '../../app/model/api_models.dart';
 import '../../base/get/login_data_controller.dart';
@@ -127,7 +128,8 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
                     _buildRatingPill(context, product, margin),
                     SizedBox(height: 16.h),
                     if (uniqueColors.isNotEmpty)
-                      _buildColorsSection(context, product, uniqueColors, margin),
+                      _buildColorsSection(
+                          context, product, uniqueColors, margin),
                     if (uniqueSizes.isNotEmpty)
                       _buildSizesSection(context, product, uniqueSizes, margin),
                     _buildBrandAndPriceSection(context, product, margin),
@@ -184,11 +186,9 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
                       style: TextStyle(color: getFontColor(context)),
                       decoration: InputDecoration(
                         hintText: "Search for products",
-                        hintStyle:
-                            TextStyle(color: getFontGreyColor(context)),
+                        hintStyle: TextStyle(color: getFontGreyColor(context)),
                         border: InputBorder.none,
-                        contentPadding:
-                            EdgeInsets.symmetric(vertical: 8.h),
+                        contentPadding: EdgeInsets.symmetric(vertical: 8.h),
                       ),
                     ),
                   ),
@@ -275,9 +275,7 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
                       child: Icon(
                         wished ? Icons.favorite : Icons.favorite_border,
                         key: ValueKey(wished),
-                        color: wished
-                            ? accentColor
-                            : getFontGreyColor(context),
+                        color: wished ? accentColor : getFontGreyColor(context),
                         size: 24.w,
                       ),
                     ),
@@ -309,8 +307,8 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
         children: [
           Icon(Icons.star, color: ratedColor, size: 14.w),
           SizedBox(width: 4.w),
-          getCustomFont(product.rating.toStringAsFixed(1), 13,
-              getFontColor(context), 1,
+          getCustomFont(
+              product.rating.toStringAsFixed(1), 13, getFontColor(context), 1,
               fontWeight: FontWeight.w700),
           SizedBox(width: 8.w),
           Container(width: 1.w, height: 14.h, color: dividerColor),
@@ -330,8 +328,7 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Obx(() => getCustomFont(
-              "Selected Color: ${selectedColor.value}", 14,
+          Obx(() => getCustomFont("Selected Color: ${selectedColor.value}", 14,
               getFontColor(context), 1,
               fontWeight: FontWeight.w600)),
           SizedBox(height: 12.h),
@@ -422,11 +419,8 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
                         ),
                         borderRadius: BorderRadius.circular(8.w),
                       ),
-                      child: getCustomFont(
-                          size,
-                          12,
-                          isSelected ? Colors.white : getFontColor(context),
-                          1,
+                      child: getCustomFont(size, 12,
+                          isSelected ? Colors.white : getFontColor(context), 1,
                           fontWeight: FontWeight.w600),
                     ),
                   );
@@ -462,8 +456,7 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
           Row(
             children: [
               Obx(() => getCustomFont(
-                  brandName.value, 
-                  14, getFontGreyColor(context), 1,
+                  brandName.value, 14, getFontGreyColor(context), 1,
                   fontWeight: FontWeight.w700)),
               SizedBox(width: 8.w),
               GestureDetector(
@@ -481,8 +474,7 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
             children: [
               if (discountPercent > 0) ...[
                 Container(
-                  padding:
-                      EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                  padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
                   decoration: BoxDecoration(
                     color: greenColor.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(4.w),
@@ -501,11 +493,8 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
                   ),
                 ),
                 SizedBox(width: 12.w),
-                getCustomFont(
-                    "₹${basePrice.toStringAsFixed(0)}",
-                    12,
-                    getFontGreyColor(context),
-                    1,
+                getCustomFont("₹${basePrice.toStringAsFixed(0)}", 12,
+                    getFontGreyColor(context), 1,
                     fontWeight: FontWeight.w500,
                     decoration: TextDecoration.lineThrough),
               ],
@@ -541,18 +530,23 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
               Icon(Icons.home, color: getFontColor(context), size: 16.w),
               SizedBox(width: 8.w),
               Obx(() {
-                final shippingController = Get.find<ShippingAddressController>();
+                final shippingController =
+                    Get.find<ShippingAddressController>();
                 final selectedAddr = shippingController.selectedAddress.value;
                 return Expanded(
                   child: getCustomFont(
-                    selectedAddr != null ? selectedAddr.fullAddress : "Select a shipping address",
-                    12, getFontColor(context), 1,
-                    fontWeight: FontWeight.w500,
-                    overflow: TextOverflow.ellipsis
-                  ),
+                      selectedAddr != null
+                          ? selectedAddr.fullAddress
+                          : "Select a shipping address",
+                      12,
+                      getFontColor(context),
+                      1,
+                      fontWeight: FontWeight.w500,
+                      overflow: TextOverflow.ellipsis),
                 );
               }),
-              Icon(Icons.arrow_forward, color: getFontGreyColor(context), size: 16.w),
+              Icon(Icons.arrow_forward,
+                  color: getFontGreyColor(context), size: 16.w),
             ],
           ),
           SizedBox(height: 12.h),
@@ -577,9 +571,21 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
 
   Widget _buildTrustBadges(BuildContext context, double margin) {
     final badges = [
-      {"icon": Icons.schedule, "title": "10-Day Return", "desc": "Change of mind"},
-      {"icon": Icons.money, "title": "Cash on Delivery", "desc": "Pay on delivery"},
-      {"icon": Icons.verified, "title": "Brand Assured", "desc": "Official product"},
+      {
+        "icon": Icons.schedule,
+        "title": "10-Day Return",
+        "desc": "Change of mind"
+      },
+      {
+        "icon": Icons.money,
+        "title": "Cash on Delivery",
+        "desc": "Pay on delivery"
+      },
+      {
+        "icon": Icons.verified,
+        "title": "Brand Assured",
+        "desc": "Official product"
+      },
     ];
 
     return Padding(
@@ -603,13 +609,11 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
                   SizedBox(height: 8.h),
                   getCustomFont(badges[i]["title"] as String, 10,
                       getFontColor(context), 1,
-                      fontWeight: FontWeight.w600,
-                      textAlign: TextAlign.center),
+                      fontWeight: FontWeight.w600, textAlign: TextAlign.center),
                   SizedBox(height: 4.h),
                   getCustomFont(badges[i]["desc"] as String, 8,
                       getFontGreyColor(context), 1,
-                      fontWeight: FontWeight.w400,
-                      textAlign: TextAlign.center),
+                      fontWeight: FontWeight.w400, textAlign: TextAlign.center),
                 ],
               ),
             ),
@@ -633,8 +637,8 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
           getCustomFont("Description", 16, getFontColor(context), 1,
               fontWeight: FontWeight.w700),
           SizedBox(height: 12.h),
-          getCustomFont(product.description ?? "", 14,
-              getFontGreyColor(context), 50,
+          getCustomFont(
+              product.description ?? "", 14, getFontGreyColor(context), 50,
               fontWeight: FontWeight.w500),
         ],
       ),
@@ -644,10 +648,11 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
   VariantModel? _getSelectedVariant(ProductModel product) {
     if (product.variants.isEmpty) return null;
     try {
-      return product.variants.firstWhere(
-        (v) => (v.color == selectedColor.value || v.color == null || v.color!.isEmpty) && 
-               (v.size == selectedSize.value || v.size == null || v.size!.isEmpty)
-      );
+      return product.variants.firstWhere((v) =>
+          (v.color == selectedColor.value ||
+              v.color == null ||
+              v.color!.isEmpty) &&
+          (v.size == selectedSize.value || v.size == null || v.size!.isEmpty));
     } catch (_) {
       return product.variants.first;
     }
@@ -660,9 +665,9 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
       if (cart == null) return 0;
       final variant = _getSelectedVariant(product);
       if (variant == null) return 0;
-      final items = cart.items.where(
-        (i) => i.productId == product.id && i.variantId == variant.id
-      ).toList();
+      final items = cart.items
+          .where((i) => i.productId == product.id && i.variantId == variant.id)
+          .toList();
       if (items.isNotEmpty) return items.first.quantity;
     } catch (_) {}
     return 0;
@@ -689,7 +694,8 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
                     ? Container(
                         padding: EdgeInsets.symmetric(vertical: 6.h),
                         decoration: BoxDecoration(
-                          border: Border.all(color: getFontColor(context), width: 1.5),
+                          border: Border.all(
+                              color: getFontColor(context), width: 1.5),
                           borderRadius: BorderRadius.circular(8.w),
                         ),
                         child: Row(
@@ -697,34 +703,42 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
                           children: [
                             GestureDetector(
                               onTap: () {
-                                VariantModel? variant = _getSelectedVariant(product);
+                                VariantModel? variant =
+                                    _getSelectedVariant(product);
                                 if (variant == null) return;
-                                cartController.decreaseQuantity(product.id, variant.id);
+                                cartController.decreaseQuantity(
+                                    product.id, variant.id);
                               },
                               child: SizedBox(
                                 width: 36.w,
                                 height: 36.w,
                                 child: Center(
-                                  child: Icon(Icons.remove, size: 20.w, color: getFontColor(context)),
+                                  child: Icon(Icons.remove,
+                                      size: 20.w, color: getFontColor(context)),
                                 ),
                               ),
                             ),
                             Container(
                               width: 40.w,
                               alignment: Alignment.center,
-                              child: getCustomFont("$cartQty", 16, getFontColor(context), 1, fontWeight: FontWeight.w700),
+                              child: getCustomFont(
+                                  "$cartQty", 16, getFontColor(context), 1,
+                                  fontWeight: FontWeight.w700),
                             ),
                             GestureDetector(
                               onTap: () {
-                                VariantModel? variant = _getSelectedVariant(product);
+                                VariantModel? variant =
+                                    _getSelectedVariant(product);
                                 if (variant == null) return;
-                                cartController.increaseQuantity(product.id, variant.id);
+                                cartController.increaseQuantity(
+                                    product.id, variant.id);
                               },
                               child: SizedBox(
                                 width: 36.w,
                                 height: 36.w,
                                 child: Center(
-                                  child: Icon(Icons.add, size: 20.w, color: accentColor),
+                                  child: Icon(Icons.add,
+                                      size: 20.w, color: accentColor),
                                 ),
                               ),
                             ),
@@ -736,16 +750,25 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
                           VariantModel? variant = _getSelectedVariant(product);
                           if (variant == null) return;
                           try {
-                            final loginController = Get.find<LoginDataController>();
-                            if (loginController.currentUser.value == null || loginController.currentUser.value!.id == null) {
+                            final loginController =
+                                Get.find<LoginDataController>();
+                            if (loginController.currentUser.value == null ||
+                                loginController.currentUser.value!.id == null) {
                               Constant.sendToNext(context, loginRoute);
                               return;
                             }
-                            bool success = await cartController.addToCart(product.id, variant.id);
+                            bool success = await cartController.addToCart(
+                                product.id, variant.id);
                             if (success) {
-                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Added to cart!'), backgroundColor: Colors.green));
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                      content: Text('Added to cart!'),
+                                      backgroundColor: Colors.green));
                             } else {
-                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to add to cart'), backgroundColor: Colors.red));
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                      content: Text('Failed to add to cart'),
+                                      backgroundColor: Colors.red));
                             }
                           } catch (e) {
                             Constant.sendToNext(context, loginRoute);
@@ -754,12 +777,13 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
                         child: Container(
                           padding: EdgeInsets.symmetric(vertical: 12.h),
                           decoration: BoxDecoration(
-                            border: Border.all(color: getFontColor(context), width: 1.5),
+                            border: Border.all(
+                                color: getFontColor(context), width: 1.5),
                             borderRadius: BorderRadius.circular(8.w),
                           ),
                           child: Center(
-                            child: getCustomFont("Add to Cart", 14,
-                                getFontColor(context), 1,
+                            child: getCustomFont(
+                                "Add to Cart", 14, getFontColor(context), 1,
                                 fontWeight: FontWeight.w700),
                           ),
                         ),
@@ -774,14 +798,19 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
                     if (variant == null) return;
                     try {
                       final loginController = Get.find<LoginDataController>();
-                      if (loginController.currentUser.value == null || loginController.currentUser.value!.id == null) {
+                      if (loginController.currentUser.value == null ||
+                          loginController.currentUser.value!.id == null) {
                         Constant.sendToNext(context, loginRoute);
                         return;
                       }
                       if (!isInCart) {
-                        bool success = await cartController.addToCart(product.id, variant.id);
+                        bool success = await cartController.addToCart(
+                            product.id, variant.id);
                         if (!success) {
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to prepare checkout'), backgroundColor: Colors.red));
+                          ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                  content: Text('Failed to prepare checkout'),
+                                  backgroundColor: Colors.red));
                           return;
                         }
                       }
@@ -798,8 +827,10 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
                     ),
                     child: Center(
                       child: getCustomFont(
-                          "Buy at \u20B9${product.currentPrice.toStringAsFixed(0)}", 14,
-                          Colors.black, 1,
+                          "Buy at \u20B9${product.currentPrice.toStringAsFixed(0)}",
+                          14,
+                          Colors.black,
+                          1,
                           fontWeight: FontWeight.w700),
                     ),
                   ),
@@ -812,4 +843,3 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
     );
   }
 }
-

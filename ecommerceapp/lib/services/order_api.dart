@@ -5,11 +5,15 @@ import 'package:url_launcher/url_launcher.dart';
 
 class OrderApiService {
   static String get baseUrl {
-    final url = dotenv.env['BASE_URL'];
-    if (url == null) {
+    final rawUrl = dotenv.env['BASE_URL']?.trim();
+    if (rawUrl == null || rawUrl.isEmpty) {
       throw Exception("BASE_URL not found in .env file");
     }
-    return url;
+    final withoutTrailingSlash = rawUrl.replaceAll(RegExp(r'/+$'), '');
+    if (withoutTrailingSlash.endsWith('/api')) {
+      return withoutTrailingSlash.substring(0, withoutTrailingSlash.length - 4);
+    }
+    return withoutTrailingSlash;
   }
 
   static Future<Map<String, dynamic>> createOrder({
@@ -41,7 +45,8 @@ class OrderApiService {
       } else {
         return {
           'success': false,
-          'message': jsonDecode(response.body)['message'] ?? 'Failed to create order',
+          'message':
+              jsonDecode(response.body)['message'] ?? 'Failed to create order',
         };
       }
     } catch (e) {
@@ -49,7 +54,8 @@ class OrderApiService {
     }
   }
 
-  static Future<Map<String, dynamic>> getUserOrders(String accessToken, {String? status}) async {
+  static Future<Map<String, dynamic>> getUserOrders(String accessToken,
+      {String? status}) async {
     try {
       String url = '$baseUrl/api/orders';
       if (status != null && status.isNotEmpty) {
@@ -69,7 +75,8 @@ class OrderApiService {
       } else {
         return {
           'success': false,
-          'message': jsonDecode(response.body)['message'] ?? 'Failed to fetch orders',
+          'message':
+              jsonDecode(response.body)['message'] ?? 'Failed to fetch orders',
         };
       }
     } catch (e) {
@@ -77,7 +84,8 @@ class OrderApiService {
     }
   }
 
-  static Future<Map<String, dynamic>> getOrderById(String accessToken, String orderId) async {
+  static Future<Map<String, dynamic>> getOrderById(
+      String accessToken, String orderId) async {
     try {
       final response = await http.get(
         Uri.parse('$baseUrl/api/orders/$orderId'),
@@ -93,7 +101,8 @@ class OrderApiService {
       } else {
         return {
           'success': false,
-          'message': jsonDecode(response.body)['message'] ?? 'Failed to fetch order',
+          'message':
+              jsonDecode(response.body)['message'] ?? 'Failed to fetch order',
         };
       }
     } catch (e) {
@@ -101,7 +110,8 @@ class OrderApiService {
     }
   }
 
-  static Future<Map<String, dynamic>> cancelOrder(String accessToken, String orderId) async {
+  static Future<Map<String, dynamic>> cancelOrder(
+      String accessToken, String orderId) async {
     try {
       final response = await http.put(
         Uri.parse('$baseUrl/api/orders/$orderId/cancel'),
@@ -118,7 +128,8 @@ class OrderApiService {
       } else {
         return {
           'success': false,
-          'message': jsonDecode(response.body)['message'] ?? 'Failed to cancel order',
+          'message':
+              jsonDecode(response.body)['message'] ?? 'Failed to cancel order',
         };
       }
     } catch (e) {
@@ -126,7 +137,8 @@ class OrderApiService {
     }
   }
 
-  static Future<Map<String, dynamic>> getOrderStatus(String accessToken, String orderId) async {
+  static Future<Map<String, dynamic>> getOrderStatus(
+      String accessToken, String orderId) async {
     try {
       final response = await http.get(
         Uri.parse('$baseUrl/api/orders/$orderId/status'),
@@ -142,7 +154,8 @@ class OrderApiService {
       } else {
         return {
           'success': false,
-          'message': jsonDecode(response.body)['message'] ?? 'Failed to get order status',
+          'message': jsonDecode(response.body)['message'] ??
+              'Failed to get order status',
         };
       }
     } catch (e) {
@@ -150,7 +163,8 @@ class OrderApiService {
     }
   }
 
-  static Future<Map<String, dynamic>> initiateReturn(String accessToken, String orderId) async {
+  static Future<Map<String, dynamic>> initiateReturn(
+      String accessToken, String orderId) async {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/api/orders/$orderId/return'),
@@ -167,7 +181,8 @@ class OrderApiService {
       } else {
         return {
           'success': false,
-          'message': jsonDecode(response.body)['message'] ?? 'Failed to initiate return',
+          'message': jsonDecode(response.body)['message'] ??
+              'Failed to initiate return',
         };
       }
     } catch (e) {
@@ -175,8 +190,10 @@ class OrderApiService {
     }
   }
 
-  static Future<void> downloadInvoice(String accessToken, String orderId) async {
-    final url = Uri.parse('$baseUrl/api/orders/$orderId/invoice?token=$accessToken');
+  static Future<void> downloadInvoice(
+      String accessToken, String orderId) async {
+    final url =
+        Uri.parse('$baseUrl/api/orders/$orderId/invoice?token=$accessToken');
     if (await canLaunchUrl(url)) {
       await launchUrl(url, mode: LaunchMode.externalApplication);
     } else {
