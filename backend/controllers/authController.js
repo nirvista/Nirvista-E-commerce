@@ -424,3 +424,108 @@ export const updateUserProfile = async (req, res) => {
         serverError(res, "Server error");
     }
 };
+
+export const forgotPassword = async (req, res) => {
+    try {
+        const { email } = req.body;
+        // Generic response to prevent email enumeration
+        const genericMessage = "If an account with that email exists, a password reset link has been sent.";
+
+        const user = await User.findOne({ where: { email } });
+        
+        // If user doesn't exist, exit quietly returning success true
+        if (!user) {
+            return res.status(200).json({ success: true, message: genericMessage });
+        }
+
+        // 1. Generate a secure 32-byte hex token
+        const resetToken = crypto.randomBytes(32).toString("hex");
+
+        // 2. Hash the token for database storage
+        const resetPasswordToken = crypto.createHash("sha256").update(resetToken).digest("hex");
+        const resetPasswordExpire = Date.now() + 15 * 60 * 1000; // 15 minutes
+
+        // 3. Save hashed token and expiry to user record
+        // NOTE: Ensure your User model has 'resetPasswordToken' and 'resetPasswordExpire' columns defined.
+        user.resetPasswordToken = resetPasswordToken;
+        user.resetPasswordExpire = new Date(resetPasswordExpire);
+        await user.save();
+
+        // 4. Send email with PLAIN token
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        const resetUrl = `${frontendUrl}/reset-password/${resetToken}`;
+        
+        const message = `You are receiving this email because you (or someone else) requested a password reset. \n\nPlease click the link below to reset your password. This link will expire in 15 minutes: \n\n ${resetUrl}`;
+
+        const transporter = nodemailer.createTransport({
+            host: process.env.SMTP_HOST,
+            port: process.env.SMTP_PORT,
+            auth: {
+                user: process.env.SMTP_EMAIL,
+                pass: process.env.SMTP_PASSWORD,
+            }
+        });
+
+        await transporter.sendMail({
+            from: `${process.env.FROM_NAME} <${process.env.FROM_EMAIL}>`,
+            to: user.email,
+            subject: "Password Reset Request",
+            text: message,
+        });
+
+        return res.status(200).json({ success: true, message: genericMessage });
+
+    } catch (error) {
+        console.error("Forgot Password Error:", error);
+        
+        // If email fails, nullify the token in DB so it can't be exploited
+        if (req.body.email) {
+            const user = await User.findOne({ where: { email: req.body.email } });
+            if (user) {
+                user.resetPasswordToken = null;
+                user.resetPasswordExpire = null;
+                await user.save();
+            }
+        }
+        return serverError(res, "Email could not be sent. Please try again later.");
+    }
+};
+
+// ==========================================
+// NEW: Reset Password Controller
+// ==========================================
+export const resetPassword = async (req, res) => {
+    try {
+        const { password } = req.body;
+        const { token } = req.params;
+
+        // 1. Hash the incoming URL token to compare with the database
+        const resetPasswordToken = crypto.createHash("sha256").update(token).digest("hex");
+
+        // 2. Find user by token AND ensure token hasn't expired
+        const user = await User.findOne({
+            where: {
+                resetPasswordToken,
+                resetPasswordExpire: { [Op.gt]: new Date() } // Expiry must be Greater Than Now
+            }
+        });
+
+        if (!user) {
+            return badRequest(res, "Invalid or expired reset token");
+        }
+
+        // 3. Hash the new password
+        user.password = await bcrypt.hash(password, 10);
+        
+        // 4. One-Time Use: Clear the token and expiry fields
+        user.resetPasswordToken = null;
+        user.resetPasswordExpire = null;
+        
+        await user.save();
+
+        return success(res, null, "Password reset successful. You can now log in.");
+    } catch (error) {
+        console.error("Reset Password Error:", error);
+        return serverError(res, "Failed to reset password.");
+    }
+};

@@ -188,6 +188,7 @@ export const createVendorByAdmin = async (req, res) => {
             name,
             email,
             phone,
+            password,
             // Vendor profile fields
             storeName,
             storeDescription,
@@ -213,9 +214,7 @@ export const createVendorByAdmin = async (req, res) => {
             return badRequest(res, "A user with this email already exists");
         }
 
-        // --- Generate a temporary random password ---
-        // The vendor will use the "forgot password" or invitation flow to set their own
-        const tempPassword = crypto.randomBytes(16).toString("hex");
+        const tempPassword = password || crypto.randomBytes(16).toString("hex");
         const hashedPassword = await bcrypt.hash(tempPassword, 10);
 
         // --- Create user account ---
