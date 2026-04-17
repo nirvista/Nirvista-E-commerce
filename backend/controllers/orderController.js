@@ -625,7 +625,7 @@ export const getOrderById = async (req, res) => {
                     as: 'items',
                     include: [
                         { model: Product, as: 'product', attributes: ['title'] },
-                        { model: ProductVariant, as: 'variant', attributes: ['variantName', 'discountPrice'] }
+                        { model: ProductVariant, as: 'variant', attributes: ['variantName', 'discountPrice', 'images'] }
                     ]
                 }
             ]
