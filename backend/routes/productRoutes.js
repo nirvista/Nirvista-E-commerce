@@ -14,12 +14,17 @@ import {
     addVariant,
     deleteVariant,
     adminApproveVariant,
-    adminApproveAllVariants
+    adminApproveAllVariants,
+    getAllProductsAdmin
  } from '../controllers/productController.js';
 import verifyToken from '../middlewares/authMiddleware.js';
 import authorizeRoles from '../middlewares/roleMiddleware.js';
 
 const router  = express.Router();
+
+// Admin Routes
+// GET  /api/admin/products/all           — List all products (for admin)
+router.get("/admin/all", getAllProductsAdmin);
 
 // Public routes
 router.get("/", getAllProducts);
