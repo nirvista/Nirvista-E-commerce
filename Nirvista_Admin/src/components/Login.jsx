@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import logo from "../assets/logo.png";
 import { setToken } from "../utils/auth";
 
@@ -62,13 +62,12 @@ export default function Login() {
             />
           </div>
           <div className="flex justify-between items-center">
-            <button
-              type="button"
+            <Link
+              to="/forgot-password"
               className="text-sm text-teal-600 hover:underline dark:text-teal-400"
-              onClick={() => {/* TODO: Add forgot password logic */}}
             >
               Forgot password?
-            </button>
+            </Link>
           </div>
           {error && <div className="text-red-600 text-sm">{error}</div>}
           <button

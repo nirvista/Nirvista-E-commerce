@@ -6,6 +6,8 @@ import Header from "./components/Header";
 import Dashboard from "./components/Dashboard";
 import Login from "./components/Login";
 import Signup from "./components/Signup";
+import ForgotPassword from "./components/ForgotPassword";
+import ResetPassword from "./components/ResetPassword";
 import Vendors from "./components/Vendors";
 import Products from "./components/Products";
 import Categories from "./components/Categories";
@@ -48,8 +50,13 @@ export default function App() {
   return (
     <Router>
       <Routes>
+        {/* Public routes */}
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password/:token" element={<ResetPassword />} />
+
+        {/* Protected Admin Routes */}
         <Route
           element={
             <ProtectedLayout
