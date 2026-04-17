@@ -7,6 +7,15 @@ const Product = sequelize.define("Product", {
         defaultValue: DataTypes.UUIDV4,
         primaryKey: true,
     },
+    vendorId: {
+        type: DataTypes.UUID,
+        allowNull: false, // allowNull for backward-compat with existing rows; set NOT NULL after migration
+        references: {
+            model: 'Users',
+            key: 'id'
+        },
+        onDelete: 'SET NULL'
+    },
     title: {
         type: DataTypes.STRING,
         allowNull: false,
@@ -38,10 +47,20 @@ const Product = sequelize.define("Product", {
     rating: {
         type: DataTypes.FLOAT,
         defaultValue: 0,
+    },
+    listingStatus: {
+        type: DataTypes.ENUM('active', 'draft', 'archived'),
+        defaultValue: 'draft', // New listings start as draft until published
+        allowNull: false,
     }
 },{
     timestamps: true,
-    tableName: 'Products'
+    tableName: 'Products',
+    indexes: [
+        { fields: ['vendorId'] },
+        { fields: ['listingStatus'] },
+        { fields: ['categoryId'] },
+    ]
 });
 
 export default Product;
