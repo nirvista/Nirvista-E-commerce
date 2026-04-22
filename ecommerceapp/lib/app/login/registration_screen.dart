@@ -51,8 +51,10 @@ class _RegistrationScreen extends State<RegistrationScreen> {
                 .marginSymmetric(horizontal: horSpace),
             8.h.verticalSpace,
             getDefaultTextFiled(context, "Enter your name", nameController,
-                getFontColor(context), (value) {}, validator: (email) {
-                  if (email!.isNotEmpty) {
+                getFontColor(context), (value) {}, 
+                keyboardType: TextInputType.name,
+                validator: (values) {
+                  if (values!.isNotEmpty) {
                     return null;
                   } else {
                     return 'Please enter full name';
@@ -64,7 +66,9 @@ class _RegistrationScreen extends State<RegistrationScreen> {
                 .marginSymmetric(horizontal: horSpace),
             8.h.verticalSpace,
             getDefaultTextFiled(context, "Enter Email Address", emailController,
-                getFontColor(context), (value) {}, validator: (email) {
+                getFontColor(context), (value) {}, 
+                keyboardType: TextInputType.emailAddress,
+                validator: (email) {
                   if (email!.isNotEmpty) {
                     return null;
                   } else {
@@ -77,7 +81,9 @@ class _RegistrationScreen extends State<RegistrationScreen> {
                 .marginSymmetric(horizontal: horSpace),
             8.h.verticalSpace,
             getDefaultTextFiled(context, "Enter Phone Number", numberController,
-                getFontColor(context), (value) {}, validator: (phone) {
+                getFontColor(context), (value) {}, 
+                keyboardType: TextInputType.phone,
+                validator: (phone) {
                   if (phone!.isNotEmpty) {
                     return null;
                   } else {
@@ -133,53 +139,65 @@ class _RegistrationScreen extends State<RegistrationScreen> {
               );
             }, showPass),
             20.h.verticalSpace,
-             SizedBox(height: 20,),
-                       getCustomFont("Select User Type", 16, getFontColor(context), 1,
-                fontWeight: FontWeight.w400),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [                       
-                            Radio<String>(
-                              value: "customer",
-                              groupValue: userType,
-                              onChanged: (String? value) {
-                                setState(() {
-                                  userType = value!;
-                                });
-                              },
-                            ),
-                            getCustomFont("Customer", 14, getFontColor(context), 1,
-        fontWeight: FontWeight.w400),
-                        
-                            Radio<String>(
-                              value: "vendor",
-                              groupValue: userType,
-                              onChanged: (String? value) {
-                                setState(() {
-                                  userType = value!;
-                                });
-                              },
-                            ),
-                            getCustomFont("Vendor", 14, getFontColor(context), 1,
-                                fontWeight: FontWeight.w400),
-
-                            
-                          ],
-                        ),
-                         SizedBox(height: 10,),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Checkbox(value: isChecked, onChanged: (value){
-                              setState(() {
-                                isChecked = value!;
-                              });
-                            }),
-                            getCustomFont("I Accept the Terms & Privacy Policy", 14, getFontColor(context), 1,
-                                fontWeight: FontWeight.w400,textAlign: TextAlign.center),
-                            // Flexible(child:Text("I Accept the Terms & Privacy Policy",textAlign: TextAlign.center,))         
-                          ],
-                        ),
+            20.h.verticalSpace,
+            Center(
+              child: getCustomFont("Select User Type", 16, getFontColor(context), 1,
+                  fontWeight: FontWeight.w500),
+            ),
+            8.h.verticalSpace,
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Radio<String>(
+                  value: "customer",
+                  groupValue: userType,
+                  activeColor: getAccentColor(context),
+                  onChanged: (String? value) {
+                    setState(() {
+                      userType = value!;
+                    });
+                  },
+                ),
+                getCustomFont("Customer", 14, getFontColor(context), 1,
+                    fontWeight: FontWeight.w400),
+                20.w.horizontalSpace,
+                Radio<String>(
+                  value: "vendor",
+                  groupValue: userType,
+                  activeColor: getAccentColor(context),
+                  onChanged: (String? value) {
+                    setState(() {
+                      userType = value!;
+                    });
+                  },
+                ),
+                getCustomFont("Vendor", 14, getFontColor(context), 1,
+                    fontWeight: FontWeight.w400),
+              ],
+            ),
+            10.h.verticalSpace,
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                SizedBox(
+                  width: 24.w,
+                  height: 24.h,
+                  child: Checkbox(
+                    value: isChecked,
+                    activeColor: getAccentColor(context),
+                    onChanged: (value) {
+                      setState(() {
+                        isChecked = value!;
+                      });
+                    },
+                  ),
+                ),
+                12.w.horizontalSpace,
+                getCustomFont("I Accept the Terms & Privacy Policy", 14,
+                    getFontColor(context), 1,
+                    fontWeight: FontWeight.w400),
+              ],
+            ),
             SizedBox(height: 40),
             ObxValue((loading) {
               return getButtonFigma(
@@ -222,23 +240,24 @@ class _RegistrationScreen extends State<RegistrationScreen> {
                     return;
                   }
                   
-                  if (emailController.text.isEmpty) {
+                  final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+                  if (!emailRegex.hasMatch(emailController.text.trim())) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text("Please enter email address"))
+                      SnackBar(content: Text("Please enter a valid email address"))
                     );
                     return;
                   }
                   
-                  if (numberController.text.isEmpty) {
+                  if (numberController.text.trim().length != 10) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text("Please enter phone number"))
+                      SnackBar(content: Text("Phone number must be exactly 10 digits"))
                     );
                     return;
                   }
                   
-                  if (passController.text.isEmpty) {
+                  if (passController.text.length < 6) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text("Please enter password"))
+                      SnackBar(content: Text("Password must be at least 6 characters"))
                     );
                     return;
                   }

@@ -34,7 +34,10 @@ class _CheckOutShippingAdd extends State<CheckOutShippingAdd> {
 
   StorageController storageController = Get.find<StorageController>();
   HomeController homeController = Get.find<HomeController>();
-  ShippingAddressController shippingAddressController = Get.put(ShippingAddressController());
+  ShippingAddressController shippingAddressController = Get.isRegistered<ShippingAddressController>()
+      ? Get.find<ShippingAddressController>()
+      : Get.put(ShippingAddressController());
+
   LoginDataController loginController = Get.find<LoginDataController>();
 
   TextEditingController fullNameController = TextEditingController();

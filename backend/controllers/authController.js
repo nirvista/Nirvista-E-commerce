@@ -3,9 +3,11 @@ import User from "../models/userModel.js";
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { created, badRequest, notFound, serverError, unauthorized } from "../utils/responseMessages.js";
+import { success, created, badRequest, notFound, serverError, unauthorized } from "../utils/responseMessages.js";
 import UserAddress from "../models/userAddresses.js";
 import RefreshToken from "../models/refreshTokenModel.js";
+import nodemailer from "nodemailer";
+import { Op } from "sequelize";
 
 // Helper: Generate Access Token (JWT)
 function generateAccessToken(user) {

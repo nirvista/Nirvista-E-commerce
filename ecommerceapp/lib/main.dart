@@ -38,6 +38,7 @@ import 'app/login/login_screen.dart';
 import 'app/my_address/edit_address_screen.dart';
 import 'app/my_address/my_address_screen.dart';
 import 'app/lists/category_products_page.dart';
+import 'app/vendor/vendor_dashboard_screen.dart';
 import 'base/get/bottom_selection_controller.dart';
 import 'base/get/cart_contr/cart_controller.dart';
 import 'base/get/cart_contr/shipping_add_controller.dart';
@@ -165,7 +166,7 @@ class MyApp extends StatelessWidget {
         paymentMethodScreenRoute: (context) => const PaymentMethodScreen(),
         categoryProductsPageRoute: (context) => const CategoryProductsPage(),
         customerCareScreenRoute: (context) => const CustomerCareScreen(),
-        vendorDashboardScreenRoute: (context) => const VendorDashboardScreen(),
+        vendorDashboardRoute: (context) => const VendorDashboardScreen(),
         // stripPaymentScreenRoute: (context) => NoWebhookPaymentScreen(),
       },
     );

@@ -40,21 +40,21 @@ class ModelTax {
   Links? links;
 
   factory ModelTax.fromJson(Map<String, dynamic> json) => ModelTax(
-    id: json["id"],
-    country: json["country"],
-    state: json["state"],
-    postcode: json["postcode"],
-    city: json["city"],
-    rate: json["rate"],
-    name: json["name"],
-    priority: json["priority"],
+    id: json["id"] is int ? json["id"] : int.tryParse(json["id"]?.toString() ?? ''),
+    country: json["country"]?.toString(),
+    state: json["state"]?.toString(),
+    postcode: json["postcode"]?.toString(),
+    city: json["city"]?.toString(),
+    rate: json["rate"]?.toString(),
+    name: json["name"]?.toString(),
+    priority: json["priority"] is int ? json["priority"] : int.tryParse(json["priority"]?.toString() ?? ''),
     compound: json["compound"],
     shipping: json["shipping"],
-    order: json["order"],
-    modelTaxClass: json["class"],
-    postcodes: List<String>.from(json["postcodes"].map((x) => x)),
-    cities: List<String>.from(json["cities"].map((x) => x)),
-    links: Links.fromJson(json["_links"]),
+    order: json["order"] is int ? json["order"] : int.tryParse(json["order"]?.toString() ?? ''),
+    modelTaxClass: json["class"]?.toString(),
+    postcodes: json["postcodes"] != null ? List<String>.from(json["postcodes"].map((x) => x.toString())) : [],
+    cities: json["cities"] != null ? List<String>.from(json["cities"].map((x) => x.toString())) : [],
+    links: json["_links"] != null ? Links.fromJson(json["_links"]) : null,
   );
 
   Map<String, dynamic> toJson() => {

@@ -173,8 +173,8 @@ Column buildCommonProductView(BuildContext context, String image, String name, S
               children: [
                 getCustomFont(price, 16, getFontColor(context), 1,
                     fontWeight: FontWeight.w500, txtHeight: 1.28),
-                (isDiscount)?getCustomFont("\$34.00", 16, Colors.red, 1,
-                    fontWeight: FontWeight.w400, txtHeight: 1.28,decoration: TextDecoration.lineThrough):0.h.horizontalSpace,
+                (isDiscount)?getCustomFont("\$34.00", 11, const Color(0xFF4B5563), 1,
+                    fontWeight: FontWeight.w400, decoration: TextDecoration.lineThrough, decorationColor: const Color(0xFF4B5563), decorationThickness: 1.2, txtHeight: 1.4):0.h.horizontalSpace,
               ],
             ),
           ),

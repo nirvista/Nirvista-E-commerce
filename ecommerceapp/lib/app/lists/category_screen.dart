@@ -188,6 +188,9 @@ class _CategoryScreenState extends State<CategoryScreen> with TickerProviderStat
                               }
                               var products = productsList.map((e) => ProductModel.fromJson(e)).toList();
                               
+                              // Filter out empty mock products
+                              products.removeWhere((p) => p.variants.isEmpty && p.originalPrice <= 0 && p.imageUrl.isEmpty);
+                              
                               if (products.isEmpty) {
                                 return Center(child: getCustomFont("No products found", 14, getFontGreyColor(context), 1));
                               }

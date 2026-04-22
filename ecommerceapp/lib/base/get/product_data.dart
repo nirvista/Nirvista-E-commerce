@@ -26,7 +26,7 @@ class ProductDataController extends GetxController {
   var isFavouriteLoading = false.obs;
 
   List<WooProduct> productList = [];
-  Rx<WooCart?> myCartList = (null).obs;
+  final myCartList = Rxn<WooCart>();
   List<ModelReviewProduct> productReviewList = [];
   List<WooProduct> flashSaleList = [];
 

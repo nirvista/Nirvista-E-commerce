@@ -96,48 +96,48 @@ class WooGetCreatedOrder {
   Links? links;
 
   factory WooGetCreatedOrder.fromJson(Map<String, dynamic> json) => WooGetCreatedOrder(
-    id: json["id"],
-    parentId: json["parent_id"],
-    number: json["number"],
-    orderKey: json["order_key"],
-    createdVia: json["created_via"],
-    version: json["version"],
-    status: json["status"],
-    currency: json["currency"],
-    dateCreated: json["date_created"],
-    dateCreatedGmt: json["date_created_gmt"],
-    dateModified: json["date_modified"],
-    dateModifiedGmt: json["date_modified_gmt"],
-    discountTotal: json["discount_total"],
-    discountTax: json["discount_tax"],
-    shippingTotal: json["shipping_total"],
-    shippingTax: json["shipping_tax"],
-    cartTax: json["cart_tax"],
-    total: json["total"],
-    totalTax: json["total_tax"],
+    id: json["id"] is int ? json["id"] : int.tryParse(json["id"]?.toString() ?? ''),
+    parentId: json["parent_id"] is int ? json["parent_id"] : int.tryParse(json["parent_id"]?.toString() ?? ''),
+    number: json["number"]?.toString(),
+    orderKey: json["order_key"]?.toString(),
+    createdVia: json["created_via"]?.toString(),
+    version: json["version"]?.toString(),
+    status: json["status"]?.toString(),
+    currency: json["currency"]?.toString(),
+    dateCreated: json["date_created"]?.toString(),
+    dateCreatedGmt: json["date_created_gmt"]?.toString(),
+    dateModified: json["date_modified"]?.toString(),
+    dateModifiedGmt: json["date_modified_gmt"]?.toString(),
+    discountTotal: json["discount_total"]?.toString(),
+    discountTax: json["discount_tax"]?.toString(),
+    shippingTotal: json["shipping_total"]?.toString(),
+    shippingTax: json["shipping_tax"]?.toString(),
+    cartTax: json["cart_tax"]?.toString(),
+    total: json["total"]?.toString(),
+    totalTax: json["total_tax"]?.toString(),
     pricesIncludeTax: json["prices_include_tax"],
-    customerId: json["customer_id"],
-    customerIpAddress: json["customer_ip_address"],
-    customerUserAgent: json["customer_user_agent"],
-    customerNote: json["customer_note"],
-    billing: Billing.fromJson(json["billing"]),
-    shipping: Shipping.fromJson(json["shipping"]),
-    paymentMethod: json["payment_method"],
-    paymentMethodTitle: json["payment_method_title"],
-    transactionId: json["transaction_id"],
-    datePaid: json["date_paid"],
-    datePaidGmt:json["date_paid_gmt"],
-    dateCompleted: json["date_completed"],
-    dateCompletedGmt: json["date_completed_gmt"],
-    cartHash: json["cart_hash"],
-    metaData: List<MetaDatum>.from(json["meta_data"].map((x) => MetaDatum.fromJson(x))),
-    lineItems: List<LineItem>.from(json["line_items"].map((x) => LineItem.fromJson(x))),
-    taxLines: List<TaxLine>.from(json["tax_lines"].map((x) => TaxLine.fromJson(x))),
-    shippingLines: List<ShippingLine>.from(json["shipping_lines"].map((x) => ShippingLine.fromJson(x))),
-    feeLines: List<dynamic>.from(json["fee_lines"].map((x) => x)),
-    couponLines: List<dynamic>.from(json["coupon_lines"].map((x) => x)),
-    refunds: List<dynamic>.from(json["refunds"].map((x) => x)),
-    links: Links.fromJson(json["_links"]),
+    customerId: json["customer_id"] is int ? json["customer_id"] : int.tryParse(json["customer_id"]?.toString() ?? ''),
+    customerIpAddress: json["customer_ip_address"]?.toString(),
+    customerUserAgent: json["customer_user_agent"]?.toString(),
+    customerNote: json["customer_note"]?.toString(),
+    billing: json["billing"] != null ? Billing.fromJson(json["billing"]) : null,
+    shipping: json["shipping"] != null ? Shipping.fromJson(json["shipping"]) : null,
+    paymentMethod: json["payment_method"]?.toString(),
+    paymentMethodTitle: json["payment_method_title"]?.toString(),
+    transactionId: json["transaction_id"]?.toString(),
+    datePaid: json["date_paid"]?.toString(),
+    datePaidGmt: json["date_paid_gmt"]?.toString(),
+    dateCompleted: json["date_completed"]?.toString(),
+    dateCompletedGmt: json["date_completed_gmt"]?.toString(),
+    cartHash: json["cart_hash"]?.toString(),
+    metaData: json["meta_data"] != null ? List<MetaDatum>.from(json["meta_data"].map((x) => MetaDatum.fromJson(x))) : [],
+    lineItems: json["line_items"] != null ? List<LineItem>.from(json["line_items"].map((x) => LineItem.fromJson(x))) : [],
+    taxLines: json["tax_lines"] != null ? List<TaxLine>.from(json["tax_lines"].map((x) => TaxLine.fromJson(x))) : [],
+    shippingLines: json["shipping_lines"] != null ? List<ShippingLine>.from(json["shipping_lines"].map((x) => ShippingLine.fromJson(x))) : [],
+    feeLines: json["fee_lines"] != null ? List<dynamic>.from(json["fee_lines"].map((x) => x)) : [],
+    couponLines: json["coupon_lines"] != null ? List<dynamic>.from(json["coupon_lines"].map((x) => x)) : [],
+    refunds: json["refunds"] != null ? List<dynamic>.from(json["refunds"].map((x) => x)) : [],
+    links: json["_links"] != null ? Links.fromJson(json["_links"]) : null,
   );
 
   Map<String, dynamic> toJson() => {
@@ -221,20 +221,20 @@ class LineItem {
   String? price;
 
   factory LineItem.fromJson(Map<String, dynamic> json) => LineItem(
-    id: json["id"],
-    name: json["name"],
-    productId: json["product_id"],
-    variationId: json["variation_id"],
-    quantity: json["quantity"],
-    taxClass: json["tax_class"],
-    subtotal: json["subtotal"],
-    subtotalTax: json["subtotal_tax"],
-    total: json["total"],
-    totalTax: json["total_tax"],
-    taxes: List<Tax>.from(json["taxes"].map((x) => Tax.fromJson(x))),
-    metaData: List<MetaDatum>.from(json["meta_data"].map((x) => MetaDatum.fromJson(x))),
-    sku: json["sku"],
-    price: json["price"].toString(),
+    id: json["id"] is int ? json["id"] : int.tryParse(json["id"]?.toString() ?? ''),
+    name: json["name"]?.toString(),
+    productId: json["product_id"] is int ? json["product_id"] : int.tryParse(json["product_id"]?.toString() ?? ''),
+    variationId: json["variation_id"] is int ? json["variation_id"] : int.tryParse(json["variation_id"]?.toString() ?? ''),
+    quantity: json["quantity"] is int ? json["quantity"] : int.tryParse(json["quantity"]?.toString() ?? ''),
+    taxClass: json["tax_class"]?.toString(),
+    subtotal: json["subtotal"]?.toString(),
+    subtotalTax: json["subtotal_tax"]?.toString(),
+    total: json["total"]?.toString(),
+    totalTax: json["total_tax"]?.toString(),
+    taxes: json["taxes"] != null ? List<Tax>.from(json["taxes"].map((x) => Tax.fromJson(x))) : [],
+    metaData: json["meta_data"] != null ? List<MetaDatum>.from(json["meta_data"].map((x) => MetaDatum.fromJson(x))) : [],
+    sku: json["sku"]?.toString(),
+    price: json["price"]?.toString(),
   );
 
   Map<String, dynamic> toJson() => {
@@ -267,9 +267,9 @@ class MetaDatum {
   String? value;
 
   factory MetaDatum.fromJson(Map<String, dynamic> json) => MetaDatum(
-    id: json["id"],
-    key: json["key"],
-    value: json["value"],
+    id: json["id"] is int ? json["id"] : int.tryParse(json["id"]?.toString() ?? ''),
+    key: json["key"]?.toString(),
+    value: json["value"]?.toString(),
   );
 
   Map<String, dynamic> toJson() => {
@@ -291,9 +291,9 @@ class Tax {
   String? subtotal;
 
   factory Tax.fromJson(Map<String, dynamic> json) => Tax(
-    id: json["id"],
-    total: json["total"],
-    subtotal: json["subtotal"],
+    id: json["id"] is int ? json["id"] : int.tryParse(json["id"]?.toString() ?? ''),
+    total: json["total"]?.toString(),
+    subtotal: json["subtotal"]?.toString(),
   );
 
   Map<String, dynamic> toJson() => {
@@ -359,13 +359,13 @@ class ShippingLine {
   List<dynamic>? metaData;
 
   factory ShippingLine.fromJson(Map<String, dynamic> json) => ShippingLine(
-    id: json["id"],
-    methodTitle: json["method_title"],
-    methodId: json["method_id"],
-    total: json["total"],
-    totalTax: json["total_tax"],
-    taxes: List<dynamic>.from(json["taxes"].map((x) => x)),
-    metaData: List<dynamic>.from(json["meta_data"].map((x) => x)),
+    id: json["id"] is int ? json["id"] : int.tryParse(json["id"]?.toString() ?? ''),
+    methodTitle: json["method_title"]?.toString(),
+    methodId: json["method_id"]?.toString(),
+    total: json["total"]?.toString(),
+    totalTax: json["total_tax"]?.toString(),
+    taxes: json["taxes"] != null ? List<dynamic>.from(json["taxes"].map((x) => x)) : [],
+    metaData: json["meta_data"] != null ? List<dynamic>.from(json["meta_data"].map((x) => x)) : [],
   );
 
   Map<String, dynamic> toJson() => {
@@ -401,14 +401,14 @@ class TaxLine {
   List<dynamic>? metaData;
 
   factory TaxLine.fromJson(Map<String, dynamic> json) => TaxLine(
-    id: json["id"],
-    rateCode: json["rate_code"],
-    rateId: json["rate_id"],
-    label: json["label"],
+    id: json["id"] is int ? json["id"] : int.tryParse(json["id"]?.toString() ?? ''),
+    rateCode: json["rate_code"]?.toString(),
+    rateId: json["rate_id"] is int ? json["rate_id"] : int.tryParse(json["rate_id"]?.toString() ?? ''),
+    label: json["label"]?.toString(),
     compound: json["compound"],
-    taxTotal: json["tax_total"],
-    shippingTaxTotal: json["shipping_tax_total"],
-    metaData: List<dynamic>.from(json["meta_data"].map((x) => x)),
+    taxTotal: json["tax_total"]?.toString(),
+    shippingTaxTotal: json["shipping_tax_total"]?.toString(),
+    metaData: json["meta_data"] != null ? List<dynamic>.from(json["meta_data"].map((x) => x)) : [],
   );
 
   Map<String, dynamic> toJson() => {

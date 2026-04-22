@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 import 'package:collection/collection.dart' show IterableExtension;
 import 'package:country_code_picker/country_code_picker.dart';
@@ -271,7 +272,7 @@ class CountryCodePickerState extends State<CountryCodePicker> {
   }
 
   void showCountryCodePickerDialog() {
-    if (Platform.isAndroid && !Platform.isIOS) {
+    if (!kIsWeb && Platform.isAndroid && !Platform.isIOS) {
       Constant.sendToScreen(
         SelectionDialog(
           elements,

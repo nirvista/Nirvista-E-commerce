@@ -129,9 +129,8 @@ class DataFile {
 
   static List<ModelPaymentMtd> getAllPaymentMthList(){
     List<ModelPaymentMtd> list = [];
-    list.add(ModelPaymentMtd("paypal.svg", "Paypal",num: "XXXX XXXX XXXX 2563"));
+    list.add(ModelPaymentMtd("card.svg", "Razorpay (Online)"));
     list.add(ModelPaymentMtd("money.svg", "Cash On Delivery",));
-    list.add(ModelPaymentMtd("Stripe.svg", "Stripe",));
     return list;
   }
   

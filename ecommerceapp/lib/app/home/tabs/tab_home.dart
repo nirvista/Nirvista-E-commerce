@@ -10,15 +10,16 @@ import 'package:pet_shop/base/get/route_key.dart';
 import 'package:pet_shop/base/get/storage_controller.dart';
 import 'package:pet_shop/base/widget_utils.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:pet_shop/services/product_api.dart';
+import 'package:pet_shop/services/brand_api.dart';
+import 'package:pet_shop/services/category_api.dart';
+import 'package:pet_shop/services/enrichment_service.dart';
 
 import '../../../base/get/bottom_selection_controller.dart';
 import '../../../base/get/home_controller.dart';
 import '../../../base/get/product_data.dart';
 import '../../model/api_models.dart';
-import '../../../services/product_api.dart';
-import '../../../services/brand_api.dart';
-import '../../../services/category_api.dart';
-import '../../../services/address_api.dart';
+import '../../../base/get/cart_contr/shipping_add_controller.dart';
 import '../../../base/get/login_data_controller.dart';
 
 class TabHome extends StatefulWidget {
@@ -35,54 +36,154 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
   final controller = Get.find<BottomItemSelectionController>();
   final loginController = Get.find<LoginDataController>();
 
-  RxString userCity = "Set Location".obs;
+  // Replaced local userCity with ShippingAddressController observation
+  final shippingController = Get.isRegistered<ShippingAddressController>()
+      ? Get.find<ShippingAddressController>()
+      : Get.put(ShippingAddressController());
+  
+  // Reactive product lists
+  RxList<ProductModel> bestSellingList = <ProductModel>[].obs;
+  RxList<ProductModel> topDealsList = <ProductModel>[].obs;
+  RxList<ProductModel> popularPicksList = <ProductModel>[].obs;
+  // Master pool to keep track of all unique products discovered (including Deep Fetch)
+  RxList<ProductModel> masterProductPool = <ProductModel>[].obs;
 
-  Future<List<ProductModel>>? bestSellingFuture;
-  Future<List<ProductModel>>? topDealsFuture;
   Future<List<BrandModel>>? brandsFuture;
-  Future<List<ProductModel>>? popularPicksFuture;
   Future<List<CategoryModel>>? categoriesFuture;
 
   RxString selectedCategory = "for_you".obs;
   RxString selectedBrand = "".obs;
   RxInt sliderPos = 0.obs;
+  RxBool isSectionLoading = false.obs;
 
   @override
   void initState() {
     super.initState();
-    bestSellingFuture = _fetchProducts(ProductApiService.getAllProducts());
-    topDealsFuture = _fetchProducts(ProductApiService.getTopRatedProducts());
-    popularPicksFuture = _fetchProducts(ProductApiService.getNewArrivals());
-    brandsFuture = _fetchBrands();
-    categoriesFuture = _fetchCategories();
-    _fetchUserLocation();
+    // Added a small delay for the initial load to resolve race conditions 
+    // during page transitions (especially on emulators).
+    Future.delayed(const Duration(milliseconds: 200), () {
+      if (mounted) {
+        _refreshAllSections();
+        setState(() {
+          brandsFuture = _fetchBrands();
+          categoriesFuture = _fetchCategories();
+        });
+      }
+    });
   }
 
-  Future<void> _fetchUserLocation() async {
-    final token = loginController.accessToken;
-    if (token != null && token.isNotEmpty) {
-      try {
-        final res = await AddressApiService.getUserAddresses(token);
-        if (res['success'] &&
-            res['data'] != null &&
-            (res['data'] as List).isNotEmpty) {
-          final addresses = (res['data'] as List)
-              .map((e) => AddressModel.fromJson(e))
-              .toList();
-          final defaultAddr =
-              addresses.where((a) => a.isDefaultShipping).toList();
-          if (defaultAddr.isNotEmpty) {
-            userCity.value = defaultAddr.first.city;
-          } else {
-            userCity.value = addresses.first.city;
-          }
-        }
-      } catch (_) {}
+  Future<void> _refreshAllSections() async {
+    isSectionLoading.value = true;
+    try {
+      // 1. Fetch products from specialized APIs AND categories (Deep Fetch)
+      // This matches the "View All" logic to ensure we catch all products even if 
+      // the specialized APIs have strict variant filters.
+      final catRes = await CategoryApiService.getAllCategories();
+      final List<String> catIdsToScrape = [];
+      if (catRes['success'] && catRes['data'] != null) {
+        catIdsToScrape.addAll(
+          (catRes['data'] as List).take(4).map((e) => e['id'].toString()).toList()
+        );
+      }
+
+      final results = await Future.wait([
+        _fetchProducts(ProductApiService.getAllProducts()),
+        _fetchProducts(ProductApiService.getTopRatedProducts()),
+        _fetchProducts(ProductApiService.getNewArrivals()),
+        // Scrape products from the first few categories
+        ...catIdsToScrape.map((id) => _fetchProducts(CategoryApiService.getProductsByCategory(id))),
+      ]);
+
+      // 2. Assign to reactive lists
+      bestSellingList.value = results[0];
+      popularPicksList.value = results[2];
+      
+      // Combine EVERYTHING into a master pool
+      final List<ProductModel> masterPool = [];
+      for (var r in results) {
+        masterPool.addAll(r);
+      }
+      
+      final Map<String, ProductModel> uniqueMap = {for (var p in masterPool) p.id: p};
+      masterProductPool.value = uniqueMap.values.toList();
+
+      // DERIVE subsections from the master pool with ROBUST sorting
+      // This ensures we show newest items first if ratings are tied, 
+      // and we aren't limited by the backend's "limit: 12" on specific endpoints.
+      List<ProductModel> sortedForDeals = List.from(masterProductPool);
+      sortedForDeals.sort((a, b) {
+        // Primary: Rating
+        int cmp = b.rating.compareTo(a.rating);
+        if (cmp != 0) return cmp;
+        // Secondary: Newest first
+        return b.id.compareTo(a.id); // Assuming ID or date is chronological
+      });
+      
+      topDealsList.value = sortedForDeals;
+
+      // 3. Proactively fetch user address if missing
+      shippingController.fetchAddresses();
+
+      // 4. Apply background enrichment to fix potential lightweight API data (images/prices)
+      await _enrichHomeSections();
+
+    } catch (e) {
+      print("Error refreshing sections: $e");
+    } finally {
+      isSectionLoading.value = false;
     }
   }
 
-  Future<List<ProductModel>> _fetchProducts(
-      Future<Map<String, dynamic>> apiCall) async {
+  Future<void> _enrichHomeSections() async {
+    // Enrich the lists we already have, PLUS the master pool to catch undiscovered deals
+    await Future.wait([
+      EnrichmentService.enrichProducts(bestSellingList),
+      EnrichmentService.enrichProducts(topDealsList),
+      EnrichmentService.enrichProducts(popularPicksList),
+      EnrichmentService.enrichProducts(masterProductPool),
+    ]);
+
+    // Relaxed cleanup: Only hide if the product is BOTH missing variants/price AND missing images.
+    void cleanup(RxList<ProductModel> list) {
+      list.removeWhere((p) => (p.variants.isEmpty && p.originalPrice <= 0) && p.imageUrl.isEmpty);
+      list.refresh();
+    }
+    
+    cleanup(bestSellingList);
+    cleanup(topDealsList);
+    cleanup(popularPicksList);
+  }
+
+  Future<void> _updateCategoryProducts(String catId) async {
+    if (catId == "for_you") {
+      _refreshAllSections();
+      return;
+    }
+
+    isSectionLoading.value = true;
+    try {
+      final res = await CategoryApiService.getProductsByCategory(catId);
+      if (res['success']) {
+        List<dynamic> data = res['data'];
+        final products = data.map((e) => ProductModel.fromJson(e)).toList();
+        
+        // Populate all sections with category products
+        // In a real app, you might have category-specific best sellers, 
+        // but here we'll show the category products in these sections.
+        bestSellingList.value = products.where((p) => p.variants.isNotEmpty || p.originalPrice > 0 || p.imageUrl.isNotEmpty).toList();
+        topDealsList.value = List.from(bestSellingList.value)..shuffle();
+        popularPicksList.value = bestSellingList.value;
+      }
+    } catch (e) {
+      print("Error updating category products: $e");
+    } finally {
+      isSectionLoading.value = false;
+    }
+  }
+
+  // Removed _fetchUserLocation as it is now handled by ShippingAddressController
+
+  Future<List<ProductModel>> _fetchProducts(Future<Map<String, dynamic>> apiCall) async {
     final res = await apiCall;
     if (res['success']) {
       dynamic data = res['data'];
@@ -168,79 +269,112 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
   // ─────────────────────────────────────────────
   Widget _buildHeader(BuildContext context, double margin) {
     return Container(
-      color: getCardColor(context),
-      padding: EdgeInsets.symmetric(horizontal: margin, vertical: 12.h),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF14B8A6), Color(0xFF0D9488), Color(0xFF0F766E)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        boxShadow: [
+          BoxShadow(color: Color(0x1A0D9488), blurRadius: 12, offset: Offset(0, 4))
+        ],
+      ),
+      padding: EdgeInsets.fromLTRB(margin, 14.h, margin, 14.h),
       child: Column(
         children: [
-          InkWell(
-            onTap: () {
-              showAddressSelectorBottomSheet(context);
-            },
-            child: Row(
-              children: [
-                Icon(Icons.location_on, color: accentColor, size: 20.w),
-                SizedBox(width: 8.w),
-                Expanded(
-                  child: Obx(
-                    () => Text(
-                      userCity.value.toUpperCase(),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: getFontColor(context),
-                        fontSize: 14.sp,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
+          // — Top row: brand + location + bell —
+          Row(
+            children: [
+              // Brand Text
+              getAssetImage(
+                context,
+                "nirvista_logo.png",
+                60.w,
+                24.h,
+                boxFit: BoxFit.contain,
+              ),
+              const Spacer(),
+              // Location chip
+              InkWell(
+                onTap: () => showAddressSelectorBottomSheet(context),
+                borderRadius: BorderRadius.circular(20.w),
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 5.h),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.18),
+                    borderRadius: BorderRadius.circular(20.w),
+                    border: Border.all(color: Colors.white.withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.location_on, color: Colors.white, size: 13.w),
+                      SizedBox(width: 4.w),
+                      Obx(() => Text(
+                        shippingController.selectedAddress.value?.city.toUpperCase() ?? "SET LOCATION",
+                        style: TextStyle(color: Colors.white, fontSize: 11.sp, fontWeight: FontWeight.w700),
+                      )),
+                      SizedBox(width: 4.w),
+                      Icon(Icons.expand_more, color: Colors.white, size: 14.w),
+                    ],
                   ),
                 ),
-                SizedBox(width: 8.w),
-                Icon(Icons.expand_more,
-                    color: getFontGreyColor(context), size: 20.w),
-              ],
-            ),
+              ),
+              SizedBox(width: 10.w),
+              // Notification bell
+              Container(
+                width: 36.w,
+                height: 36.w,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.18),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.notifications_outlined, color: Colors.white, size: 20.w),
+              ),
+            ],
           ),
-          SizedBox(height: 12.h),
-          // ── CHANGED: wrap in GestureDetector + AbsorbPointer ──
+          SizedBox(height: 14.h),
+          // — Search bar —
           GestureDetector(
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const SearchPage()),
-              );
-            },
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const TabSearch()),
+            ),
             child: AbsorbPointer(
               child: Container(
+                height: 52.h,
                 decoration: BoxDecoration(
-                  color: getGreyCardColor(context),
-                  borderRadius: BorderRadius.circular(12.w),
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(30.w),
+                  boxShadow: [
+                    BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 10, offset: const Offset(0, 4)),
+                  ],
                 ),
-                padding: EdgeInsets.symmetric(horizontal: 12.w),
+                padding: EdgeInsets.symmetric(horizontal: 18.w),
                 child: Row(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Icon(Icons.search,
-                        color: getFontGreyColor(context), size: 18.w),
-                    SizedBox(width: 8.w),
+                    Icon(Icons.search, color: accentColor, size: 22.w),
+                    SizedBox(width: 10.w),
                     Expanded(
                       child: TextField(
-                        style: TextStyle(color: getFontColor(context)),
+                        style: TextStyle(color: getFontColor(context), fontSize: 14.sp),
                         decoration: InputDecoration(
-                          hintText: "Search for products",
-                          hintStyle:
-                              TextStyle(color: getFontGreyColor(context)),
+                          hintText: "Search products, brands...",
+                          hintStyle: TextStyle(color: getFontGreyColor(context).withOpacity(0.7), fontSize: 13.sp),
                           border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(
-                              vertical: 10.h, horizontal: 8.w),
+                          isDense: true,
+                          contentPadding: EdgeInsets.symmetric(vertical: 12.h),
                         ),
+                        textAlignVertical: TextAlignVertical.center,
                       ),
                     ),
-                    Icon(Icons.camera_alt_outlined,
-                        color: getFontGreyColor(context), size: 18.w),
+                    Icon(Icons.tune, color: accentColor, size: 20.w),
                   ],
                 ),
               ),
             ),
           ),
-          // ── END CHANGE ──
         ],
       ),
     );
@@ -251,167 +385,192 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
       color: getCardColor(context),
       padding: EdgeInsets.symmetric(horizontal: margin, vertical: 12.h),
       child: FutureBuilder<List<CategoryModel>>(
-          future: categoriesFuture,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return Center(
-                  child: CircularProgressIndicator(color: accentColor));
-            }
-            if (snapshot.hasError ||
-                !snapshot.hasData ||
-                snapshot.data!.isEmpty) {
-              return SizedBox(); // fallback if no categories
-            }
-
-            List<CategoryModel> apiCategories = snapshot.data!;
-
-            return SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Obx(
-                () => Row(children: [
-                  // Default 'For You' option
+        future: categoriesFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return Center(child: CircularProgressIndicator(color: accentColor));
+          }
+          if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
+            return const SizedBox();
+          }
+          List<CategoryModel> apiCategories = snapshot.data!;
+          return SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Obx(
+              () => Row(
+                children: [
                   _buildSingleCategoryTab(context, 'for_you', 'For You'),
                   ...List.generate(
                     apiCategories.length,
-                    (index) {
-                      return _buildSingleCategoryTab(context,
-                          apiCategories[index].id, apiCategories[index].name);
-                    },
+                    (index) => _buildSingleCategoryTab(
+                        context, apiCategories[index].id, apiCategories[index].name),
                   ),
-                ]),
+                ],
               ),
-            );
-          }),
+            ),
+          );
+        },
+      ),
     );
   }
 
   Widget _buildSingleCategoryTab(
       BuildContext context, String catId, String catName) {
     bool isSelected = selectedCategory.value == catId;
-    return InkWell(
+    return GestureDetector(
       onTap: () {
+        if (selectedCategory.value == catId) return;
         selectedCategory.value = catId;
         storeController.setSelectedCategory(catId);
         storeController.setSelectedCategoryName(catName);
+        _updateCategoryProducts(catId);
       },
-      child: Padding(
-        padding: EdgeInsets.only(right: 20.w),
-        child: Column(
-          children: [
-            getCustomFont(
-              catName,
-              14,
-              isSelected ? accentColor : getFontGreyColor(context),
-              1,
-              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-            ),
-            if (isSelected)
-              Container(
-                height: 3.h,
-                width: 30.w,
-                margin: EdgeInsets.only(top: 4.h),
-                decoration: BoxDecoration(
-                  color: accentColor,
-                  borderRadius: BorderRadius.circular(2.h),
-                ),
-              ),
-          ],
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        margin: EdgeInsets.only(right: 8.w),
+        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+        decoration: BoxDecoration(
+          color: isSelected ? accentColor : getGreyCardColor(context),
+          borderRadius: BorderRadius.circular(20.w),
+          boxShadow: isSelected
+              ? [BoxShadow(color: accentColor.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 3))]
+              : [],
+        ),
+        child: Text(
+          catName,
+          style: TextStyle(
+            fontSize: 12.sp,
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+            color: isSelected ? Colors.white : getFontGreyColor(context),
+          ),
         ),
       ),
     );
   }
 
   Widget _buildBannerCarousel(BuildContext context, double margin) {
-    List<Map<String, String>> banners = [
-      {
-        "title": "Big Fashion Sale",
-        "subtitle": "Up to 80% Off",
-        "color": "#CDF5E7"
-      },
-      {
-        "title": "Electronics Week",
-        "subtitle": "Top Brands on Deals",
-        "color": "#E8D5F2"
-      },
-      {
-        "title": "Beauty Essentials",
-        "subtitle": "Min 50% Off",
-        "color": "#FFE5E5"
-      },
+    final List<Map<String, dynamic>> banners = [
+      {"title": "Big Season Sale", "subtitle": "Up to 80% Off — Shop Now", "icon": Icons.local_offer_rounded, "gradient": [const Color(0xFF14B8A6), const Color(0xFF0D9488)]},
+      {"title": "Electronics Week", "subtitle": "Top Brands · Best Prices", "icon": Icons.devices_rounded, "gradient": [const Color(0xFF0D9488), const Color(0xFF0F766E)]},
+      {"title": "New Arrivals", "subtitle": "Fresh Picks Just for You", "icon": Icons.auto_awesome_rounded, "gradient": [const Color(0xFF0F766E), const Color(0xFF134E4A)]},
     ];
 
-    return SizedBox(
-      height: 140.h,
-      width: double.infinity,
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: margin),
-        child: CarouselSlider(
-          items: List.generate(banners.length, (index) {
-            return Container(
-              decoration: BoxDecoration(
-                color: banners[index]["color"]!.toColor(),
-                borderRadius: BorderRadius.circular(16.w),
-              ),
-              padding: EdgeInsets.all(16.w),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        getCustomFont(
-                          banners[index]["title"]!,
-                          16,
-                          getFontColor(context),
-                          1,
-                          fontWeight: FontWeight.w600,
-                        ),
-                        SizedBox(height: 4.h),
-                        getCustomFont(
-                          banners[index]["subtitle"]!,
-                          14,
-                          getFontColor(context),
-                          1,
-                          fontWeight: FontWeight.w500,
-                        ),
-                        SizedBox(height: 8.h),
-                        Row(
+    return Column(
+      children: [
+        SizedBox(
+          height: 160.h,
+          width: double.infinity,
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: margin),
+            child: CarouselSlider(
+              items: List.generate(banners.length, (index) {
+                final b = banners[index];
+                return Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: b["gradient"] as List<Color>,
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(18.w),
+                    boxShadow: [
+                      BoxShadow(color: accentColor.withOpacity(0.25), blurRadius: 12, offset: const Offset(0, 4)),
+                    ],
+                  ),
+                  padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 16.h),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            getCustomFont(
-                              "SHOP NOW",
-                              12,
-                              accentColor,
-                              1,
-                              fontWeight: FontWeight.w700,
+                            Container(
+                              padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(6.w),
+                              ),
+                              child: Text("LIMITED OFFER", style: TextStyle(color: Colors.white70, fontSize: 9.sp, fontWeight: FontWeight.w700, letterSpacing: 0.8)),
                             ),
-                            SizedBox(width: 6.w),
-                            Icon(Icons.arrow_forward,
-                                color: accentColor, size: 14.w),
+                            SizedBox(height: 8.h),
+                            Text(b["title"]!, style: TextStyle(color: Colors.white, fontSize: 18.sp, fontWeight: FontWeight.w800)),
+                            SizedBox(height: 4.h),
+                            Text(b["subtitle"]!, style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 12.sp, fontWeight: FontWeight.w500)),
+                            SizedBox(height: 12.h),
+                            Container(
+                              padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 6.h),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(20.w),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text("SHOP NOW", style: TextStyle(color: accentColor, fontSize: 10.sp, fontWeight: FontWeight.w800, letterSpacing: 0.5)),
+                                  SizedBox(width: 4.w),
+                                  Icon(Icons.arrow_forward, color: accentColor, size: 11.w),
+                                ],
+                              ),
+                            ),
                           ],
                         ),
-                      ],
-                    ),
+                      ),
+                      Icon(b["icon"] as IconData, color: Colors.white.withOpacity(0.25), size: 80.w),
+                    ],
                   ),
-                  Icon(Icons.shopping_bag,
-                      color: accentColor.withOpacity(0.3), size: 60.w),
-                ],
+                );
+              }),
+              options: CarouselOptions(
+                viewportFraction: 1,
+                autoPlay: true,
+                autoPlayInterval: const Duration(seconds: 4),
+                autoPlayAnimationDuration: const Duration(milliseconds: 800),
+                autoPlayCurve: Curves.fastOutSlowIn,
+                onPageChanged: (index, reason) { sliderPos.value = index; },
               ),
-            );
-          }),
-          options: CarouselOptions(
-            viewportFraction: 1,
-            autoPlay: true,
-            autoPlayInterval: const Duration(seconds: 4),
-            autoPlayAnimationDuration: const Duration(milliseconds: 800),
-            autoPlayCurve: Curves.fastOutSlowIn,
-            onPageChanged: (index, reason) {
-              sliderPos.value = index;
-            },
+            ),
           ),
         ),
+        SizedBox(height: 10.h),
+        // Dot indicators
+        Obx(() => Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(banners.length, (i) => AnimatedContainer(
+            duration: const Duration(milliseconds: 250),
+            margin: EdgeInsets.only(right: 5.w),
+            width: sliderPos.value == i ? 18.w : 6.w,
+            height: 6.h,
+            decoration: BoxDecoration(
+              color: sliderPos.value == i ? accentColor : accentColor.withOpacity(0.25),
+              borderRadius: BorderRadius.circular(4.w),
+            ),
+          )),
+        )),
+      ],
+    );
+  }
+
+  Widget _buildSectionHeader(BuildContext context, double margin, String title, VoidCallback onViewAll) {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: margin),
+      child: Row(
+        children: [
+          Container(width: 4.w, height: 20.h, decoration: BoxDecoration(color: accentColor, borderRadius: BorderRadius.circular(2.w))),
+          SizedBox(width: 10.w),
+          Expanded(child: Text(title, style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w800, color: getFontColor(context)))),
+          GestureDetector(
+            onTap: onViewAll,
+            child: Row(
+              children: [
+                Text("View All", style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: accentColor)),
+                SizedBox(width: 2.w),
+                Icon(Icons.arrow_forward_ios, color: accentColor, size: 11.w),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -422,72 +581,30 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
       padding: EdgeInsets.symmetric(vertical: margin),
       child: Column(
         children: [
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: margin),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                getCustomFont("Best Selling", 18, getFontColor(context), 1,
-                    fontWeight: FontWeight.w700),
-                GestureDetector(
-                  onTap: () {
-                    storeController.setSelectedCategory("best_selling");
-                    Constant.sendToNext(context, categoryProductsPageRoute);
-                  },
-                  child: getCustomFont("View All", 14, accentColor, 1,
-                      fontWeight: FontWeight.w600),
-                ),
-              ],
-            ),
-          ),
+          _buildSectionHeader(context, margin, "Best Selling", () {
+            storeController.setSelectedCategory("best_selling");
+            storeController.setSelectedCategoryName("Best Selling");
+            Constant.sendToNext(context, categoryProductsPageRoute);
+          }),
           SizedBox(height: 16.h),
           SizedBox(
-              height: 200.w,
-              child: FutureBuilder<List<ProductModel>>(
-                future: bestSellingFuture,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return Center(
-                        child: CircularProgressIndicator(color: accentColor));
-                  }
-                  if (snapshot.hasError ||
-                      !snapshot.hasData ||
-                      snapshot.data!.isEmpty) {
-                    return Center(
-                        child: getCustomFont("No products available", 14,
-                            getFontGreyColor(context), 1));
-                  }
-
-                  var allProducts = snapshot.data!;
-                  return Obx(() {
-                    var currentCat = selectedCategory.value;
-                    var products = currentCat == 'for_you'
-                        ? allProducts
-                        : allProducts
-                            .where((p) => p.categoryId == currentCat)
-                            .toList();
-
-                    if (products.isEmpty) {
-                      return Center(
-                          child: getCustomFont("No products available", 14,
-                              getFontGreyColor(context), 1));
-                    }
-
-                    return ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      padding: EdgeInsets.symmetric(horizontal: margin),
-                      itemCount: products.length,
-                      itemBuilder: (context, index) {
-                        return _buildProductCard(
-                          context,
-                          products[index],
-                          width: 150.w,
-                        );
-                      },
-                    );
-                  });
-                },
-              )),
+            height: 220.w,
+            child: Obx(() {
+              if (isSectionLoading.value) {
+                return Center(child: CircularProgressIndicator(color: accentColor));
+              }
+              if (bestSellingList.isEmpty) {
+                return Center(child: getCustomFont("No products available", 14, getFontGreyColor(context), 1));
+              }
+              return ListView.builder(
+                scrollDirection: Axis.horizontal,
+                padding: EdgeInsets.symmetric(horizontal: margin),
+                itemCount: bestSellingList.length,
+                itemBuilder: (context, index) =>
+                    _buildProductCard(context, bestSellingList[index], width: 155.w),
+              );
+            }),
+          ),
         ],
       ),
     );
@@ -499,72 +616,30 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
       padding: EdgeInsets.symmetric(vertical: margin),
       child: Column(
         children: [
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: margin),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                getCustomFont("Top Deals For You", 18, getFontColor(context), 1,
-                    fontWeight: FontWeight.w700),
-                GestureDetector(
-                  onTap: () {
-                    storeController.setSelectedCategory("top_deals");
-                    Constant.sendToNext(context, categoryProductsPageRoute);
-                  },
-                  child: getCustomFont("View All", 14, accentColor, 1,
-                      fontWeight: FontWeight.w600),
-                ),
-              ],
-            ),
-          ),
+          _buildSectionHeader(context, margin, "Top Deals For You", () {
+            storeController.setSelectedCategory("top_deals");
+            storeController.setSelectedCategoryName("Top Deals For You");
+            Constant.sendToNext(context, categoryProductsPageRoute);
+          }),
           SizedBox(height: 16.h),
           SizedBox(
-              height: 200.w,
-              child: FutureBuilder<List<ProductModel>>(
-                future: topDealsFuture,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return Center(
-                        child: CircularProgressIndicator(color: accentColor));
-                  }
-                  if (snapshot.hasError ||
-                      !snapshot.hasData ||
-                      snapshot.data!.isEmpty) {
-                    return Center(
-                        child: getCustomFont("No top deals available", 14,
-                            getFontGreyColor(context), 1));
-                  }
-
-                  var allProducts = snapshot.data!;
-                  return Obx(() {
-                    var currentCat = selectedCategory.value;
-                    var products = currentCat == 'for_you'
-                        ? allProducts
-                        : allProducts
-                            .where((p) => p.categoryId == currentCat)
-                            .toList();
-
-                    if (products.isEmpty) {
-                      return Center(
-                          child: getCustomFont("No top deals available", 14,
-                              getFontGreyColor(context), 1));
-                    }
-
-                    return ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      padding: EdgeInsets.symmetric(horizontal: margin),
-                      itemCount: products.length,
-                      itemBuilder: (context, index) {
-                        return _buildProductCard(
-                          context,
-                          products[index],
-                          width: 150.w,
-                        );
-                      },
-                    );
-                  });
-                },
-              )),
+            height: 220.w,
+            child: Obx(() {
+              if (isSectionLoading.value) {
+                return Center(child: CircularProgressIndicator(color: accentColor));
+              }
+              if (topDealsList.isEmpty) {
+                return Center(child: getCustomFont("No top deals available", 14, getFontGreyColor(context), 1));
+              }
+              return ListView.builder(
+                scrollDirection: Axis.horizontal,
+                padding: EdgeInsets.symmetric(horizontal: margin),
+                itemCount: topDealsList.length,
+                itemBuilder: (context, index) =>
+                    _buildProductCard(context, topDealsList[index], width: 155.w),
+              );
+            }),
+          ),
         ],
       ),
     );
@@ -649,52 +724,62 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
           Obx(() {
             if (selectedBrand.value.isEmpty) return SizedBox();
             return SizedBox(
-                height: 200.w,
-                child: FutureBuilder<Map<String, dynamic>>(
-                    future: selectedBrand.value == 'all'
-                        ? ProductApiService.getAllProducts()
-                        : BrandApiService.getProductsByBrand(
-                            selectedBrand.value),
-                    builder: (context, prodSnapshot) {
-                      if (prodSnapshot.connectionState ==
-                          ConnectionState.waiting) {
-                        return Center(
-                            child:
-                                CircularProgressIndicator(color: accentColor));
+              height: 200.w,
+              child: FutureBuilder<Map<String, dynamic>>(
+                future: () async {
+                  if (selectedBrand.value == 'all') {
+                    // Scrape from top brands to bypass Product API restriction
+                    final bRes = await BrandApiService.getAllBrands();
+                    if (!bRes['success']) return {'success': false};
+                    List<BrandModel> topBrands = (bRes['data'] as List).take(3).map((e) => BrandModel.fromJson(e)).toList();
+                    
+                    final brandScrape = await Future.wait(topBrands.map((b) => BrandApiService.getProductsByBrand(b.id)));
+                    List<dynamic> allProds = [];
+                    for (var r in brandScrape) {
+                      if (r['success']) {
+                        var d = r['data'];
+                        if (d is List) allProds.addAll(d);
+                        else if (d is Map && d['products'] is List) allProds.addAll(d['products']);
                       }
-                      if (!prodSnapshot.hasData ||
-                          prodSnapshot.data!['success'] == false) {
-                        return Center(
-                            child: getCustomFont("No products available", 14,
-                                getFontGreyColor(context), 1));
-                      }
-
-                      List<dynamic> productsList = [];
-                      var resData = prodSnapshot.data!['data'];
-                      if (resData is List)
-                        productsList = resData;
-                      else if (resData is Map && resData['products'] is List)
-                        productsList = resData['products'];
-
-                      var products = productsList
-                          .map((e) => ProductModel.fromJson(e))
-                          .toList();
-
-                      if (products.isEmpty) {
-                        return Center(
-                            child: getCustomFont("No products available", 14,
-                                getFontGreyColor(context), 1));
-                      }
-
-                      return ListView.builder(
-                          scrollDirection: Axis.horizontal,
-                          padding: EdgeInsets.symmetric(horizontal: margin),
-                          itemCount: products.length,
-                          itemBuilder: (context, index) {
-                            return _buildProductCard(context, products[index],
-                                width: 150.w);
-                          });
-                    }));
+                    }
+                    return {'success': true, 'data': allProds};
+                  } else {
+                    return BrandApiService.getProductsByBrand(selectedBrand.value);
+                  }
+                }(),
+                builder: (context, prodSnapshot) {
+                   if (prodSnapshot.connectionState == ConnectionState.waiting) {
+                      return Center(child: CircularProgressIndicator(color: accentColor));
+                   }
+                   if (!prodSnapshot.hasData || prodSnapshot.data!['success'] == false) {
+                     return Center(child: getCustomFont("No products available", 14, getFontGreyColor(context), 1));
+                   }
+                   
+                   List<dynamic> productsList = [];
+                   var resData = prodSnapshot.data!['data'];
+                   if (resData is List) productsList = resData;
+                   else if (resData is Map && resData['products'] is List) productsList = resData['products'];
+                   
+                   var products = productsList.map((e) => ProductModel.fromJson(e)).toList();
+                   
+                   // Relaxed cleanup: Only hide if the product is BOTH missing variants/price AND missing images.
+                   products.removeWhere((p) => (p.variants.isEmpty && p.originalPrice <= 0) && p.imageUrl.isEmpty);
+                   
+                   if (products.isEmpty) {
+                     return Center(child: getCustomFont("No products available", 14, getFontGreyColor(context), 1));
+                   }
+                   
+                   return ListView.builder(
+                     scrollDirection: Axis.horizontal,
+                     padding: EdgeInsets.symmetric(horizontal: margin),
+                     itemCount: products.length,
+                     itemBuilder: (context, index) {
+                       return _buildProductCard(context, products[index], width: 150.w);
+                     }
+                   );
+                }
+              )
+            );
           }),
         ],
       ),
@@ -704,75 +789,36 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
   Widget _buildPopularPicksSection(BuildContext context, double margin) {
     return Container(
       color: getCardColor(context),
-      padding: EdgeInsets.symmetric(vertical: margin, horizontal: margin),
+      padding: EdgeInsets.fromLTRB(margin, margin, margin, margin),
       child: Column(
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              getCustomFont("New Arrivals", 18, getFontColor(context), 1,
-                  fontWeight: FontWeight.w700),
-              GestureDetector(
-                onTap: () {
-                  storeController.setSelectedCategory("new_arrivals");
-                  storeController.setSelectedCategoryName("New Arrivals");
-                  Constant.sendToNext(context, categoryProductsPageRoute);
-                },
-                child: getCustomFont("View All", 14, accentColor, 1,
-                    fontWeight: FontWeight.w600),
-              ),
-            ],
-          ),
+          _buildSectionHeader(context, 0, "New Arrivals", () {
+            storeController.setSelectedCategory("new_arrivals");
+            storeController.setSelectedCategoryName("New Arrivals");
+            Constant.sendToNext(context, categoryProductsPageRoute);
+          }),
           SizedBox(height: 16.h),
-          FutureBuilder<List<ProductModel>>(
-              future: popularPicksFuture,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return Center(
-                      child: CircularProgressIndicator(color: accentColor));
-                }
-                if (snapshot.hasError ||
-                    !snapshot.hasData ||
-                    snapshot.data!.isEmpty) {
-                  return Center(
-                      child: getCustomFont("No picks available", 14,
-                          getFontGreyColor(context), 1));
-                }
-                var allProducts = snapshot.data!;
-                return Obx(() {
-                  var currentCat = selectedCategory.value;
-                  var popularProducts = currentCat == 'for_you'
-                      ? allProducts
-                      : allProducts
-                          .where((p) => p.categoryId == currentCat)
-                          .toList();
-
-                  if (popularProducts.isEmpty) {
-                    return Center(
-                        child: getCustomFont("No picks available", 14,
-                            getFontGreyColor(context), 1));
-                  }
-
-                  return GridView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      crossAxisSpacing: 12.w,
-                      mainAxisSpacing: 12.w,
-                      childAspectRatio: 0.75,
-                    ),
-                    itemCount: popularProducts.take(4).length,
-                    itemBuilder: (context, index) {
-                      return _buildProductCard(
-                        context,
-                        popularProducts[index],
-                        width: double.infinity,
-                      );
-                    },
-                  );
-                });
-              })
+          Obx(() {
+            if (isSectionLoading.value) {
+              return Center(child: CircularProgressIndicator(color: accentColor));
+            }
+            if (popularPicksList.isEmpty) {
+              return Center(child: getCustomFont("No picks available", 14, getFontGreyColor(context), 1));
+            }
+            return GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                crossAxisSpacing: 12.w,
+                mainAxisSpacing: 12.w,
+                childAspectRatio: 0.94,
+              ),
+              itemCount: popularPicksList.take(4).length,
+              itemBuilder: (context, index) =>
+                  _buildProductCard(context, popularPicksList[index], width: double.infinity),
+            );
+          }),
         ],
       ),
     );
@@ -783,110 +829,137 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
     double basePrice = product.originalPrice;
     double currentPrice = product.currentPrice;
     double discountPercent = 0.0;
-
+    if (basePrice <= 0) basePrice = currentPrice;
+    if (currentPrice <= 0) currentPrice = basePrice;
     if (basePrice > 0 && currentPrice > 0 && basePrice > currentPrice) {
-      discountPercent =
-          (((basePrice - currentPrice) / basePrice) * 100).toDouble();
+      discountPercent = (((basePrice - currentPrice) / basePrice) * 100);
     } else {
       basePrice = currentPrice;
     }
 
-    return InkWell(
+    return GestureDetector(
       onTap: () {
         storeController.setSelectedProductModel(product);
         Constant.sendToNext(context, productDetailScreenRoute);
       },
-      child: SizedBox(
+      child: Container(
         width: width,
-        child: Container(
-          decoration: BoxDecoration(
-            color: getScaffoldColor(context),
-            borderRadius: BorderRadius.circular(12.w),
-            border: Border.all(color: dividerColor, width: 0.5),
-          ),
-          padding: EdgeInsets.all(8.w),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Image
-              Expanded(
-                child: Container(
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(10.w),
+        margin: EdgeInsets.only(right: width == double.infinity ? 0 : 12.w),
+        decoration: BoxDecoration(
+          color: getCardColor(context),
+          borderRadius: BorderRadius.circular(14.w),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF0D9488).withOpacity(0.07),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // ── Image with heart overlay ──
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(14.w)),
+                  child: Container(
+                    height: 110.w,
+                    width: double.infinity,
                     color: getGreyCardColor(context),
+                    child: (product.imageUrl.isNotEmpty && !product.imageUrl.contains("example.com"))
+                        ? CachedNetworkImage(
+                            imageUrl: product.imageUrl,
+                            fit: BoxFit.cover,
+                            placeholder: (_, __) => Center(
+                              child: CircularProgressIndicator(color: accentColor, strokeWidth: 2),
+                            ),
+                            errorWidget: (_, __, ___) =>
+                                Icon(Icons.shopping_bag_outlined, color: getFontGreyColor(context), size: 32.w),
+                          )
+                        : Icon(Icons.shopping_bag_outlined, color: getFontGreyColor(context), size: 32.w),
                   ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(10.w),
-                    child: CachedNetworkImage(
-                      imageUrl: product.imageUrl.isNotEmpty
-                          ? product.imageUrl
-                          : 'https://placehold.co/400',
-                      fit: BoxFit.cover,
-                      placeholder: (context, url) => Center(
-                        child: CircularProgressIndicator(
-                          color: accentColor,
-                        ),
-                      ),
-                      errorWidget: (context, url, error) => Icon(
-                          Icons.image_not_supported,
-                          color: getFontGreyColor(context)),
+                ),
+                // Heart icon — top right
+                Positioned(
+                  top: 6.h,
+                  right: 6.w,
+                  child: Container(
+                    width: 28.w,
+                    height: 28.w,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 6)],
                     ),
+                    child: Icon(Icons.favorite_border, color: accentColor, size: 15.w),
                   ),
                 ),
-              ),
-              SizedBox(height: 8.h),
-              // Brand
-              getCustomFont(product.brandName, 11, getFontGreyColor(context), 1,
-                  fontWeight: FontWeight.w500),
-              SizedBox(height: 4.h),
-              // Product Name
-              getCustomFont(product.title, 12, getFontColor(context), 2,
-                  fontWeight: FontWeight.w600, overflow: TextOverflow.ellipsis),
-              SizedBox(height: 4.h),
-              // Rating
-              Row(
+              ],
+            ),
+            // ── Info ──
+            Padding(
+              padding: EdgeInsets.fromLTRB(8.w, 8.h, 8.w, 10.h),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.star, color: ratedColor, size: 12.w),
-                  SizedBox(width: 4.w),
-                  getCustomFont(product.rating.toStringAsFixed(1), 11,
-                      getFontColor(context), 1,
-                      fontWeight: FontWeight.w500),
-                ],
-              ),
-              SizedBox(height: 8.h),
-              // Price Row
-              Row(
-                children: [
-                  getCustomFont(
-                      "₹${currentPrice.toStringAsFixed(0)}", 13, accentColor, 1,
-                      fontWeight: FontWeight.w700),
-                  SizedBox(width: 6.w),
-                  if (discountPercent > 0)
-                    getCustomFont("₹${basePrice.toStringAsFixed(0)}", 11,
-                        getFontGreyColor(context), 1,
-                        fontWeight: FontWeight.w500,
-                        decoration: TextDecoration.lineThrough),
-                ],
-              ),
-              // Discount Badge
-              if (discountPercent > 0)
-                Container(
-                  margin: EdgeInsets.only(top: 6.h),
-                  padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
-                  decoration: BoxDecoration(
-                    color: redColor,
-                    borderRadius: BorderRadius.circular(4.w),
+                  Text(product.brandName,
+                      style: TextStyle(fontSize: 10.sp, color: getFontGreyColor(context), fontWeight: FontWeight.w500)),
+                  SizedBox(height: 3.h),
+                  Text(product.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 12.sp, color: getFontColor(context), fontWeight: FontWeight.w600, height: 1.3)),
+                  SizedBox(height: 5.h),
+                  Row(
+                    children: [
+                      Icon(Icons.star_rounded, color: ratedColor, size: 12.w),
+                      SizedBox(width: 3.w),
+                      Text(product.rating.toStringAsFixed(1),
+                          style: TextStyle(fontSize: 10.sp, color: getFontColor(context), fontWeight: FontWeight.w500)),
+                    ],
                   ),
-                  child: getCustomFont(
-                      "${discountPercent.toStringAsFixed(0)}% OFF",
-                      9,
-                      Colors.white,
-                      1,
-                      fontWeight: FontWeight.w700),
-                ),
-            ],
-          ),
+                  SizedBox(height: 6.h),
+                  // Price row with inline discount badge
+                  Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 5.w,
+                    runSpacing: 3.h,
+                    children: [
+                      Text("₹${currentPrice.toStringAsFixed(0)}",
+                          style: TextStyle(fontSize: 14.sp, color: accentColor, fontWeight: FontWeight.w800)),
+                      if (discountPercent > 0) ...[
+                        Text("₹${basePrice.toStringAsFixed(0)}",
+                            style: TextStyle(
+                              fontSize: 11.sp,
+                              color: const Color(0xFF4B5563),
+                              decoration: TextDecoration.lineThrough,
+                              decorationColor: const Color(0xFF4B5563),
+                              decorationThickness: 1.2,
+                              height: 1.4,
+                              fontWeight: FontWeight.w500,
+                            )),
+                        Container(
+                          padding: EdgeInsets.symmetric(horizontal: 5.w, vertical: 2.h),
+                          decoration: BoxDecoration(
+                            color: accentColor.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(4.w),
+                          ),
+                          child: Text(
+                            "${discountPercent.toStringAsFixed(0)}% off",
+                            style: TextStyle(fontSize: 9.sp, color: accentColor, fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );

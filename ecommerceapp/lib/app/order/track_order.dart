@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:pet_shop/base/constant.dart';
@@ -26,16 +27,35 @@ class _TrackOrder extends State<TrackOrder> {
 
   OrderModel? order;
   final loginController = Get.find<LoginDataController>();
+  final orderController = Get.find<GlobalOrderController>();
+  late String orderId;
+
+  final Rx<OrderModel?> detailedOrder = Rx<OrderModel?>(null);
+  final RxBool isLoadingDetails = true.obs;
 
   @override
   void initState() {
     super.initState();
     // Get the order model passed from the previous screen
-    order = Get.arguments as OrderModel?;
+    OrderModel? initialOrder = Get.arguments as OrderModel?;
+    if (initialOrder != null) {
+      orderId = initialOrder.id;
+      _fetchOrderDetails();
+    }
+  }
+
+  Future<void> _fetchOrderDetails() async {
+    final token = loginController.accessToken ?? '';
+    final res = await OrderApiService.getOrderById(token, orderId);
+    if (res['success'] && res['data'] != null) {
+      detailedOrder.value = OrderModel.fromJson(res['data']);
+    }
+    isLoadingDetails.value = false;
   }
 
   Future<void> _handleCancelOrder() async {
-    if (order == null) return;
+    final currentOrder = orderController.userOrders.firstWhereOrNull((o) => o.id == orderId);
+    if (currentOrder == null) return;
     
     final token = loginController.accessToken ?? '';
     
@@ -46,21 +66,15 @@ class _TrackOrder extends State<TrackOrder> {
     );
 
     try {
-      final res = await OrderApiService.cancelOrder(token, order!.id);
+      final res = await OrderApiService.cancelOrder(token, currentOrder.id);
       Navigator.pop(context); // hide loading
 
       if (res['success']) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Order Canceled successfully'), backgroundColor: Colors.green)
         );
-        setState(() {
-          order!.orderStatus = 'canceled';
-        });
         // Sync with global order list
-        try {
-          final orderController = Get.find<GlobalOrderController>();
-          orderController.updateOrderStatusLocally(order!.id, 'canceled');
-        } catch (_) {}
+        orderController.updateOrderStatusLocally(currentOrder.id, 'canceled');
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(res['message'] ?? 'Failed to cancel order'), backgroundColor: Colors.red)
@@ -76,22 +90,6 @@ class _TrackOrder extends State<TrackOrder> {
     Constant.setupSize(context);
     double margin = FetchPixels.getDefaultHorSpaceFigma(context);
 
-    if (order == null) {
-      return Scaffold(
-        body: Center(child: getCustomFont("Order not found", 18, getFontColor(context), 1)),
-      );
-    }
-
-    String dateStr = '';
-    if (order!.createdAt.isNotEmpty) {
-      try {
-        final dt = DateTime.parse(order!.createdAt);
-        dateStr = "${dt.day} ${_monthName(dt.month)}, ${dt.year}";
-      } catch (_) { dateStr = order!.createdAt; }
-    }
-
-    bool canCancel = order!.orderStatus.toLowerCase() == 'pending' || order!.orderStatus.toLowerCase() == 'processing';
-
     return WillPopScope(
       onWillPop: () async {
         backClick(context);
@@ -99,42 +97,73 @@ class _TrackOrder extends State<TrackOrder> {
       },
       child: Scaffold(
         backgroundColor: getScaffoldColor(context),
-        body: Column(
-          children: [
-            getDefaultHeader(context, "Order Detail", () { backClick(context); }, isShowSearch: false),
-            Expanded(
-              child: ListView(
-                padding: EdgeInsets.zero,
-                children: [
-                  _buildHeaderInfo(context, margin, dateStr),
-                  _buildCustomerInfo(context),
-                  getVerSpace(20.h),
-                  _buildOrderItems(context),
-                  getVerSpace(20.h),
-                  _buildPriceSummary(context, margin),
-                  if (canCancel) ...[
+        body: Obx(() {
+          // ── Reactive: picks the order from the controller's list ──
+          final currentOrder = orderController.userOrders.firstWhereOrNull((o) => o.id == orderId);
+          
+          if (currentOrder == null && detailedOrder.value == null) {
+            return Center(child: getCustomFont("Order not found", 18, getFontColor(context), 1));
+          }
+
+          if (isLoadingDetails.value) {
+            return Center(child: CircularProgressIndicator(color: accentColor));
+          }
+
+          // Use detailedOrder if available to show full product info; fallback to currentOrder
+          final displayOrder = detailedOrder.value ?? currentOrder!;
+          
+          // However, we want to maintain the reactive status from currentOrder
+          if (currentOrder != null) {
+            displayOrder.orderStatus = currentOrder.orderStatus;
+          }
+
+          String dateStr = '';
+          if (displayOrder.createdAt.isNotEmpty) {
+            try {
+              final dt = DateTime.parse(displayOrder.createdAt);
+              dateStr = "${dt.day} ${_monthName(dt.month)}, ${dt.year}";
+            } catch (_) { dateStr = displayOrder.createdAt; }
+          }
+
+          bool canCancel = displayOrder.orderStatus.toLowerCase() == 'pending' || displayOrder.orderStatus.toLowerCase() == 'processing';
+
+          return Column(
+            children: [
+              getDefaultHeader(context, "Order Detail", () { backClick(context); }, isShowSearch: false),
+              Expanded(
+                child: ListView(
+                  padding: EdgeInsets.zero,
+                  children: [
+                    _buildHeaderInfo(context, margin, dateStr, displayOrder),
+                    _buildCustomerInfo(context, displayOrder),
                     getVerSpace(20.h),
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: margin),
-                      child: getButtonFigma(context, Colors.red, true, "Cancel Order", Colors.white, () {
-                        showGetDeleteDialog(
-                          context, 
-                          "Are you sure you want to cancel this order?", 
-                          "Cancel Order", 
-                          () { _handleCancelOrder(); },
-                          withCancelBtn: true,
-                          btnTextCancel: "No, Keep it",
-                          functionCancel: () {}
-                        );
-                      }, EdgeInsets.zero),
-                    ),
+                    _buildOrderItems(context, displayOrder),
+                    getVerSpace(20.h),
+                    _buildPriceSummary(context, margin, displayOrder),
+                    if (canCancel) ...[
+                      getVerSpace(20.h),
+                      Padding(
+                        padding: EdgeInsets.symmetric(horizontal: margin),
+                        child: getButtonFigma(context, Colors.red, true, "Cancel Order", Colors.white, () {
+                          showGetDeleteDialog(
+                            context, 
+                            "Are you sure you want to cancel this order?", 
+                            "Cancel Order", 
+                            () { _handleCancelOrder(); },
+                            withCancelBtn: true,
+                            btnTextCancel: "No, Keep it",
+                            functionCancel: () {}
+                          );
+                        }, EdgeInsets.zero),
+                      ),
+                    ],
+                    getVerSpace(40.h),
                   ],
-                  getVerSpace(40.h),
-                ],
+                ),
               ),
-            ),
-          ],
-        ),
+            ],
+          );
+        }),
       ),
     );
   }
@@ -144,7 +173,7 @@ class _TrackOrder extends State<TrackOrder> {
     return months[month - 1];
   }
 
-  Widget _buildHeaderInfo(BuildContext context, double margin, String dateStr) {
+  Widget _buildHeaderInfo(BuildContext context, double margin, String dateStr, OrderModel order) {
     return Padding(
       padding: EdgeInsets.all(margin),
       child: Row(
@@ -153,7 +182,7 @@ class _TrackOrder extends State<TrackOrder> {
           Row(
             children: [
               getCustomFont("Order ID: ", 16, getFontColor(context), 1, fontWeight: FontWeight.w400),
-              getCustomFont(order!.id.length > 8 ? order!.id.substring(0, 8) : order!.id, 16, getFontColor(context), 1, fontWeight: FontWeight.w600),
+              getCustomFont(order.id.length > 8 ? order.id.substring(0, 8) : order.id, 16, getFontColor(context), 1, fontWeight: FontWeight.w600),
             ],
           ),
           getCustomFont(dateStr, 14, getFontGreyColor(context), 1, fontWeight: FontWeight.w400),
@@ -162,7 +191,7 @@ class _TrackOrder extends State<TrackOrder> {
     );
   }
 
-  Widget _buildCustomerInfo(BuildContext context) {
+  Widget _buildCustomerInfo(BuildContext context, OrderModel order) {
     final user = loginController.currentUser.value;
     return Container(
       color: getCardColor(context),
@@ -193,12 +222,12 @@ class _TrackOrder extends State<TrackOrder> {
           getVerSpace(15.h),
           getCustomFont("Shipping Address", 14, getFontGreyColor(context), 1, fontWeight: FontWeight.w600),
           getVerSpace(6.h),
-          getMultilineCustomFont(order!.shippingAddress ?? "No address details", 14, getFontColor(context), fontWeight: FontWeight.w400),
+          getMultilineCustomFont(order.shippingAddress ?? "No address details", 14, getFontColor(context), fontWeight: FontWeight.w400),
           getVerSpace(16.h),
           Row(
             children: [
               getCustomFont("Status: ", 14, getFontGreyColor(context), 1),
-              getCustomFont(order!.orderStatus, 14, Constant.getOrderStatusColor(order!.orderStatus), 1, fontWeight: FontWeight.w600),
+              getCustomFont(order.orderStatus, 14, Constant.getOrderStatusColor(order.orderStatus), 1, fontWeight: FontWeight.w600),
             ],
           ),
         ],
@@ -206,23 +235,26 @@ class _TrackOrder extends State<TrackOrder> {
     );
   }
 
-  Widget _buildOrderItems(BuildContext context) {
+  Widget _buildOrderItems(BuildContext context, OrderModel order) {
     return Container(
       color: getCardColor(context),
       padding: EdgeInsets.all(20.h),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          getCustomFont("Items (${order!.items.length})", 16, getFontColor(context), 1, fontWeight: FontWeight.w600),
+          getCustomFont("Items (${order.items.length})", 16, getFontColor(context), 1, fontWeight: FontWeight.w600),
           getVerSpace(12.h),
           ListView.separated(
             physics: const NeverScrollableScrollPhysics(),
             shrinkWrap: true,
             padding: EdgeInsets.zero,
-            itemCount: order!.items.length,
+            itemCount: order.items.length,
             separatorBuilder: (ctx, i) => getDivider(setColor: Colors.grey.shade200).marginSymmetric(vertical: 12.h),
             itemBuilder: (ctx, i) {
-              final item = order!.items[i];
+              final item = order.items[i];
+              String img = item.displayImage;
+              String title = (item.product?.title.isNotEmpty == true) ? item.product!.title : "Product ID: ${item.productId.length > 5 ? item.productId.substring(0, 5) : item.productId}";
+              
               return Row(
                 children: [
                   Container(
@@ -232,16 +264,25 @@ class _TrackOrder extends State<TrackOrder> {
                       color: getGreyCardColor(context),
                       borderRadius: BorderRadius.circular(8.w),
                     ),
-                    child: const Icon(Icons.shopping_bag_outlined),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8.w),
+                      child: img.isNotEmpty 
+                        ? CachedNetworkImage(imageUrl: img, fit: BoxFit.cover, 
+                            placeholder: (context, url) => const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                            errorWidget: (context, url, error) => const Icon(Icons.image_not_supported))
+                        : const Icon(Icons.shopping_bag_outlined),
+                    ),
                   ),
                   getHorSpace(12.h),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        getCustomFont("Product ID: ${item.productId.substring(0, 5)}", 14, getFontColor(context), 1, fontWeight: FontWeight.w500),
+                        getCustomFont(title, 14, getFontColor(context), 1, fontWeight: FontWeight.w500),
                         getVerSpace(4.h),
                         getCustomFont("Qty: ${item.quantity}", 12, getFontGreyColor(context), 1),
+                        if (item.variant?.variantName != null) 
+                          getCustomFont("Variant: ${item.variant!.variantName}", 12, getFontGreyColor(context), 1),
                       ],
                     ),
                   ),
@@ -255,19 +296,19 @@ class _TrackOrder extends State<TrackOrder> {
     );
   }
 
-  Widget _buildPriceSummary(BuildContext context, double margin) {
+  Widget _buildPriceSummary(BuildContext context, double margin, OrderModel order) {
     return Container(
       color: getCardColor(context),
       padding: EdgeInsets.all(20.h),
       child: Column(
         children: [
-          buildSubtotalRow(context, "Item Total", "\u20B9${order!.totalAmount.toStringAsFixed(0)}"),
+          buildSubtotalRow(context, "Item Total", "\u20B9${order.totalAmount.toStringAsFixed(0)}"),
           getVerSpace(12.h),
           buildSubtotalRow(context, "Tax", "\u20B90"),
           getVerSpace(12.h),
           buildSubtotalRow(context, "Shipping", "Free"),
           getDivider(setColor: Colors.grey.shade200).marginSymmetric(vertical: 16.h),
-          buildTotalRow(context, "Total Paid", "\u20B9${order!.totalAmount.toStringAsFixed(0)}"),
+          buildTotalRow(context, "Total Paid", "\u20B9${order.totalAmount.toStringAsFixed(0)}"),
         ],
       ),
     );

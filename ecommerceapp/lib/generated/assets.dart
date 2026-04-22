@@ -48,7 +48,7 @@ class Assets {
   static const String imagesProfile = 'assets/images/profile.svg';
   static const String imagesProfileSelected = 'assets/images/profile_selected.svg';
   static const String imagesSearch = 'assets/images/search.svg';
-  static const String imagesSearchSelected = 'assets/images/search_selected.svg';
+  static const String imagesSearchSelected = 'assets/images/search_seslected.svg';
   static const String imagesSelectedRadio = 'assets/images/selected_radio.svg';
   static const String imagesShare = 'assets/images/share.svg';
   static const String imagesStar = 'assets/images/star.svg';
@@ -56,5 +56,6 @@ class Assets {
   static const String imagesUncheck = 'assets/images/uncheck.svg';
   static const String imagesUnlock = 'assets/images/unlock.png';
   static const String imagesUnselectedRadio = 'assets/images/unselected_radio.svg';
+  static const String imagesNirvistaLogo = 'assets/images/nirvista_logo.png';
 
 }

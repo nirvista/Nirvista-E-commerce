@@ -69,35 +69,35 @@ class RetrieveCoupon {
   Links? links;
 
   factory RetrieveCoupon.fromJson(Map<String, dynamic> json) => RetrieveCoupon(
-    id: json["id"],
-    code: json["code"],
-    amount: json["amount"],
-    status: json["status"],
-    dateCreated: json["date_created"],
-    dateCreatedGmt: json["date_created_gmt"],
-    dateModified: json["date_modified"],
-    dateModifiedGmt: json["date_modified_gmt"],
-    discountType: json["discount_type"],
-    description: json["description"],
-    dateExpires: json["date_expires"],
-    dateExpiresGmt: json["date_expires_gmt"],
-    usageCount: json["usage_count"],
+    id: json["id"] is int ? json["id"] : int.tryParse(json["id"]?.toString() ?? ''),
+    code: json["code"]?.toString(),
+    amount: json["amount"]?.toString(),
+    status: json["status"]?.toString(),
+    dateCreated: json["date_created"]?.toString(),
+    dateCreatedGmt: json["date_created_gmt"]?.toString(),
+    dateModified: json["date_modified"]?.toString(),
+    dateModifiedGmt: json["date_modified_gmt"]?.toString(),
+    discountType: json["discount_type"]?.toString(),
+    description: json["description"]?.toString(),
+    dateExpires: json["date_expires"]?.toString(),
+    dateExpiresGmt: json["date_expires_gmt"]?.toString(),
+    usageCount: json["usage_count"] is int ? json["usage_count"] : int.tryParse(json["usage_count"]?.toString() ?? ''),
     individualUse: json["individual_use"],
-    productIds: List<int>.from(json["product_ids"].map((x) => x)),
-    excludedProductIds: List<dynamic>.from(json["excluded_product_ids"].map((x) => x)),
+    productIds: json["product_ids"] != null ? List<int>.from(json["product_ids"].map((x) => x is int ? x : int.tryParse(x.toString()) ?? 0)) : [],
+    excludedProductIds: json["excluded_product_ids"] != null ? List<dynamic>.from(json["excluded_product_ids"].map((x) => x)) : [],
     usageLimit: json["usage_limit"],
     usageLimitPerUser: json["usage_limit_per_user"],
     limitUsageToXItems: json["limit_usage_to_x_items"],
     freeShipping: json["free_shipping"],
-    productCategories: List<dynamic>.from(json["product_categories"].map((x) => x)),
-    excludedProductCategories: List<dynamic>.from(json["excluded_product_categories"].map((x) => x)),
+    productCategories: json["product_categories"] != null ? List<dynamic>.from(json["product_categories"].map((x) => x)) : [],
+    excludedProductCategories: json["excluded_product_categories"] != null ? List<dynamic>.from(json["excluded_product_categories"].map((x) => x)) : [],
     excludeSaleItems: json["exclude_sale_items"],
-    minimumAmount: json["minimum_amount"],
-    maximumAmount: json["maximum_amount"],
-    emailRestrictions: List<dynamic>.from(json["email_restrictions"].map((x) => x)),
-    usedBy: List<String>.from(json["used_by"].map((x) => x)),
-    metaData: List<MetaDatum>.from(json["meta_data"].map((x) => MetaDatum.fromJson(x))),
-    links: Links.fromJson(json["_links"]),
+    minimumAmount: json["minimum_amount"]?.toString(),
+    maximumAmount: json["maximum_amount"]?.toString(),
+    emailRestrictions: json["email_restrictions"] != null ? List<dynamic>.from(json["email_restrictions"].map((x) => x)) : [],
+    usedBy: json["used_by"] != null ? List<String>.from(json["used_by"].map((x) => x.toString())) : [],
+    metaData: json["meta_data"] != null ? List<MetaDatum>.from(json["meta_data"].map((x) => MetaDatum.fromJson(x))) : [],
+    links: json["_links"] != null ? Links.fromJson(json["_links"]) : null,
   );
 
   Map<String, dynamic> toJson() => {
@@ -181,9 +181,9 @@ class MetaDatum {
   String? value;
 
   factory MetaDatum.fromJson(Map<String, dynamic> json) => MetaDatum(
-    id: json["id"],
-    key: json["key"],
-    value: json["value"],
+    id: json["id"] is int ? json["id"] : int.tryParse(json["id"]?.toString() ?? ''),
+    key: json["key"]?.toString(),
+    value: json["value"]?.toString(),
   );
 
   Map<String, dynamic> toJson() => {

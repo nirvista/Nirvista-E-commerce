@@ -16,7 +16,11 @@ class AddressApiService {
     try {
       final response = await http.get(
         Uri.parse('$baseUrl/api/address'),
-        headers: {'Authorization': 'Bearer $accessToken'},
+        headers: {
+          'Authorization': 'Bearer $accessToken',
+          'Content-Type': 'application/json',
+          'x-client-type': 'mobile',
+        },
       );
       if (response.statusCode == 200 || response.statusCode == 201) {
         final decoded = jsonDecode(response.body);
@@ -26,13 +30,17 @@ class AddressApiService {
           'message': decoded['message'],
         };
       } else {
+        String msg = 'Failed to fetch addresses';
+        try {
+          msg = jsonDecode(response.body)['message'] ?? msg;
+        } catch (_) {}
         return {
           'success': false,
-          'message': jsonDecode(response.body)['message'] ?? 'Failed to fetch addresses',
+          'message': msg,
         };
       }
     } catch (e) {
-      return {'success': false, 'message': e.toString()};
+      return {'success': false, 'message': "Connection error: ${e.toString()}"};
     }
   }
 
@@ -68,6 +76,7 @@ class AddressApiService {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $accessToken',
+          'x-client-type': 'mobile',
         },
         body: jsonEncode(body),
       );
@@ -79,13 +88,17 @@ class AddressApiService {
           'message': decoded['message'],
         };
       } else {
+        String msg = 'Failed to add address';
+        try {
+           msg = jsonDecode(response.body)['message'] ?? msg;
+        } catch (_) {}
         return {
           'success': false,
-          'message': jsonDecode(response.body)['message'] ?? 'Failed to add address',
+          'message': msg,
         };
       }
     } catch (e) {
-      return {'success': false, 'message': e.toString()};
+      return {'success': false, 'message': "Connection error: ${e.toString()}"};
     }
   }
 
@@ -120,6 +133,7 @@ class AddressApiService {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $accessToken',
+          'x-client-type': 'mobile',
         },
         body: jsonEncode(body),
       );
@@ -127,10 +141,14 @@ class AddressApiService {
         final decoded = jsonDecode(response.body);
         return {'success': true, 'data': decoded['data'], 'message': decoded['message']};
       } else {
-        return {'success': false, 'message': jsonDecode(response.body)['message'] ?? 'Failed to update address'};
+        String msg = 'Failed to update address';
+        try {
+          msg = jsonDecode(response.body)['message'] ?? msg;
+        } catch (_) {}
+        return {'success': false, 'message': msg};
       }
     } catch (e) {
-      return {'success': false, 'message': e.toString()};
+      return {'success': false, 'message': "Connection error: ${e.toString()}"};
     }
   }
 
@@ -139,15 +157,23 @@ class AddressApiService {
     try {
       final response = await http.delete(
         Uri.parse('$baseUrl/api/address/$addressId'),
-        headers: {'Authorization': 'Bearer $accessToken'},
+        headers: {
+          'Authorization': 'Bearer $accessToken',
+          'Content-Type': 'application/json',
+          'x-client-type': 'mobile',
+        },
       );
       if (response.statusCode == 200 || response.statusCode == 201) {
         return {'success': true, 'message': jsonDecode(response.body)['message']};
       } else {
-        return {'success': false, 'message': jsonDecode(response.body)['message'] ?? 'Failed to delete address'};
+        String msg = 'Failed to delete address';
+        try {
+          msg = jsonDecode(response.body)['message'] ?? msg;
+        } catch (_) {}
+        return {'success': false, 'message': msg};
       }
     } catch (e) {
-      return {'success': false, 'message': e.toString()};
+      return {'success': false, 'message': "Connection error: ${e.toString()}"};
     }
   }
 
@@ -156,16 +182,24 @@ class AddressApiService {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/api/address/$addressId/default'),
-        headers: {'Authorization': 'Bearer $accessToken'},
+        headers: {
+          'Authorization': 'Bearer $accessToken',
+          'Content-Type': 'application/json',
+          'x-client-type': 'mobile',
+        },
       );
       if (response.statusCode == 200 || response.statusCode == 201) {
         final decoded = jsonDecode(response.body);
         return {'success': true, 'data': decoded['data'], 'message': decoded['message']};
       } else {
-        return {'success': false, 'message': jsonDecode(response.body)['message'] ?? 'Failed to set default'};
+        String msg = 'Failed to set default address';
+        try {
+          msg = jsonDecode(response.body)['message'] ?? msg;
+        } catch (_) {}
+        return {'success': false, 'message': msg};
       }
     } catch (e) {
-      return {'success': false, 'message': e.toString()};
+      return {'success': false, 'message': "Connection error: ${e.toString()}"};
     }
   }
 }

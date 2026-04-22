@@ -116,17 +116,19 @@ class _LoginScreen extends State<LoginScreen> {
                 ),
               ],
             ),
-            SizedBox(
-              height: 20,
+            20.h.verticalSpace,
+            Center(
+              child: getCustomFont("Select User Type", 16, getFontColor(context), 1,
+                  fontWeight: FontWeight.w500),
             ),
-            getCustomFont("Select User Type", 16, getFontColor(context), 1,
-                fontWeight: FontWeight.w400),
+            8.h.verticalSpace,
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Radio<String>(
                   value: "customer",
                   groupValue: userType,
+                  activeColor: getAccentColor(context),
                   onChanged: (String? value) {
                     setState(() {
                       userType = value!;
@@ -135,9 +137,11 @@ class _LoginScreen extends State<LoginScreen> {
                 ),
                 getCustomFont("Customer", 14, getFontColor(context), 1,
                     fontWeight: FontWeight.w400),
+                20.w.horizontalSpace,
                 Radio<String>(
                   value: "vendor",
                   groupValue: userType,
+                  activeColor: getAccentColor(context),
                   onChanged: (String? value) {
                     setState(() {
                       userType = value!;
@@ -150,99 +154,102 @@ class _LoginScreen extends State<LoginScreen> {
             ),
             ObxValue((loading) {
               return getButtonFigma(
-                  context,
-                  getAccentColor(context),
-                  true,
-                  isLoading.value ? "Logging in..." : "Log In",
-                  Colors.white,
-                  isLoading.value
-                      ? () {}
-                      : () async {
-                          // Validation
-                          if (emailController.text.isEmpty) {
-                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                                content: Text("Please enter email address")));
-                            return;
-                          }
-                          if (passController.text.isEmpty) {
-                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                                content: Text("Please enter password")));
-                            return;
-                          }
-                          if (userType == null) {
-                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                                content: Text("Please select a user type")));
-                            return;
-                          }
+                context,
+                getAccentColor(context),
+                true,
+                isLoading.value ? "Logging in..." : "Log In",
+                Colors.white,
+                isLoading.value ? () {} : () async {
+                  // Validation
+                  if (emailController.text.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text("Please enter email address"))
+                    );
+                    return;
+                  }
+                  if (passController.text.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text("Please enter password"))
+                    );
+                    return;
+                  }
+                  if (userType == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text("Please select a user type"))
+                    );
+                    return;
+                  }
+                  
+                  isLoading.value = true;
+                  
+                  try {
+                    final result = await ApiService.userLogin(
+                      email: emailController.text.trim(),
+                      password: passController.text,
+                    );
+                    
+                    if (result['success']) {
+                      final userData = result['data']['user'];
+                      final accessToken = result['data']['accessToken'];
+                      final refreshToken = result['data']['refreshToken'];
 
-                          isLoading.value = true;
+                      // ── ROLE VERIFICATION ──
+                      // Compare the role returned by server with the selection in UI
+                      final serverRole = userData['userRole'].toString().toLowerCase();
+                      final selectedRole = userType!.toLowerCase();
+                      
+                      if (serverRole != selectedRole) {
+                        isLoading.value = false;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text("Access denied: This account is registered as a $serverRole. Please select the correct user type."),
+                            backgroundColor: Colors.orange.shade800,
+                          )
+                        );
+                        return;
+                      }
 
-                          try {
-                            final result = await ApiService.userLogin(
-                              email: emailController.text.trim(),
-                              password: passController.text,
-                            );
-
-                            if (result['success']) {
-                              final userData = result['data']['user'];
-                              final accessToken = result['data']['accessToken'];
-                              final refreshToken =
-                                  result['data']['refreshToken'];
-
-                              User LoggedInUser = User(
-                                id: userData['id'],
-                                name: userData['name'],
-                                email: userData['email'],
-                                phone: userData['phone'],
-                                userRole: userData['userRole'],
-                              );
-                              final loginController =
-                                  Get.find<LoginDataController>();
-                              loginController.saveUser(
-                                LoggedInUser,
-                                accessToken: accessToken,
-                                refreshToken: refreshToken,
-                              );
-                              final apiRole = (userData['userRole'] ?? '')
-                                  .toString()
-                                  .toLowerCase();
-                              if (apiRole.isNotEmpty && userType != apiRole) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                        "Selected role does not match your account role."),
-                                    backgroundColor: Colors.red,
-                                  ),
-                                );
-                                return;
-                              }
-
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text("Login successful!")));
-                              if (userType == "vendor") {
-                                Constant.sendToNext(
-                                    context, vendorDashboardScreenRoute);
-                              } else {
-                                Constant.sendToNext(context, homeScreenRoute);
-                              }
-                            } else {
-                              ScaffoldMessenger.of(context)
-                                  .showSnackBar(SnackBar(
-                                content:
-                                    Text(result['message'] ?? 'Login failed'),
-                                backgroundColor: Colors.red,
-                              ));
-                            }
-                          } catch (e) {
-                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                              content: Text("Error: ${e.toString()}"),
-                              backgroundColor: Colors.red,
-                            ));
-                          } finally {
-                            isLoading.value = false;
-                          }
-                        },
-                  EdgeInsets.symmetric(horizontal: horSpace, vertical: 62.h));
+                      User LoggedInUser =User(
+                        id :userData['id'],
+                        name:userData['name'],
+                        email: userData['email'],
+                        phone: userData['phone'],
+                        userRole: userData['userRole'],
+                      );
+                      final loginController = Get.find<LoginDataController>();
+                      loginController.saveUser(
+                        LoggedInUser,
+                        accessToken: accessToken,
+                        refreshToken: refreshToken,
+                      );
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text("Login successful!"))
+                      );
+                      String nextRoute = LoggedInUser.userRole?.toLowerCase() == 'vendor' 
+                          ? vendorDashboardRoute 
+                          : homeScreenRoute;
+                      Constant.sendToNext(context, nextRoute);
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(result['message'] ?? 'Login failed'),
+                          backgroundColor: Colors.red,
+                        )
+                      );
+                    }
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text("Error: ${e.toString()}"),
+                        backgroundColor: Colors.red,
+                      )
+                    );
+                  } finally {
+                    isLoading.value = false;
+                  }
+                },
+                EdgeInsets.symmetric(horizontal: horSpace, vertical: 62.h)
+              );
             }, isLoading),
             // Row(
             //   mainAxisAlignment: MainAxisAlignment.center,
@@ -268,7 +275,7 @@ class _LoginScreen extends State<LoginScreen> {
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 getCustomFont(
-                  "Already have an account?",
+                  "Don't have an account?",
                   16,
                   getFontBlackColor(context),
                   1,

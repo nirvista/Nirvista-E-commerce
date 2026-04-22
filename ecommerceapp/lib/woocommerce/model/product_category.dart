@@ -56,17 +56,17 @@ class WooProductCategory {
       this.links});
 
   WooProductCategory.fromJson(Map<String, dynamic> json) {
-    id = json['id'];
-    name = json['name'];
-    slug = json['slug'];
-    parent = json['parent'];
-    description = json['description'];
-    display = json['display'];
+    id = json['id'] is int ? json['id'] : int.tryParse(json['id']?.toString() ?? '');
+    name = json['name']?.toString();
+    slug = json['slug']?.toString();
+    parent = json['parent'] is int ? json['parent'] : int.tryParse(json['parent']?.toString() ?? '');
+    description = json['description']?.toString();
+    display = json['display']?.toString();
     image = json['image'] != null
         ? WooProductCategoryImage.fromJson(json['image'])
         : null;
-    menuOrder = json['menu_order'];
-    count = json['count'];
+    menuOrder = json['menu_order'] is int ? json['menu_order'] : int.tryParse(json['menu_order']?.toString() ?? '');
+    count = json['count'] is int ? json['count'] : int.tryParse(json['count']?.toString() ?? '');
     links = json['_links'] != null
         ? WooProductCategoryLinks.fromJson(json['_links'])
         : null;
@@ -116,14 +116,14 @@ class WooProductCategoryImage {
       this.alt});
 
   WooProductCategoryImage.fromJson(Map<String, dynamic> json) {
-    id = json['id'];
-    dateCreated = json['date_created'];
-    dateCreatedGmt = json['date_created_gmt'];
-    dateModified = json['date_modified'];
-    dateModifiedGmt = json['date_modified_gmt'];
-    src = (json['src'] != null && json['src'] is String) ? json['src'] : "";
-    name = json['name'];
-    alt = json['alt'];
+    id = json['id'] is int ? json['id'] : int.tryParse(json['id']?.toString() ?? '');
+    dateCreated = json['date_created']?.toString();
+    dateCreatedGmt = json['date_created_gmt']?.toString();
+    dateModified = json['date_modified']?.toString();
+    dateModifiedGmt = json['date_modified_gmt']?.toString();
+    src = json['src']?.toString() ?? "";
+    name = json['name']?.toString();
+    alt = json['alt']?.toString();
   }
 
   Map<String, dynamic> toJson() {

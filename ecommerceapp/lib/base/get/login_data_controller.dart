@@ -48,6 +48,9 @@ class LoginDataController extends GetxController {
               setCurrentUserNew(apiUser.toJson());
               currentUser.refresh();
             }
+          } else if (response.statusCode == 401 || response.statusCode == 403) {
+            print('Token expired or invalid: ${response.statusCode}. Logging out.');
+            logout();
           } else {
             print('Failed to load user data: ${response.statusCode}');
           }

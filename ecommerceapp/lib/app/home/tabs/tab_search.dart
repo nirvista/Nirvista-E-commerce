@@ -12,7 +12,8 @@ import 'package:pet_shop/base/widget_utils.dart';
 import 'package:pet_shop/services/product_api.dart';
 import 'package:pet_shop/services/brand_api.dart';
 import 'package:pet_shop/services/category_api.dart';
-import '../../model/api_models.dart';
+import 'package:pet_shop/services/enrichment_service.dart';
+import 'package:pet_shop/app/model/api_models.dart';
 
 // ─────────────────────────────────────────────
 //  Filter Model
@@ -69,7 +70,12 @@ class SearchFilters {
 
   Map<String, dynamic> toQueryParams(String keyword) {
     final params = <String, dynamic>{};
-    if (keyword.isNotEmpty) params['keyword'] = keyword;
+    if (keyword.isNotEmpty) {
+      params['keyword'] = keyword;
+      params['search'] = keyword;
+      params['q'] = keyword;
+      params['name'] = keyword;
+    }
     if (categoryIds.isNotEmpty) params['categoryId'] = categoryIds;
     if (brandIds.isNotEmpty) params['brandId'] = brandIds;
     if (materials.isNotEmpty) params['material'] = materials;
@@ -97,14 +103,15 @@ class SearchFilters {
 // ─────────────────────────────────────────────
 //  Search Page
 // ─────────────────────────────────────────────
-class SearchPage extends StatefulWidget {
-  const SearchPage({Key? key}) : super(key: key);
+class TabSearch extends StatefulWidget {
+  final bool showBack;
+  const TabSearch({Key? key, this.showBack = true}) : super(key: key);
 
   @override
-  State<SearchPage> createState() => _SearchPageState();
+  State<TabSearch> createState() => _TabSearchState();
 }
 
-class _SearchPageState extends State<SearchPage> {
+class _TabSearchState extends State<TabSearch> {
   final StorageController storeController = Get.find<StorageController>();
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _focusNode = FocusNode();
@@ -187,17 +194,31 @@ class _SearchPageState extends State<SearchPage> {
       if (!mounted) return;
 
       if (res['success'] == true) {
-        List<dynamic> data = [];
-        final resData = res['data'];
-        if (resData is List) {
-          data = resData;
-        } else if (resData is Map && resData['products'] is List) {
-          data = resData['products'];
+        dynamic rawData = res['data'];
+        List<dynamic> productList = [];
+        
+        if (rawData is List) {
+          productList = rawData;
+        } else if (rawData is Map) {
+          final nested = rawData['data'] ?? rawData['products'] ?? rawData['results'] ?? rawData['items'];
+          if (nested is List) {
+            productList = nested;
+          }
         }
-        setState(() {
-          _results = data.map((e) => ProductModel.fromJson(e)).toList();
-          _isLoading = false;
-        });
+
+        List<ProductModel> parsedResults = productList.map((e) => ProductModel.fromJson(e)).toList();
+
+        // ── NEW: Await enrichment and filter placeholders ──
+        await EnrichmentService.enrichProducts(parsedResults);
+        parsedResults.removeWhere((p) => p.variants.isEmpty && p.originalPrice <= 0 && p.imageUrl.isEmpty);
+
+        if (mounted) {
+          setState(() {
+            _results = parsedResults;
+            _isLoading = false;
+          });
+        }
+        // ───────────────────────────────
       } else {
         setState(() {
           _results = [];
@@ -205,11 +226,14 @@ class _SearchPageState extends State<SearchPage> {
           _errorMessage = res['message'] ?? 'Search failed';
         });
       }
-    } catch (e) {
+    } catch (e, stack) {
+      print('=== SEARCH PARSE ERROR ===');
+      print(e);
+      print(stack);
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _errorMessage = 'Something went wrong. Please try again.';
+          _errorMessage = 'Error parsing search results. Check logs.';
         });
       }
     }
@@ -264,32 +288,46 @@ class _SearchPageState extends State<SearchPage> {
 
   PreferredSizeWidget _buildAppBar(BuildContext context, double margin) {
     return PreferredSize(
-      preferredSize: Size.fromHeight(64.h),
+      preferredSize: Size.fromHeight(72.h),
       child: SafeArea(
         child: Container(
           color: getCardColor(context),
           padding: EdgeInsets.symmetric(horizontal: margin, vertical: 10.h),
           child: Row(
             children: [
-              GestureDetector(
-                onTap: () => Navigator.of(context).pop(),
-                child: Icon(Icons.arrow_back_ios_new,
-                    color: getFontColor(context), size: 20.w),
-              ),
-              SizedBox(width: 12.w),
+              if (widget.showBack) ...[
+                GestureDetector(
+                  onTap: () => Navigator.of(context).pop(),
+                  child: Container(
+                    padding: EdgeInsets.all(8.w),
+                    decoration: BoxDecoration(
+                      color: getGreyCardColor(context),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(Icons.arrow_back_ios_new,
+                        color: getFontColor(context), size: 18.w),
+                  ),
+                ),
+                SizedBox(width: 12.w),
+              ],
               Expanded(
                 child: Container(
-                  height: 42.h,
+                  height: 52.h,
                   decoration: BoxDecoration(
                     color: getGreyCardColor(context),
-                    borderRadius: BorderRadius.circular(12.w),
+                    borderRadius: BorderRadius.circular(30.w),
+                    boxShadow: [
+                      BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2)),
+                    ],
                   ),
-                  padding: EdgeInsets.symmetric(horizontal: 12.w),
+                  padding: EdgeInsets.symmetric(horizontal: 16.w),
                   child: Row(
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       Icon(Icons.search,
-                          color: getFontGreyColor(context), size: 18.w),
-                      SizedBox(width: 8.w),
+                          color: accentColor, size: 20.w),
+                      SizedBox(width: 10.w),
                       Expanded(
                         child: TextField(
                           controller: _searchController,
@@ -299,11 +337,12 @@ class _SearchPageState extends State<SearchPage> {
                           decoration: InputDecoration(
                             hintText: 'Search products...',
                             hintStyle:
-                                TextStyle(color: getFontGreyColor(context)),
+                                TextStyle(color: getFontGreyColor(context).withOpacity(0.7), fontSize: 13.sp),
                             border: InputBorder.none,
                             isDense: true,
-                            contentPadding: EdgeInsets.zero,
+                            contentPadding: EdgeInsets.symmetric(vertical: 12.h),
                           ),
+                          textAlignVertical: TextAlignVertical.center,
                           onChanged: _onSearchChanged,
                           textInputAction: TextInputAction.search,
                           onSubmitted: (v) {
@@ -315,8 +354,12 @@ class _SearchPageState extends State<SearchPage> {
                       if (_searchController.text.isNotEmpty)
                         GestureDetector(
                           onTap: _clearSearch,
-                          child: Icon(Icons.close,
-                              color: getFontGreyColor(context), size: 18.w),
+                          child: Container(
+                            padding: EdgeInsets.all(4.w),
+                            decoration: BoxDecoration(color: getFontGreyColor(context).withOpacity(0.2), shape: BoxShape.circle),
+                            child: Icon(Icons.close,
+                                color: getFontGreyColor(context), size: 14.w),
+                          ),
                         ),
                     ],
                   ),
@@ -583,7 +626,7 @@ class _SearchPageState extends State<SearchPage> {
               ),
             ),
             SizedBox(height: 8.h),
-            getCustomFont(product.brandId, 11, getFontGreyColor(context), 1,
+            getCustomFont(product.brandName, 11, getFontGreyColor(context), 1,
                 fontWeight: FontWeight.w500),
             SizedBox(height: 4.h),
             getCustomFont(product.title, 12, getFontColor(context), 2,
@@ -607,10 +650,15 @@ class _SearchPageState extends State<SearchPage> {
                     fontWeight: FontWeight.w700),
                 SizedBox(width: 6.w),
                 if (discountPercent > 0)
-                  getCustomFont('₹${basePrice.toStringAsFixed(0)}', 11,
-                      getFontGreyColor(context), 1,
-                      fontWeight: FontWeight.w500,
-                      decoration: TextDecoration.lineThrough),
+                  Text('₹${basePrice.toStringAsFixed(0)}',
+                      style: TextStyle(
+                        fontSize: 11.sp,
+                        color: const Color(0xFF757575),
+                        fontWeight: FontWeight.w500,
+                        decoration: TextDecoration.lineThrough,
+                        decorationColor: const Color(0xFF555555),
+                        decorationThickness: 2.0,
+                      )),
               ],
             ),
             if (discountPercent > 0)
@@ -619,13 +667,13 @@ class _SearchPageState extends State<SearchPage> {
                 padding:
                     EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
                 decoration: BoxDecoration(
-                  color: redColor,
-                  borderRadius: BorderRadius.circular(4.w),
+                  color: const Color(0xFFE0F2F1),
+                  borderRadius: BorderRadius.circular(20.w),
                 ),
                 child: getCustomFont(
                     '${discountPercent.toStringAsFixed(0)}% OFF',
                     9,
-                    Colors.white,
+                    const Color(0xFF004D40),
                     1,
                     fontWeight: FontWeight.w700),
               ),

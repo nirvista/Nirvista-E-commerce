@@ -69,26 +69,26 @@ class WooCustomer {
       this.links});
 
   WooCustomer.fromJson(Map<String, dynamic> json) {
-    id = json['id'];
-    dateCreated = json['date_created'];
-    dateCreatedGmt = json['date_created_gmt'];
-    dateModified = json['date_modified'];
-    dateModifiedGmt = json['date_modified_gmt'];
-    email = json['email'];
-    firstName = json['first_name'];
-    lastName = json['last_name'];
-    role = json['role'];
-    username = json['username'];
+    id = json['id'] is int ? json['id'] : int.tryParse(json['id']?.toString() ?? '');
+    dateCreated = json['date_created']?.toString();
+    dateCreatedGmt = json['date_created_gmt']?.toString();
+    dateModified = json['date_modified']?.toString();
+    dateModifiedGmt = json['date_modified_gmt']?.toString();
+    email = json['email']?.toString();
+    firstName = json['first_name']?.toString();
+    lastName = json['last_name']?.toString();
+    role = json['role']?.toString();
+    username = json['username']?.toString();
     billing =
         json['billing'] != null ? Billing.fromJson(json['billing']) : null;
     shipping = json['shipping'] != null
         ? Shipping.fromJson(json['shipping'])
         : null;
     isPayingCustomer = json['is_paying_customer'];
-    avatarUrl = json['avatar_url'];
-    metaData = (json['meta_data'] as List)
+    avatarUrl = json['avatar_url']?.toString();
+    metaData = json['meta_data'] != null ? (json['meta_data'] as List)
         .map((i) => WooCustomerMetaData.fromJson(i))
-        .toList();
+        .toList() : [];
     links = json['_links'] != null ? Links.fromJson(json['_links']) : null;
   }
 
@@ -150,8 +150,8 @@ class WooCustomerMetaData {
   WooCustomerMetaData(this.id, this.key, this.value);
 
   WooCustomerMetaData.fromJson(Map<String, dynamic> json)
-      : id = json['id'],
-        key = json['key'],
+      : id = json['id'] is int ? json['id'] : int.tryParse(json['id']?.toString() ?? ''),
+        key = json['key']?.toString(),
         value = json['value'];
 
   Map<String, dynamic> toJson() => {'id': id, 'key': key, 'value': value};
@@ -184,17 +184,17 @@ class Billing {
       this.phone});
 
   Billing.fromJson(Map<String, dynamic> json) {
-    firstName = json['first_name'];
-    lastName = json['last_name'];
-    company = json['company'];
-    address1 = json['address_1'];
-    address2 = json['address_2'];
-    city = json['city'];
-    state = json['state'];
-    postcode = json['postcode'];
-    country = json['country'];
-    email = json['email'];
-    phone = json['phone'];
+    firstName = json['first_name']?.toString();
+    lastName = json['last_name']?.toString();
+    company = json['company']?.toString();
+    address1 = json['address_1']?.toString();
+    address2 = json['address_2']?.toString();
+    city = json['city']?.toString();
+    state = json['state']?.toString();
+    postcode = json['postcode']?.toString();
+    country = json['country']?.toString();
+    email = json['email']?.toString();
+    phone = json['phone']?.toString();
   }
 
   Map<String, dynamic> toJson() {
@@ -237,15 +237,15 @@ class Shipping {
       this.country});
 
   Shipping.fromJson(Map<String, dynamic> json) {
-    firstName = json['first_name'] ?? "";
-    lastName = json['last_name'] ?? "";
-    company = json['company'] ?? "";
-    address1 = json['address_1'] ?? "";
-    address2 = json['address_2'] ?? "";
-    city = json['city'] ?? "";
-    state = json['state'] ?? "";
-    postcode = json['postcode'] ?? "";
-    country = json['country'] ?? "";
+    firstName = json['first_name']?.toString() ?? "";
+    lastName = json['last_name']?.toString() ?? "";
+    company = json['company']?.toString() ?? "";
+    address1 = json['address_1']?.toString() ?? "";
+    address2 = json['address_2']?.toString() ?? "";
+    city = json['city']?.toString() ?? "";
+    state = json['state']?.toString() ?? "";
+    postcode = json['postcode']?.toString() ?? "";
+    country = json['country']?.toString() ?? "";
   }
 
   Map<String, dynamic> toJson() {

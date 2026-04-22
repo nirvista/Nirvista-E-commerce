@@ -223,21 +223,21 @@ class WooCart {
   Extensions? extensions;
 
   factory WooCart.fromJson(Map<String, dynamic> json) => WooCart(
-    coupons: List<Coupon>.from(json["coupons"].map((x) => Coupon.fromJson(x))),
-    shippingRates: List<WooCartShippingRate>.from(json["shipping_rates"].map((x) => WooCartShippingRate.fromJson(x))),
-    shippingAddress: IngAddress.fromJson(json["shipping_address"]),
-    billingAddress: IngAddress.fromJson(json["billing_address"]),
-    items: List<WooCartItem>.from(json["items"].map((x) => WooCartItem.fromJson(x))),
-    itemsCount: json["items_count"],
-    itemsWeight: json["items_weight"],
+    coupons: json["coupons"] != null ? List<Coupon>.from(json["coupons"].map((x) => Coupon.fromJson(x))) : [],
+    shippingRates: json["shipping_rates"] != null ? List<WooCartShippingRate>.from(json["shipping_rates"].map((x) => WooCartShippingRate.fromJson(x))) : [],
+    shippingAddress: json["shipping_address"] != null ? IngAddress.fromJson(json["shipping_address"]) : null,
+    billingAddress: json["billing_address"] != null ? IngAddress.fromJson(json["billing_address"]) : null,
+    items: json["items"] != null ? List<WooCartItem>.from(json["items"].map((x) => WooCartItem.fromJson(x))) : [],
+    itemsCount: json["items_count"] is int ? json["items_count"] : int.tryParse(json["items_count"]?.toString() ?? ''),
+    itemsWeight: json["items_weight"] is int ? json["items_weight"] : int.tryParse(json["items_weight"]?.toString() ?? ''),
     needsPayment: json["needs_payment"],
     needsShipping: json["needs_shipping"],
     hasCalculatedShipping: json["has_calculated_shipping"],
-    fees: List<dynamic>.from(json["fees"].map((x) => x)),
-    totals: WooCartTotals.fromJson(json["totals"]),
-    errors: List<dynamic>.from(json["errors"].map((x) => x)),
-    paymentRequirements: List<String>.from(json["payment_requirements"].map((x) => x)),
-    extensions: Extensions.fromJson(json["extensions"]),
+    fees: json["fees"] != null ? List<dynamic>.from(json["fees"].map((x) => x)) : [],
+    totals: json["totals"] != null ? WooCartTotals.fromJson(json["totals"]) : null,
+    errors: json["errors"] != null ? List<dynamic>.from(json["errors"].map((x) => x)) : [],
+    paymentRequirements: json["payment_requirements"] != null ? List<String>.from(json["payment_requirements"].map((x) => x.toString())) : [],
+    extensions: json["extensions"] != null ? Extensions.fromJson(json["extensions"]) : null,
   );
 
   Map<String, dynamic> toJson() => {
@@ -287,17 +287,17 @@ class IngAddress {
   String? phone;
 
   factory IngAddress.fromJson(Map<String, dynamic> json) => IngAddress(
-    firstName: json["first_name"],
-    lastName: json["last_name"],
-    company: json["company"],
-    address1: json["address_1"],
-    address2: json["address_2"],
-    city: json["city"],
-    state: json["state"],
-    postcode: json["postcode"],
-    country: json["country"],
-    email: json["email"] == null ? null : json["email"],
-    phone: json["phone"],
+    firstName: json["first_name"]?.toString(),
+    lastName: json["last_name"]?.toString(),
+    company: json["company"]?.toString(),
+    address1: json["address_1"]?.toString(),
+    address2: json["address_2"]?.toString(),
+    city: json["city"]?.toString(),
+    state: json["state"]?.toString(),
+    postcode: json["postcode"]?.toString(),
+    country: json["country"]?.toString(),
+    email: json["email"]?.toString(),
+    phone: json["phone"]?.toString(),
   );
 
   Map<String, dynamic> toJson() => {
@@ -363,15 +363,15 @@ class CouponTotals {
   String? currencySuffix;
 
   factory CouponTotals.fromJson(Map<String, dynamic> json) => CouponTotals(
-    totalDiscount: json["total_discount"],
-    totalDiscountTax: json["total_discount_tax"],
-    currencyCode: json["currency_code"],
-    currencySymbol: json["currency_symbol"],
-    currencyMinorUnit: json["currency_minor_unit"],
-    currencyDecimalSeparator: json["currency_decimal_separator"],
-    currencyThousandSeparator: json["currency_thousand_separator"],
-    currencyPrefix: json["currency_prefix"],
-    currencySuffix: json["currency_suffix"],
+    totalDiscount: json["total_discount"]?.toString(),
+    totalDiscountTax: json["total_discount_tax"]?.toString(),
+    currencyCode: json["currency_code"]?.toString(),
+    currencySymbol: json["currency_symbol"]?.toString(),
+    currencyMinorUnit: json["currency_minor_unit"] is int ? json["currency_minor_unit"] : int.tryParse(json["currency_minor_unit"]?.toString() ?? ''),
+    currencyDecimalSeparator: json["currency_decimal_separator"]?.toString(),
+    currencyThousandSeparator: json["currency_thousand_separator"]?.toString(),
+    currencyPrefix: json["currency_prefix"]?.toString(),
+    currencySuffix: json["currency_suffix"]?.toString(),
   );
 
   Map<String, dynamic> toJson() => {
@@ -603,10 +603,10 @@ class RawPrices {
   String? salePrice;
 
   factory RawPrices.fromJson(Map<String, dynamic> json) => RawPrices(
-    precision: json["precision"],
-    price: json["price"],
-    regularPrice: json["regular_price"],
-    salePrice: json["sale_price"],
+    precision: json["precision"] is int ? json["precision"] : int.tryParse(json["precision"]?.toString() ?? ''),
+    price: json["price"]?.toString(),
+    regularPrice: json["regular_price"]?.toString(),
+    salePrice: json["sale_price"]?.toString(),
   );
 
   Map<String, dynamic> toJson() => {
@@ -717,11 +717,11 @@ class WooCartShippingRate {
   List<ShippingRateShippingRate>? shippingRates;
 
   factory WooCartShippingRate.fromJson(Map<String, dynamic> json) => WooCartShippingRate(
-    packageId: json["package_id"],
-    name: json["name"],
-    destination: Destination.fromJson(json["destination"]),
-    items: List<ShippingRateItem>.from(json["items"].map((x) => ShippingRateItem.fromJson(x))),
-    shippingRates: List<ShippingRateShippingRate>.from(json["shipping_rates"].map((x) => ShippingRateShippingRate.fromJson(x))),
+    packageId: json["package_id"] is int ? json["package_id"] : int.tryParse(json["package_id"]?.toString() ?? ''),
+    name: json["name"]?.toString(),
+    destination: json["destination"] != null ? Destination.fromJson(json["destination"]) : null,
+    items: json["items"] != null ? List<ShippingRateItem>.from(json["items"].map((x) => ShippingRateItem.fromJson(x))) : [],
+    shippingRates: json["shipping_rates"] != null ? List<ShippingRateShippingRate>.from(json["shipping_rates"].map((x) => ShippingRateShippingRate.fromJson(x))) : [],
   );
 
   Map<String, dynamic> toJson() => {
@@ -781,9 +781,9 @@ class ShippingRateItem {
   int? quantity;
 
   factory ShippingRateItem.fromJson(Map<String, dynamic> json) => ShippingRateItem(
-    key: json["key"],
-    name: json["name"],
-    quantity: json["quantity"],
+    key: json["key"] is int ? json["key"] : int.tryParse(json["key"]?.toString() ?? ''),
+    name: json["name"]?.toString(),
+    quantity: json["quantity"] is int ? json["quantity"] : int.tryParse(json["quantity"]?.toString() ?? ''),
   );
 
   Map<String, dynamic> toJson() => {
@@ -833,23 +833,23 @@ class ShippingRateShippingRate {
   String? currencySuffix;
 
   factory ShippingRateShippingRate.fromJson(Map<String, dynamic> json) => ShippingRateShippingRate(
-    rateId: json["rate_id"],
-    name: json["name"],
-    description: json["description"],
-    deliveryTime: json["delivery_time"],
-    price: json["price"],
-    taxes: json["taxes"],
-    instanceId: json["instance_id"],
-    methodId: json["method_id"],
-    metaData: List<MetaDatum>.from(json["meta_data"].map((x) => MetaDatum.fromJson(x))),
+    rateId: json["rate_id"]?.toString(),
+    name: json["name"]?.toString(),
+    description: json["description"]?.toString(),
+    deliveryTime: json["delivery_time"]?.toString(),
+    price: json["price"]?.toString(),
+    taxes: json["taxes"]?.toString(),
+    instanceId: json["instance_id"] is int ? json["instance_id"] : int.tryParse(json["instance_id"]?.toString() ?? ''),
+    methodId: json["method_id"]?.toString(),
+    metaData: json["meta_data"] != null ? List<MetaDatum>.from(json["meta_data"].map((x) => MetaDatum.fromJson(x))) : [],
     selected: json["selected"],
-    currencyCode: json["currency_code"],
-    currencySymbol: json["currency_symbol"],
-    currencyMinorUnit: json["currency_minor_unit"],
-    currencyDecimalSeparator: json["currency_decimal_separator"],
-    currencyThousandSeparator: json["currency_thousand_separator"],
-    currencyPrefix: json["currency_prefix"],
-    currencySuffix: json["currency_suffix"],
+    currencyCode: json["currency_code"]?.toString(),
+    currencySymbol: json["currency_symbol"]?.toString(),
+    currencyMinorUnit: json["currency_minor_unit"] is int ? json["currency_minor_unit"] : int.tryParse(json["currency_minor_unit"]?.toString() ?? ''),
+    currencyDecimalSeparator: json["currency_decimal_separator"]?.toString(),
+    currencyThousandSeparator: json["currency_thousand_separator"]?.toString(),
+    currencyPrefix: json["currency_prefix"]?.toString(),
+    currencySuffix: json["currency_suffix"]?.toString(),
   );
 
   Map<String, dynamic> toJson() => {
@@ -883,8 +883,8 @@ class MetaDatum {
   String? value;
 
   factory MetaDatum.fromJson(Map<String, dynamic> json) => MetaDatum(
-    key: json["key"],
-    value: json["value"],
+    key: json["key"]?.toString(),
+    value: json["value"]?.toString(),
   );
 
   Map<String, dynamic> toJson() => {
@@ -935,24 +935,24 @@ class WooCartTotals {
   String? currencySuffix;
 
   factory WooCartTotals.fromJson(Map<String, dynamic> json) => WooCartTotals(
-    totalItems: json["total_items"],
-    totalItemsTax: json["total_items_tax"],
-    totalFees: json["total_fees"],
-    totalFeesTax: json["total_fees_tax"],
-    totalDiscount: json["total_discount"],
-    totalDiscountTax: json["total_discount_tax"],
-    totalShipping: json["total_shipping"],
-    totalShippingTax: json["total_shipping_tax"],
-    totalPrice: json["total_price"],
-    totalTax: json["total_tax"],
-    taxLines: List<dynamic>.from(json["tax_lines"].map((x) => x)),
-    currencyCode: json["currency_code"],
-    currencySymbol: json["currency_symbol"],
-    currencyMinorUnit: json["currency_minor_unit"],
-    currencyDecimalSeparator: json["currency_decimal_separator"],
-    currencyThousandSeparator: json["currency_thousand_separator"],
-    currencyPrefix: json["currency_prefix"],
-    currencySuffix: json["currency_suffix"],
+    totalItems: json["total_items"]?.toString(),
+    totalItemsTax: json["total_items_tax"]?.toString(),
+    totalFees: json["total_fees"]?.toString(),
+    totalFeesTax: json["total_fees_tax"]?.toString(),
+    totalDiscount: json["total_discount"]?.toString(),
+    totalDiscountTax: json["total_discount_tax"]?.toString(),
+    totalShipping: json["total_shipping"]?.toString(),
+    totalShippingTax: json["total_shipping_tax"]?.toString(),
+    totalPrice: json["total_price"]?.toString(),
+    totalTax: json["total_tax"]?.toString(),
+    taxLines: json["tax_lines"] != null ? List<dynamic>.from(json["tax_lines"].map((x) => x)) : [],
+    currencyCode: json["currency_code"]?.toString(),
+    currencySymbol: json["currency_symbol"]?.toString(),
+    currencyMinorUnit: json["currency_minor_unit"] is int ? json["currency_minor_unit"] : int.tryParse(json["currency_minor_unit"]?.toString() ?? ''),
+    currencyDecimalSeparator: json["currency_decimal_separator"]?.toString(),
+    currencyThousandSeparator: json["currency_thousand_separator"]?.toString(),
+    currencyPrefix: json["currency_prefix"]?.toString(),
+    currencySuffix: json["currency_suffix"]?.toString(),
   );
 
   Map<String, dynamic> toJson() => {

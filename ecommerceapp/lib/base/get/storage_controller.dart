@@ -13,12 +13,13 @@ class StorageController extends GetxController {
   DummyProduct? selectedDummyProduct;
   ProductModel? selectedProductModel;
   RxInt currentQuantity=1.obs;
-  Rx<WooProductVariation?> variationModel = (null).obs;
-  Rx<WooCartItem?> wooCartItem=(null).obs;
+  final variationModel = Rxn<WooProductVariation>();
+  final wooCartItem = Rxn<WooCartItem>();
   RxString selectedCategory = "for_you".obs;
   RxString selectedCategoryName = "".obs;
   RxString selectedColor = "".obs;
   RxString selectedSize = "".obs;
+  RxString selectedPaymentMethod = "online".obs;
 
   // WooCartItem? wooCartItem;
 
@@ -106,8 +107,10 @@ class StorageController extends GetxController {
 
   setSelectedProductModel(ProductModel product) {
     selectedProductModel = product;
-    // Assuming UI does variant selection directly, but wait, variants have color/size.
-    // If you want to default:
+    // Reset selection first
+    selectedColor.value = "";
+    selectedSize.value = "";
+    
     if (product.variants.isNotEmpty) {
        var v = product.variants.first;
        if (v.color != null) selectedColor.value = v.color!;
