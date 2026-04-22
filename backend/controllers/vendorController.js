@@ -178,6 +178,73 @@ export const getVendorById = async (req, res) => {
 };
 
 // ---------------------------------------------------------------------------
+// POST /api/vendor/profile
+// Create a vendor profile for an existing vendor if not present
+// ---------------------------------------------------------------------------
+export const createVendorProfileIfNotExists = async (req, res) => {
+    try {
+        const userId = req.user?.id; // Assumes authentication middleware sets req.user
+        if (!userId) {
+            return res.status(401).json({ success: false, message: "Unauthorized" });
+        }
+
+        // Check if user is a vendor
+        const user = await User.findByPk(userId);
+        if (!user || user.userRole !== "vendor") {
+            return res.status(403).json({ success: false, message: "Only vendors can create a profile" });
+        }
+
+        // Check if profile already exists
+        const existingProfile = await VendorProfile.findOne({ where: { userId } });
+        if (existingProfile) {
+            return res.status(400).json({ success: false, message: "Vendor profile already exists" });
+        }
+
+        // Extract profile fields from request body
+        const {
+            storeName,
+            storeDescription,
+            businessEmail,
+            businessPhone,
+            businessAddress,
+            businessRegistrationNumber,
+            businessRegistrationDocUrl,
+            taxId,
+            bankAccountName,
+            bankAccountNumber,
+            bankName,
+            bankIFSC,
+        } = req.body;
+
+        // Validate required fields
+        if (!storeName) {
+            return res.status(400).json({ success: false, message: "storeName is required" });
+        }
+
+        // Create the vendor profile
+        const vendorProfile = await VendorProfile.create({
+            userId,
+            storeName,
+            storeDescription,
+            businessEmail,
+            businessPhone,
+            businessAddress,
+            businessRegistrationNumber,
+            businessRegistrationDocUrl,
+            taxId,
+            bankAccountName,
+            bankAccountNumber,
+            bankName,
+            bankIFSC,
+        });
+
+        return success(res, vendorProfile, "Vendor profile created successfully");
+    } catch (error) {
+        return serverError(res, "Failed to create vendor profile");
+    }
+};
+
+// ---------------------------------------------------------------------------
 // POST /api/admin/vendors
 // Manually provision a vendor account (bypasses public application)
 // ---------------------------------------------------------------------------

@@ -3,7 +3,8 @@ import User from "../models/userModel.js";
 import Product from "../models/productModel.js";
 import ProductVariant from "../models/variantModel.js";
 import Tag from "../models/tagModel.js";
-import { created, notFound, serverError, success } from "../utils/responseMessages.js";
+import Review from "../models/reviewModel.js"; // Newly added Review Model
+import { created, notFound, serverError, success, badRequest } from "../utils/responseMessages.js"; // Added badRequest
 
 // --- Include helpers ---
 const variantInclude = {
@@ -432,5 +433,158 @@ export const getAllProductsAdmin = async (req, res) => {
     } catch (error) {
         console.error("[getAllProductsAdmin] Error:", error);
         serverError(res, `Database error: ${error.message}`);
+    }
+};
+
+// ==========================================
+// NEW: Rating and Review System Controllers
+// ==========================================
+
+// --- Customer: Add a Review ---
+export const addReview = async (req, res) => {
+    try {
+        const { id: productId } = req.params;
+        const userId = req.user.id;
+        const { headline, comment, rating, media } = req.body;
+
+        if (!rating || rating < 1 || rating > 5) {
+            return badRequest(res, "Rating must be an integer between 1 and 5.");
+        }
+
+        // Check if product exists
+        const product = await Product.findByPk(productId);
+        if (!product) return notFound(res, "Product not found");
+
+        // Create review (Defaults to pending status)
+        const review = await Review.create({
+            productId,
+            userId,
+            headline,
+            comment,
+            rating,
+            media: media || [], // Accepts an array of image/video URLs
+            status: 'pending'   // Requires Admin approval to prevent spam
+        });
+
+        created(res, review, "Review submitted successfully and is pending admin approval.");
+    } catch (error) {
+        console.error("[addReview] Error:", error);
+        serverError(res, "Failed to submit review");
+    }
+};
+
+// --- Admin: Update Review Status & Recalculate Average Rating ---
+export const updateReviewStatus = async (req, res) => {
+    try {
+        const { reviewId } = req.params;
+        const { status } = req.body; // 'approved' or 'rejected'
+
+        if (!['approved', 'rejected'].includes(status)) {
+            return badRequest(res, "Status must be 'approved' or 'rejected'.");
+        }
+
+        const review = await Review.findByPk(reviewId);
+        if (!review) return notFound(res, "Review not found");
+
+        review.status = status;
+        await review.save();
+
+        // If the review is approved, recalculate the product's average rating
+        if (status === 'approved') {
+            const approvedReviews = await Review.findAll({
+                where: { productId: review.productId, status: 'approved' }
+            });
+
+            const totalRating = approvedReviews.reduce((sum, r) => sum + r.rating, 0);
+            const avgRating = approvedReviews.length > 0 ? (totalRating / approvedReviews.length).toFixed(1) : 0;
+
+            // Update the existing rating field in the Product Model
+            await Product.update(
+                { rating: avgRating }, 
+                { where: { id: review.productId } }
+            );
+        }
+
+        success(res, review, `Review ${status} successfully.`);
+    } catch (error) {
+        console.error("[updateReviewStatus] Error:", error);
+        serverError(res, "Failed to update review status");
+    }
+};
+
+// --- Public/Customer: Get Approved Reviews for a Product ---
+export const getProductReviews = async (req, res) => {
+    try {
+        const { id: productId } = req.params;
+
+        const reviews = await Review.findAll({
+            where: { productId, status: 'approved' },
+            order: [['createdAt', 'DESC']],
+            include: [{
+                model: User,
+                as: 'user',
+                attributes: ['name'] 
+            }]
+        });
+
+        success(res, reviews, "Reviews fetched successfully");
+    } catch (error) {
+        console.error("[getProductReviews] Error:", error);
+        serverError(res, "Failed to fetch reviews");
+    }
+};
+
+// --- Admin: Get All Reviews for a Product ---
+export const getProductReviewsAdmin = async (req, res) => {
+    try {
+        const { id: productId } = req.params;
+
+        const reviews = await Review.findAll({
+            where: { productId },
+            order: [['createdAt', 'DESC']],
+            include: [{
+                model: User,
+                as: 'user',
+                attributes: ['name'] 
+            }]
+        });
+
+        success(res, reviews, "Reviews fetched successfully");
+    } catch (error) {
+        console.error("[getProductReviewsAdmin] Error:", error);
+        serverError(res, "Failed to fetch reviews");
+    }
+};
+
+// --- Admin: Approve All Pending Reviews for a Product & Recalculate Average Rating ---
+export const adminApproveAllReviews = async (req, res) => {
+    try {
+        const { id: productId } = req.params;
+
+        // Approve all pending reviews for the product
+        const [updatedCount] = await Review.update(
+            { status: 'approved' },
+            { where: { productId, status: 'pending' } }
+        );
+
+        // Fetch all approved reviews for the product
+        const approvedReviews = await Review.findAll({
+            where: { productId, status: 'approved' }
+        });
+
+        // Recalculate average rating
+        const totalRating = approvedReviews.reduce((sum, r) => sum + r.rating, 0);
+        const avgRating = approvedReviews.length > 0 ? (totalRating / approvedReviews.length).toFixed(1) : 0;
+
+        // Update product's rating
+        await Product.update(
+            { rating: avgRating },
+            { where: { id: productId } }
+        );
+
+        success(res, { approvedCount: updatedCount, avgRating }, "All pending reviews approved and average rating updated.");
+    } catch (error) {
+        console.error("[adminApproveAllReviews] Error:", error);
+        serverError(res, "Failed to approve all reviews");
     }
 };

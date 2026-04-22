@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Plus, Edit, User as UserIcon, X, Check } from "lucide-react";
+import { Plus, Edit, User as UserIcon, X, Check, Search, FilterX } from "lucide-react";
 import { apiFetch } from "../utils/api";
 
 export default function Vendors() {
@@ -8,6 +8,10 @@ export default function Vendors() {
   const [errorMsg, setErrorMsg] = useState(null);
   const [modalType, setModalType] = useState(null); // 'create', 'edit', 'profile', null
   const [selectedVendor, setSelectedVendor] = useState(null);
+
+  // Search & Filter State
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
   
   const defaultFormData = {
     name: "", email: "", phone: "", userStatus: "active",
@@ -92,32 +96,58 @@ export default function Vendors() {
     setModalType("create");
   };
 
-  const openEditModal = (vendor) => {
-    setSelectedVendor(vendor);
+  // --- NEW: Helper to fetch full vendor details before opening modals ---
+  const fetchFullVendorDetails = async (vendorId) => {
+    try {
+      const res = await apiFetch(`${baseUrl}/api/admin/vendors/${vendorId}`);
+      const data = await res.json();
+      if (res.ok) {
+        return data.data || data;
+      }
+      alert(`Error: ${data.message || "Failed to fetch complete vendor details."}`);
+      return null;
+    } catch (err) {
+      console.error(err);
+      alert("Network error while fetching vendor details.");
+      return null;
+    }
+  };
+
+  const openEditModal = async (vendor) => {
+    const vendorId = vendor.id || vendor._id;
+    // Fetch full data so inputs don't default to empty
+    const fullVendor = await fetchFullVendorDetails(vendorId);
+    if (!fullVendor) return;
+
+    setSelectedVendor(fullVendor);
     setFormData({
-      name: vendor.name || "",
-      email: vendor.email || "",
-      phone: vendor.phone || "",
-      userStatus: vendor.userStatus || "active",
-      // Pull existing profile data if available
-      storeName: vendor.vendorProfile?.storeName || "",
-      storeDescription: vendor.vendorProfile?.storeDescription || "",
-      businessEmail: vendor.vendorProfile?.businessEmail || "",
-      businessPhone: vendor.vendorProfile?.businessPhone || "",
-      businessAddress: vendor.vendorProfile?.businessAddress || "",
-      businessRegistrationNumber: vendor.vendorProfile?.businessRegistrationNumber || "",
-      taxId: vendor.vendorProfile?.taxId || "",
-      bankAccountName: vendor.vendorProfile?.bankAccountName || "",
-      bankAccountNumber: vendor.vendorProfile?.bankAccountNumber || "",
-      bankName: vendor.vendorProfile?.bankName || "",
-      bankIFSC: vendor.vendorProfile?.bankIFSC || "",
-      statusReason: vendor.vendorProfile?.statusReason || ""
+      name: fullVendor.name || "",
+      email: fullVendor.email || "",
+      phone: fullVendor.phone || "",
+      userStatus: fullVendor.userStatus || "active",
+      storeName: fullVendor.vendorProfile?.storeName || "",
+      storeDescription: fullVendor.vendorProfile?.storeDescription || "",
+      businessEmail: fullVendor.vendorProfile?.businessEmail || "",
+      businessPhone: fullVendor.vendorProfile?.businessPhone || "",
+      businessAddress: fullVendor.vendorProfile?.businessAddress || "",
+      businessRegistrationNumber: fullVendor.vendorProfile?.businessRegistrationNumber || "",
+      taxId: fullVendor.vendorProfile?.taxId || "",
+      bankAccountName: fullVendor.vendorProfile?.bankAccountName || "",
+      bankAccountNumber: fullVendor.vendorProfile?.bankAccountNumber || "",
+      bankName: fullVendor.vendorProfile?.bankName || "",
+      bankIFSC: fullVendor.vendorProfile?.bankIFSC || "",
+      statusReason: fullVendor.vendorProfile?.statusReason || ""
     });
     setModalType("edit");
   };
 
-  const openProfileModal = (vendor) => {
-    setSelectedVendor(vendor);
+  const openProfileModal = async (vendor) => {
+    const vendorId = vendor.id || vendor._id;
+    // Fetch full data to populate all the 'N/A' spaces
+    const fullVendor = await fetchFullVendorDetails(vendorId);
+    if (!fullVendor) return;
+
+    setSelectedVendor(fullVendor);
     setModalType("profile");
   };
 
@@ -129,7 +159,6 @@ export default function Vendors() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     const isEditing = modalType === "edit";
-    // Pointing to the distinct endpoints defined in your updated routes
     const url = isEditing 
         ? `${baseUrl}/api/admin/vendors/${selectedVendor.id || selectedVendor._id}/details`
         : `${baseUrl}/api/admin/vendors`;
@@ -163,8 +192,27 @@ export default function Vendors() {
     }
   };
 
+  const clearFilters = () => {
+    setSearchTerm("");
+    setStatusFilter("");
+  };
+
+  // Dynamic Frontend Filtering
+  const filteredVendors = vendors.filter(vendor => {
+    const term = searchTerm.toLowerCase();
+    const matchesSearch = 
+      (vendor.name && vendor.name.toLowerCase().includes(term)) ||
+      (vendor.email && vendor.email.toLowerCase().includes(term)) ||
+      (vendor.vendorProfile?.storeName && vendor.vendorProfile.storeName.toLowerCase().includes(term));
+    
+    const matchesStatus = statusFilter === "" || (vendor.userStatus && vendor.userStatus.toLowerCase() === statusFilter.toLowerCase());
+
+    return matchesSearch && matchesStatus;
+  });
+
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto w-full">
+      {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-slate-800 dark:text-gray-100">Vendors</h1>
         <button
@@ -182,12 +230,57 @@ export default function Vendors() {
          </div>
       )}
 
+      {/* Filter & Search Bar */}
+      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-slate-100 dark:border-gray-800 p-4 mb-6 flex flex-wrap items-end gap-4">
+        <div className="flex-1 min-w-[200px]">
+          <label className="block text-xs font-semibold text-slate-500 dark:text-gray-400 mb-1 uppercase tracking-wider">Search Vendors</label>
+          <div className="relative">
+            <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Search size={16} className="text-slate-400" />
+            </span>
+            <input 
+              type="text" 
+              value={searchTerm} 
+              onChange={(e) => setSearchTerm(e.target.value)} 
+              className="w-full pl-10 pr-3 py-2 border border-slate-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 dark:bg-gray-800 dark:text-white text-sm" 
+              placeholder="Search by store, name, or email..." 
+            />
+          </div>
+        </div>
+
+        <div className="w-full md:w-48">
+          <label className="block text-xs font-semibold text-slate-500 dark:text-gray-400 mb-1 uppercase tracking-wider">Account Status</label>
+          <select 
+            value={statusFilter} 
+            onChange={(e) => setStatusFilter(e.target.value)} 
+            className="w-full px-3 py-2 border border-slate-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 dark:bg-gray-800 dark:text-white text-sm"
+          >
+            <option value="">All Statuses</option>
+            <option value="active">Active</option>
+            <option value="pending">Pending</option>
+            <option value="suspended">Suspended</option>
+            <option value="deleted">Deleted</option>
+          </select>
+        </div>
+
+        <div className="flex gap-2 w-full md:w-auto">
+          <button 
+            onClick={clearFilters} 
+            className="px-3 py-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-gray-800 rounded-lg transition"
+            title="Clear Filters"
+          >
+            <FilterX size={18} />
+          </button>
+        </div>
+      </div>
+
+      {/* Vendors Table */}
       <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-slate-100 dark:border-gray-800 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50 dark:bg-gray-800 border-b border-slate-200 dark:border-gray-700">
-                <th className="p-4 text-sm font-semibold text-slate-600 dark:text-gray-300">Name</th>
+                <th className="p-4 text-sm font-semibold text-slate-600 dark:text-gray-300">Name / Store</th>
                 <th className="p-4 text-sm font-semibold text-slate-600 dark:text-gray-300">Email</th>
                 <th className="p-4 text-sm font-semibold text-slate-600 dark:text-gray-300">Phone</th>
                 <th className="p-4 text-sm font-semibold text-slate-600 dark:text-gray-300">Status</th>
@@ -199,14 +292,17 @@ export default function Vendors() {
                 <tr>
                   <td colSpan="5" className="p-8 text-center text-slate-500">Loading vendors...</td>
                 </tr>
-              ) : vendors.length === 0 ? (
+              ) : filteredVendors.length === 0 ? (
                 <tr>
-                  <td colSpan="5" className="p-8 text-center text-slate-500">No vendors found.</td>
+                  <td colSpan="5" className="p-8 text-center text-slate-500">No vendors found matching your criteria.</td>
                 </tr>
               ) : (
-                vendors.map((vendor, idx) => (
+                filteredVendors.map((vendor, idx) => (
                   <tr key={idx} className="border-b border-slate-100 dark:border-gray-800 hover:bg-slate-50 dark:hover:bg-gray-800/50 transition">
-                    <td className="p-4 text-slate-800 dark:text-gray-200 font-medium">{vendor.vendorProfile?.storeName || vendor.name}</td>
+                    <td className="p-4 text-slate-800 dark:text-gray-200 font-medium">
+                      <span className="block">{vendor.vendorProfile?.storeName || vendor.name}</span>
+                      {vendor.vendorProfile?.storeName && <span className="block text-xs font-normal text-slate-500">{vendor.name}</span>}
+                    </td>
                     <td className="p-4 text-slate-600 dark:text-gray-400">{vendor.email}</td>
                     <td className="p-4 text-slate-600 dark:text-gray-400">{vendor.phone}</td>
                     <td className="p-4">
@@ -219,10 +315,10 @@ export default function Vendors() {
                             'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
                           }`}
                         >
-                          <option value="approved" className="bg-white text-slate-800 dark:bg-gray-800 dark:text-gray-100">Approved</option>
+                          <option value="active" className="bg-white text-slate-800 dark:bg-gray-800 dark:text-gray-100">Active</option>
                           <option value="pending" className="bg-white text-slate-800 dark:bg-gray-800 dark:text-gray-100">Pending</option>
                           <option value="suspended" className="bg-white text-slate-800 dark:bg-gray-800 dark:text-gray-100">Suspended</option>
-                          <option value="rejected" className="bg-white text-slate-800 dark:bg-gray-800 dark:text-gray-100">Rejected</option>
+                          <option value="deleted" className="bg-white text-slate-800 dark:bg-gray-800 dark:text-gray-100">Deleted</option>
                       </select>
                     </td>
                     <td className="p-4 flex items-center justify-center gap-3">

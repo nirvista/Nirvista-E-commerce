@@ -11,7 +11,7 @@
 import express from "express";
 import verifyToken     from "../middlewares/authMiddleware.js";
 import authorizeRoles  from "../middlewares/roleMiddleware.js";
-
+import { createVendorProfileIfNotExists } from "../controllers/vendorController.js";
 // Product & Catalog
 import {
     getVendorProducts,
@@ -46,6 +46,8 @@ const router = express.Router();
 
 // ── Apply auth to all vendor routes ──────────────────────────────────────────
 router.use(verifyToken, authorizeRoles("vendor"));
+
+router.post("/profile", createVendorProfileIfNotExists);
 
 // ── Product & Catalog ─────────────────────────────────────────────────────────
 router.get( "/products",                       getVendorProducts);

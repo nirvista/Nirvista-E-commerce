@@ -302,7 +302,7 @@ export const downloadInvoice = async (req, res) => {
         });
 
         doc.moveDown();
-        doc.fontSize(16).text(`Total: $${order.totalAmount}`, { align: 'right' });
+        doc.fontSize(16).text(`Total: ₹${order.totalAmount}`, { align: 'right' });
 
         doc.end();
     } catch (error) {

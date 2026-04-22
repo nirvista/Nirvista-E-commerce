@@ -18,7 +18,7 @@ export const getWishlist = async (req, res) => {
                 as: 'items',
                 include: [
                     { model: Product, as: 'product', attributes: ['id', 'title'] },
-                    { model: ProductVariant, as: 'variant', attributes: ['id', 'variantName', 'price', 'images', 'status'] }
+                    { model: ProductVariant, as: 'variant', attributes: ['id', 'variantName', 'price', 'discountPrice', 'images', 'status'] }
                 ]
             }]
         });
