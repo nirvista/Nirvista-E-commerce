@@ -13,7 +13,11 @@ class OrderApiService {
     if (url == null) {
       throw Exception("BASE_URL not found in .env file");
     }
-    return url;
+    final withoutTrailingSlash = rawUrl.replaceAll(RegExp(r'/+$'), '');
+    if (withoutTrailingSlash.endsWith('/api')) {
+      return withoutTrailingSlash.substring(0, withoutTrailingSlash.length - 4);
+    }
+    return withoutTrailingSlash;
   }
 
   static Future<Map<String, dynamic>> createOrder({
@@ -58,7 +62,8 @@ class OrderApiService {
     }
   }
 
-  static Future<Map<String, dynamic>> getUserOrders(String accessToken, {String? status}) async {
+  static Future<Map<String, dynamic>> getUserOrders(String accessToken,
+      {String? status}) async {
     try {
       String url = '$baseUrl/api/orders';
       if (status != null && status.isNotEmpty) {
@@ -92,7 +97,8 @@ class OrderApiService {
     }
   }
 
-  static Future<Map<String, dynamic>> getOrderById(String accessToken, String orderId) async {
+  static Future<Map<String, dynamic>> getOrderById(
+      String accessToken, String orderId) async {
     try {
       final response = await http.get(
         Uri.parse('$baseUrl/api/orders/$orderId'),
@@ -122,7 +128,8 @@ class OrderApiService {
     }
   }
 
-  static Future<Map<String, dynamic>> cancelOrder(String accessToken, String orderId) async {
+  static Future<Map<String, dynamic>> cancelOrder(
+      String accessToken, String orderId) async {
     try {
       final response = await http.put(
         Uri.parse('$baseUrl/api/orders/$orderId/cancel'),
@@ -152,7 +159,8 @@ class OrderApiService {
     }
   }
 
-  static Future<Map<String, dynamic>> getOrderStatus(String accessToken, String orderId) async {
+  static Future<Map<String, dynamic>> getOrderStatus(
+      String accessToken, String orderId) async {
     try {
       final response = await http.get(
         Uri.parse('$baseUrl/api/orders/$orderId/status'),
@@ -182,7 +190,8 @@ class OrderApiService {
     }
   }
 
-  static Future<Map<String, dynamic>> initiateReturn(String accessToken, String orderId) async {
+  static Future<Map<String, dynamic>> initiateReturn(
+      String accessToken, String orderId) async {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/api/orders/$orderId/return'),

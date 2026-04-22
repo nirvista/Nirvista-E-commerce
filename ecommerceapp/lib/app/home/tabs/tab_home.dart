@@ -2,7 +2,7 @@ import 'package:carousel_slider/carousel_slider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
-import 'package:pet_shop/app/home/tabs/tab_search.dart'; 
+import 'package:pet_shop/app/home/tabs/tab_search.dart';
 import 'package:pet_shop/base/color_data.dart';
 import 'package:pet_shop/base/constant.dart';
 import 'package:pet_shop/base/fetch_pixels.dart';
@@ -239,7 +239,7 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
             child: SingleChildScrollView(
               child: Column(
                 children: [
-                   // Category Tabs
+                  // Category Tabs
                   _buildCategoryTabs(context, margin),
                   SizedBox(height: 20.h),
                   // Banner Carousel
@@ -418,7 +418,8 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildSingleCategoryTab(BuildContext context, String catId, String catName) {
+  Widget _buildSingleCategoryTab(
+      BuildContext context, String catId, String catName) {
     bool isSelected = selectedCategory.value == catId;
     return GestureDetector(
       onTap: () {
@@ -662,53 +663,66 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
           ),
           SizedBox(height: 16.h),
           SizedBox(
-            height: 40.h,
-            child: FutureBuilder<List<BrandModel>>(
-              future: brandsFuture,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return SizedBox();
-                }
-                if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
-                  return SizedBox();
-                }
-                var apiBrands = snapshot.data!;
-                var brands = [
-                  BrandModel(id: 'all', name: 'All', logoUrl: ''),
-                  ...apiBrands
-                ];
-                return ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  padding: EdgeInsets.symmetric(horizontal: margin),
-                  itemCount: brands.length,
-                  itemBuilder: (context, index) {
-                    return Obx(() {
-                      bool isSelected = selectedBrand.value == brands[index].id;
-                      return InkWell(
-                        onTap: () {
-                          selectedBrand.value = brands[index].id;
-                        },
-                        child: Container(
-                          margin: EdgeInsets.only(right: 10.w),
-                          padding: EdgeInsets.symmetric(horizontal: 16.w),
-                          decoration: BoxDecoration(
-                            color: isSelected ? accentColor : getGreyCardColor(context),
-                            borderRadius: BorderRadius.circular(20.w),
-                            border: Border.all(color: isSelected ? accentColor : dividerColor, width: isSelected ? 1 : 0.5),
-                          ),
-                          child: Center(
-                            child: getCustomFont(brands[index].name, 13, isSelected ? Colors.white : getFontColor(context),
-                                1,
-                                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600),
-                          ),
-                        ),
-                      );
-                    });
-                  },
-                );
-              }
-            )
-          ),
+              height: 40.h,
+              child: FutureBuilder<List<BrandModel>>(
+                  future: brandsFuture,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return SizedBox();
+                    }
+                    if (snapshot.hasError ||
+                        !snapshot.hasData ||
+                        snapshot.data!.isEmpty) {
+                      return SizedBox();
+                    }
+                    var apiBrands = snapshot.data!;
+                    var brands = [
+                      BrandModel(id: 'all', name: 'All', logoUrl: ''),
+                      ...apiBrands
+                    ];
+                    return ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      padding: EdgeInsets.symmetric(horizontal: margin),
+                      itemCount: brands.length,
+                      itemBuilder: (context, index) {
+                        return Obx(() {
+                          bool isSelected =
+                              selectedBrand.value == brands[index].id;
+                          return InkWell(
+                            onTap: () {
+                              selectedBrand.value = brands[index].id;
+                            },
+                            child: Container(
+                              margin: EdgeInsets.only(right: 10.w),
+                              padding: EdgeInsets.symmetric(horizontal: 16.w),
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? accentColor
+                                    : getGreyCardColor(context),
+                                borderRadius: BorderRadius.circular(20.w),
+                                border: Border.all(
+                                    color:
+                                        isSelected ? accentColor : dividerColor,
+                                    width: isSelected ? 1 : 0.5),
+                              ),
+                              child: Center(
+                                child: getCustomFont(
+                                    brands[index].name,
+                                    13,
+                                    isSelected
+                                        ? Colors.white
+                                        : getFontColor(context),
+                                    1,
+                                    fontWeight: isSelected
+                                        ? FontWeight.w700
+                                        : FontWeight.w600),
+                              ),
+                            ),
+                          );
+                        });
+                      },
+                    );
+                  })),
           SizedBox(height: 16.h),
           // Products for Selected Brand
           Obx(() {

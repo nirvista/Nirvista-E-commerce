@@ -76,4 +76,35 @@ class BrandApiService {
       return {'success': false, 'message': 'Error: $e'};
     }
   }
+
+  // Create a new brand
+  static Future<Map<String, dynamic>> createBrand(
+    String accessToken,
+    Map<String, dynamic> payload,
+  ) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/brands'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $accessToken',
+        },
+        body: jsonEncode(payload),
+      );
+      if (response.statusCode == 201) {
+        final decodedResponse = jsonDecode(response.body);
+        return {
+          'success': true,
+          'data': decodedResponse['data'],
+          'message': decodedResponse['message'],
+        };
+      }
+      return {
+        'success': false,
+        'message': jsonDecode(response.body)['message'] ?? 'Failed to create brand',
+      };
+    } catch (e) {
+      return {'success': false, 'message': 'Error: $e'};
+    }
+  }
 }
