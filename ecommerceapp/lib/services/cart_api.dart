@@ -129,6 +129,40 @@ class CartApiService {
     }
   }
 
+  static Future<Map<String, dynamic>> updateCartItemQuantity({
+    required String accessToken,
+    required String userId,
+    required String productId,
+    required String variantId,
+    required int quantity,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/cart/update'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $accessToken'
+        },
+        body: jsonEncode({
+          'userId': userId,
+          'productId': productId,
+          'variantId': variantId,
+          'quantity': quantity,
+        }),
+      );
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return {'success': true, 'message': jsonDecode(response.body)['message']};
+      } else {
+        return {
+          'success': false,
+          'message': 'Failed to update quantity',
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
   static Future<Map<String, dynamic>> deleteCart(String accessToken, String userId) async {
     try {
       final response = await http.delete(

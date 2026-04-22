@@ -139,53 +139,65 @@ class _RegistrationScreen extends State<RegistrationScreen> {
               );
             }, showPass),
             20.h.verticalSpace,
-             SizedBox(height: 20,),
-                       getCustomFont("Select User Type", 16, getFontColor(context), 1,
-                fontWeight: FontWeight.w400),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [                       
-                            Radio<String>(
-                              value: "customer",
-                              groupValue: userType,
-                              onChanged: (String? value) {
-                                setState(() {
-                                  userType = value!;
-                                });
-                              },
-                            ),
-                            getCustomFont("Customer", 14, getFontColor(context), 1,
-        fontWeight: FontWeight.w400),
-                        
-                            Radio<String>(
-                              value: "vendor",
-                              groupValue: userType,
-                              onChanged: (String? value) {
-                                setState(() {
-                                  userType = value!;
-                                });
-                              },
-                            ),
-                            getCustomFont("Vendor", 14, getFontColor(context), 1,
-                                fontWeight: FontWeight.w400),
-
-                            
-                          ],
-                        ),
-                         SizedBox(height: 10,),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Checkbox(value: isChecked, onChanged: (value){
-                              setState(() {
-                                isChecked = value!;
-                              });
-                            }),
-                            getCustomFont("I Accept the Terms & Privacy Policy", 14, getFontColor(context), 1,
-                                fontWeight: FontWeight.w400,textAlign: TextAlign.center),
-                            // Flexible(child:Text("I Accept the Terms & Privacy Policy",textAlign: TextAlign.center,))         
-                          ],
-                        ),
+            20.h.verticalSpace,
+            Center(
+              child: getCustomFont("Select User Type", 16, getFontColor(context), 1,
+                  fontWeight: FontWeight.w500),
+            ),
+            8.h.verticalSpace,
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Radio<String>(
+                  value: "customer",
+                  groupValue: userType,
+                  activeColor: getAccentColor(context),
+                  onChanged: (String? value) {
+                    setState(() {
+                      userType = value!;
+                    });
+                  },
+                ),
+                getCustomFont("Customer", 14, getFontColor(context), 1,
+                    fontWeight: FontWeight.w400),
+                20.w.horizontalSpace,
+                Radio<String>(
+                  value: "vendor",
+                  groupValue: userType,
+                  activeColor: getAccentColor(context),
+                  onChanged: (String? value) {
+                    setState(() {
+                      userType = value!;
+                    });
+                  },
+                ),
+                getCustomFont("Vendor", 14, getFontColor(context), 1,
+                    fontWeight: FontWeight.w400),
+              ],
+            ),
+            10.h.verticalSpace,
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                SizedBox(
+                  width: 24.w,
+                  height: 24.h,
+                  child: Checkbox(
+                    value: isChecked,
+                    activeColor: getAccentColor(context),
+                    onChanged: (value) {
+                      setState(() {
+                        isChecked = value!;
+                      });
+                    },
+                  ),
+                ),
+                12.w.horizontalSpace,
+                getCustomFont("I Accept the Terms & Privacy Policy", 14,
+                    getFontColor(context), 1,
+                    fontWeight: FontWeight.w400),
+              ],
+            ),
             SizedBox(height: 40),
             ObxValue((loading) {
               return getButtonFigma(

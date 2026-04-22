@@ -2,11 +2,14 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:get/get.dart';
+import 'package:pet_shop/base/get/login_data_controller.dart';
 import 'package:pet_shop/base/get/route_key.dart';
 import 'package:pet_shop/base/get/storage.dart';
 import '../../base/color_data.dart';
 import '../../base/constant.dart';
 import '../../base/widget_utils.dart';
+import '../../generated/assets.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({Key? key}) : super(key: key);
@@ -24,9 +27,28 @@ class _SplashScreen extends State<SplashScreen> {
 
     Future.delayed(const Duration(seconds: 3),
           () {
-            (isIntroAvailable)
-                ? Constant.sendToNext(context, introRoute)
-                : Constant.sendToNext(context, homeScreenRoute);
+            final loginController = Get.find<LoginDataController>();
+            final user = loginController.currentUser.value;
+
+            // If user is not logged in, always go to login first
+            if (user == null || user.id == null || user.id!.isEmpty) {
+              Constant.sendToNext(context, loginRoute);
+              return;
+            }
+
+            /* 
+            // Commenting out intro redirection as requested
+            if (isIntroAvailable) {
+              Constant.sendToNext(context, introRoute);
+            } else {
+            */
+              
+              String nextRoute = user.userRole?.toLowerCase() == 'vendor' 
+                  ? vendorDashboardRoute 
+                  : homeScreenRoute;
+              
+              Constant.sendToNext(context, nextRoute);
+            /* } */
       },
     );
   }
@@ -48,13 +70,31 @@ class _SplashScreen extends State<SplashScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                getSvgImageWithSize(context, "Logo.svg", 102.h, 148.h,
-                    fit: BoxFit.fill),
-                26.h.verticalSpace,
-                getCustomFont("PET SHOP", 28, Colors.white, 1,
-                    fontWeight: FontWeight.w700,
-                    fontFamily: Constant.fontsFamily,
-                    textAlign: TextAlign.center)
+                // Display Branding Icon
+                Container(
+                  width: 100.h,
+                  height: 100.h,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(25),
+                  ),
+                  child: Icon(
+                    Icons.shopping_bag_rounded,
+                    color: Colors.white,
+                    size: 54.h,
+                  ),
+                ),
+                20.h.verticalSpace,
+                // Display Branding Text
+                Text(
+                  "NIRVISTA",
+                  style: TextStyle(
+                    fontSize: 44.sp,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                    letterSpacing: 2.5,
+                  ),
+                ),
               ],
             ),
           ),

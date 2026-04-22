@@ -118,39 +118,42 @@ class _LoginScreen extends State<LoginScreen> {
                 ),
               ],
             ),
-            SizedBox(height: 20,),
-                       getCustomFont("Select User Type", 16, getFontColor(context), 1,
-                fontWeight: FontWeight.w400),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [                       
-                            Radio<String>(
-                              value: "customer",
-                              groupValue: userType,
-                              onChanged: (String? value) {
-                                setState(() {
-                                  userType = value!;
-                                });
-                              },
-                            ),
-                            getCustomFont("Customer", 14, getFontColor(context), 1,
-        fontWeight: FontWeight.w400),
-                        
-                            Radio<String>(
-                              value: "vendor",
-                              groupValue: userType,
-                              onChanged: (String? value) {
-                                setState(() {
-                                  userType = value!;
-                                });
-                              },
-                            ),
-                            getCustomFont("Vendor", 14, getFontColor(context), 1,
-                                fontWeight: FontWeight.w400),
-
-                            
-                          ],
-                        ),
+            20.h.verticalSpace,
+            Center(
+              child: getCustomFont("Select User Type", 16, getFontColor(context), 1,
+                  fontWeight: FontWeight.w500),
+            ),
+            8.h.verticalSpace,
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Radio<String>(
+                  value: "customer",
+                  groupValue: userType,
+                  activeColor: getAccentColor(context),
+                  onChanged: (String? value) {
+                    setState(() {
+                      userType = value!;
+                    });
+                  },
+                ),
+                getCustomFont("Customer", 14, getFontColor(context), 1,
+                    fontWeight: FontWeight.w400),
+                20.w.horizontalSpace,
+                Radio<String>(
+                  value: "vendor",
+                  groupValue: userType,
+                  activeColor: getAccentColor(context),
+                  onChanged: (String? value) {
+                    setState(() {
+                      userType = value!;
+                    });
+                  },
+                ),
+                getCustomFont("Vendor", 14, getFontColor(context), 1,
+                    fontWeight: FontWeight.w400),
+              ],
+            ),
             ObxValue((loading) {
               return getButtonFigma(
                 context,
@@ -224,7 +227,10 @@ class _LoginScreen extends State<LoginScreen> {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(content: Text("Login successful!"))
                       );
-                      Constant.sendToNext(context, homeScreenRoute);
+                      String nextRoute = LoggedInUser.userRole?.toLowerCase() == 'vendor' 
+                          ? vendorDashboardRoute 
+                          : homeScreenRoute;
+                      Constant.sendToNext(context, nextRoute);
                     } else {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
@@ -271,7 +277,7 @@ class _LoginScreen extends State<LoginScreen> {
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 getCustomFont(
-                  "Already have an account?",
+                  "Don't have an account?",
                   16,
                   getFontBlackColor(context),
                   1,

@@ -39,13 +39,17 @@ class OrderApiService {
           ...decoded,
         };
       } else {
+        String msg = 'Failed to create order';
+        try {
+          msg = jsonDecode(response.body)['message'] ?? msg;
+        } catch (_) {}
         return {
           'success': false,
-          'message': jsonDecode(response.body)['message'] ?? 'Failed to create order',
+          'message': msg,
         };
       }
     } catch (e) {
-      return {'success': false, 'message': e.toString()};
+      return {'success': false, 'message': "Connection error: ${e.toString()}"};
     }
   }
 
@@ -59,6 +63,7 @@ class OrderApiService {
         Uri.parse(url),
         headers: {
           'Authorization': 'Bearer $accessToken',
+          'Content-Type': 'application/json',
         },
       );
       if (response.statusCode == 200 || response.statusCode == 201) {
@@ -67,13 +72,17 @@ class OrderApiService {
           'data': jsonDecode(response.body)['data'],
         };
       } else {
+        String msg = 'Failed to fetch orders';
+        try {
+          msg = jsonDecode(response.body)['message'] ?? msg;
+        } catch (_) {}
         return {
           'success': false,
-          'message': jsonDecode(response.body)['message'] ?? 'Failed to fetch orders',
+          'message': msg,
         };
       }
     } catch (e) {
-      return {'success': false, 'message': e.toString()};
+      return {'success': false, 'message': "Connection error: ${e.toString()}"};
     }
   }
 
@@ -83,6 +92,7 @@ class OrderApiService {
         Uri.parse('$baseUrl/api/orders/$orderId'),
         headers: {
           'Authorization': 'Bearer $accessToken',
+          'Content-Type': 'application/json',
         },
       );
       if (response.statusCode == 200 || response.statusCode == 201) {
@@ -91,13 +101,17 @@ class OrderApiService {
           'data': jsonDecode(response.body)['data'],
         };
       } else {
+        String msg = 'Failed to fetch order';
+        try {
+          msg = jsonDecode(response.body)['message'] ?? msg;
+        } catch (_) {}
         return {
           'success': false,
-          'message': jsonDecode(response.body)['message'] ?? 'Failed to fetch order',
+          'message': msg,
         };
       }
     } catch (e) {
-      return {'success': false, 'message': e.toString()};
+      return {'success': false, 'message': "Connection error: ${e.toString()}"};
     }
   }
 
@@ -116,13 +130,17 @@ class OrderApiService {
           'message': jsonDecode(response.body)['message'] ?? 'Order cancelled',
         };
       } else {
+        String msg = 'Failed to cancel order';
+        try {
+          msg = jsonDecode(response.body)['message'] ?? msg;
+        } catch (_) {}
         return {
           'success': false,
-          'message': jsonDecode(response.body)['message'] ?? 'Failed to cancel order',
+          'message': msg,
         };
       }
     } catch (e) {
-      return {'success': false, 'message': e.toString()};
+      return {'success': false, 'message': "Connection error: ${e.toString()}"};
     }
   }
 
@@ -140,13 +158,17 @@ class OrderApiService {
           'data': jsonDecode(response.body)['data'],
         };
       } else {
+        String msg = 'Failed to get order status';
+        try {
+          msg = jsonDecode(response.body)['message'] ?? msg;
+        } catch (_) {}
         return {
           'success': false,
-          'message': jsonDecode(response.body)['message'] ?? 'Failed to get order status',
+          'message': msg,
         };
       }
     } catch (e) {
-      return {'success': false, 'message': e.toString()};
+      return {'success': false, 'message': "Connection error: ${e.toString()}"};
     }
   }
 
@@ -165,13 +187,17 @@ class OrderApiService {
           'message': jsonDecode(response.body)['message'] ?? 'Return initiated',
         };
       } else {
+        String msg = 'Failed to initiate return';
+        try {
+          msg = jsonDecode(response.body)['message'] ?? msg;
+        } catch (_) {}
         return {
           'success': false,
-          'message': jsonDecode(response.body)['message'] ?? 'Failed to initiate return',
+          'message': msg,
         };
       }
     } catch (e) {
-      return {'success': false, 'message': e.toString()};
+      return {'success': false, 'message': "Connection error: ${e.toString()}"};
     }
   }
 

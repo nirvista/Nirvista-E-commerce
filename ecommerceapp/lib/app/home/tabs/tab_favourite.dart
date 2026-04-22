@@ -70,25 +70,34 @@ class TabFavourite extends StatelessWidget {
     List<WishlistItem> items,
   ) {
     return Container(
-      color: getCardColor(context),
-      padding: EdgeInsets.symmetric(horizontal: margin, vertical: 14.h),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF14B8A6), Color(0xFF0D9488), Color(0xFF0F766E)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      padding: EdgeInsets.symmetric(horizontal: margin, vertical: 16.h),
       child: Row(
         children: [
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                getCustomFont("My Wishlist", 20, getFontColor(context), 1,
-                    fontWeight: FontWeight.w800),
+                Text("My Wishlist",
+                    style: TextStyle(
+                        fontSize: 20.sp,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white)),
                 if (items.isNotEmpty)
                   Padding(
-                    padding: EdgeInsets.only(top: 4.h),
-                    child: getCustomFont(
-                      "${items.length} item${items.length > 1 ? 's' : ''}",
-                      12,
-                      getFontGreyColor(context),
-                      1,
-                      fontWeight: FontWeight.w500,
+                    padding: EdgeInsets.only(top: 3.h),
+                    child: Text(
+                      "${items.length} item${items.length > 1 ? 's' : ''} saved",
+                      style: TextStyle(
+                          fontSize: 12.sp,
+                          color: Colors.white70,
+                          fontWeight: FontWeight.w500),
                     ),
                   ),
               ],
@@ -98,21 +107,21 @@ class TabFavourite extends StatelessWidget {
             GestureDetector(
               onTap: () => _confirmClearWishlist(context, ctrl),
               child: Container(
-                padding:
-                    EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+                padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 7.h),
                 decoration: BoxDecoration(
-                  border:
-                      Border.all(color: Colors.redAccent.withOpacity(0.5)),
+                  border: Border.all(color: Colors.white.withOpacity(0.6)),
                   borderRadius: BorderRadius.circular(20.w),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.delete_outline,
-                        color: Colors.redAccent, size: 16.w),
+                    Icon(Icons.delete_outline, color: Colors.white, size: 15.w),
                     SizedBox(width: 4.w),
-                    getCustomFont("Clear All", 11, Colors.redAccent, 1,
-                        fontWeight: FontWeight.w600),
+                    Text("Clear All",
+                        style: TextStyle(
+                            fontSize: 11.sp,
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600)),
                   ],
                 ),
               ),
@@ -197,6 +206,9 @@ class TabFavourite extends StatelessWidget {
         decoration: BoxDecoration(
           color: getCardColor(context),
           borderRadius: BorderRadius.circular(16.w),
+          border: Border(
+            left: BorderSide(color: accentColor, width: 4.w),
+          ),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.04),
@@ -261,12 +273,33 @@ class TabFavourite extends StatelessWidget {
                               fontWeight: FontWeight.w500),
                         ),
                         SizedBox(height: 8.h),
-                        getCustomFont(
-                          "₹${item.variant.price.toStringAsFixed(0)}",
-                          18,
-                          accentColor,
-                          1,
-                          fontWeight: FontWeight.w800,
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.baseline,
+                          textBaseline: TextBaseline.alphabetic,
+                          children: [
+                            getCustomFont(
+                              "₹${(item.variant.discountPrice ?? item.variant.price).toStringAsFixed(0)}",
+                              18,
+                              accentColor,
+                              1,
+                              fontWeight: FontWeight.w800,
+                            ),
+                            if (item.variant.discountPrice != null && item.variant.discountPrice! < item.variant.price) ...[
+                              SizedBox(width: 8.w),
+                              Text(
+                                "₹${item.variant.price.toStringAsFixed(0)}",
+                                style: TextStyle(
+                                  fontSize: 14.sp,
+                                  color: const Color(0xFF4B5563),
+                                  decoration: TextDecoration.lineThrough,
+                                  decorationColor: const Color(0xFF4B5563),
+                                  decorationThickness: 1.2,
+                                  height: 1.4,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                         SizedBox(height: 6.h),
                         Row(
@@ -341,7 +374,7 @@ class TabFavourite extends StatelessWidget {
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.favorite_border,
+                            Icon(Icons.delete_outline,
                                 color: Colors.redAccent, size: 16.w),
                             SizedBox(width: 6.w),
                             getCustomFont(

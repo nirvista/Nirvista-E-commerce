@@ -104,6 +104,23 @@ class CartController extends GetxController {
     }
   }
 
+  Future<void> removeItem(String productId, String variantId) async {
+    final loginController = Get.find<LoginDataController>();
+    final user = loginController.currentUser.value;
+    if (user == null || user.id == null) return;
+
+    final res = await CartApiService.updateCartItemQuantity(
+      accessToken: loginController.accessToken ?? '',
+      userId: user.id!,
+      productId: productId,
+      variantId: variantId,
+      quantity: 0,
+    );
+    if (res['success']) {
+      await fetchCart();
+    }
+  }
+
   Future<void> clearCartAction() async {
     final loginController = Get.find<LoginDataController>();
     final user = loginController.currentUser.value;
@@ -132,6 +149,29 @@ class CartController extends GetxController {
     // Add logic for tax, shipping, promo if needed
     // Simplified:
     return cartSubTotal - promoPrice.value;
+  }
+
+  double get originalSubTotal {
+    if (cartModel.value == null) return 0.0;
+    double total = 0.0;
+    for (var item in cartModel.value!.items) {
+      total += ((item.variant?.price ?? 0.0) * item.quantity);
+    }
+    return total;
+  }
+
+  double get itemSavings {
+    if (cartModel.value == null) return 0.0;
+    double savings = 0.0;
+    for (var item in cartModel.value!.items) {
+      if (item.variant != null && 
+          item.variant!.discountPrice != null && 
+          item.variant!.discountPrice! > 0 && 
+          item.variant!.price > item.variant!.discountPrice!) {
+        savings += (item.variant!.price - item.variant!.discountPrice!) * item.quantity;
+      }
+    }
+    return savings;
   }
 
   int get cartCount {

@@ -24,6 +24,7 @@ import '../services/address_api.dart';
 import '../app/model/api_models.dart';
 import 'get/order_controller.dart';
 import 'get/cart_contr/shipping_add_controller.dart';
+import '../generated/assets.dart';
 
 void showCustomToast(String texts) {
   Fluttertoast.showToast(
@@ -73,6 +74,8 @@ Widget getCustomFont(String text, double fontSize, Color fontColor, int maxLine,
     TextDecoration decoration = TextDecoration.none,
     FontWeight fontWeight = FontWeight.normal,
     TextAlign textAlign = TextAlign.start,
+    Color? decorationColor,
+    double? decorationThickness,
     txtHeight,
     bool horFactor = false}) {
   return Text(
@@ -80,6 +83,8 @@ Widget getCustomFont(String text, double fontSize, Color fontColor, int maxLine,
     overflow: overflow,
     style: TextStyle(
         decoration: decoration,
+        decorationColor: decorationColor,
+        decorationThickness: decorationThickness,
         fontSize: fontSize.sp,
         fontStyle: FontStyle.normal,
         color: fontColor,
@@ -258,11 +263,12 @@ Widget getButtonContainer(
     },
     child: Container(
       width: size.h,
-      decoration:
-          BoxDecoration(color: "#FFF3F3".toColor(), shape: BoxShape.circle),
+      decoration: const BoxDecoration(
+          color: Color(0xFFCCFBF1), // _kTealLight
+          shape: BoxShape.circle),
       height: size.h,
       child: Center(
-        child: Icon(iconData, size: iconSize.h, color: getAccentColor(context)),
+        child: Icon(iconData, size: iconSize.h, color: const Color(0xFF0D9488)),
       ),
     ),
   );
@@ -438,9 +444,9 @@ ShapeDecoration getButtonDecorationWithGradient(Color bgColor,
 }
 
 getGradients() {
-  return LinearGradient(colors: [
-    "#FF8080".toColor(),
-    "#F44144".toColor(),
+  return const LinearGradient(colors: [
+    Color(0xFF14B8A6), // _kTealMid
+    Color(0xFF0D9488), // _kTeal
   ], begin: Alignment.topCenter, end: Alignment.bottomCenter);
 }
 
@@ -1195,7 +1201,16 @@ Widget getCircleProfileImage(
     child: ClipRRect(
         borderRadius: BorderRadius.all(Radius.circular(size / 2)),
         child: Container(
-          color: getAccentColor(context),
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                Color(0xFF14B8A6), // _kTealMid
+                Color(0xFF0F766E), // _kTealDark
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
           child: (profileName.isNotEmpty)
               ? Center(
                   child: getCustomFont(profileName, 36, Colors.white, 1,
@@ -3996,58 +4011,60 @@ WillPopScope buildTitleDefaultWidget(
     BuildContext context, String title, Function backClick, Widget widget) {
   return WillPopScope(
       child: Scaffold(
-        backgroundColor: getCurrentTheme(context).scaffoldBackgroundColor,
+        backgroundColor: const Color(0xFFF4F7F6), // _kBg — teal scaffold
         body: Stack(
           children: [
-            SizedBox(
+            // ── Content scrollable beneath the header ──
+            ListView(
+              padding: EdgeInsets.only(top: 300.h, bottom: 40.h),
+              shrinkWrap: true,
+              children: [widget],
+            ),
+
+            // ── Teal gradient header (Renders ON TOP of content) ──
+            Container(
               height: 260.h,
               width: double.infinity,
-              child: Stack(
-                alignment: Alignment.bottomCenter,
-                fit: StackFit.expand,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [
+                    Color(0xFF14B8A6), // _kTealMid
+                    Color(0xFF0D9488), // _kTeal
+                    Color(0xFF0F766E), // _kTealDark
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: const BorderRadius.only(
+                  bottomLeft: Radius.circular(36),
+                  bottomRight: Radius.circular(36),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Positioned(
-                      left: -108.h,
-                      top: -30.h,
-                      child: SizedBox(
-                          height: 232.h,
-                          width: 229.h,
-                          child: Align(
-                              alignment: Alignment.topLeft,
-                              child: getSvgImage(
-                                  context, "Paw_Print.svg", double.infinity)))),
-                  Positioned(
-                      right: -108.h,
-                      child: SizedBox(
-                          height: 180.h,
-                          width: 177.w,
-                          child: Align(
-                              alignment: Alignment.bottomRight,
-                              child: getSvgImage(
-                                  context, "Paw_Print.svg", double.infinity)))),
-                  Align(
-                    alignment: Alignment.center,
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        getSvgImageWithSize(context, "Logo1.svg", 60.h, 60.h,
-                            fit: BoxFit.fill),
-                        8.h.verticalSpace,
-                        getCustomFont(title, 26, getFontColor(context), 1,
-                            fontWeight: FontWeight.w700,
-                            textAlign: TextAlign.center),
-                      ],
+                  getAssetImage(context, "nirvista_logo.png", double.infinity, 60.h,
+                      boxFit: material.BoxFit.contain),
+                  SizedBox(height: 12.h),
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 20.sp,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white.withOpacity(0.9),
+                      letterSpacing: 0.3,
                     ),
                   ),
                 ],
-              ).paddingOnly(bottom: 30.h),
+              ).paddingOnly(top: MediaQuery.of(context).padding.top + 16.h, bottom: 20.h),
             ),
-            ListView(
-              padding: EdgeInsets.only(top: 240.h),
-              shrinkWrap: true,
-              children: [widget],
-            )
           ],
         ),
       ),
@@ -4625,11 +4642,11 @@ Widget buildNewArrivalItem(
                                 total: product.regularPrice, context: context),
                             // "${Constant.getCurrency(context)}${product.regularPrice}",
                             18,
-                            getFontColor(context),
+                            const Color(0xFF757575),
                             1,
                             fontWeight: FontWeight.w400,
                             decoration: TextDecoration.lineThrough,
-                            txtHeight: 1.24,
+                            decorationColor: const Color(0xFF555555),
                           ))
                       : 0.horizontalSpace
                 ],
@@ -4665,6 +4682,7 @@ AppBar getTitleAppBar(BuildContext context, Function backClick,
     bool isCartAvailable = true,
     bool isFilterAvailable = false,
     bool withBack = true,
+    Widget? trailing,
     ValueChanged? filterFun}) {
   return AppBar(
     centerTitle: centerTitle,
@@ -4682,6 +4700,8 @@ AppBar getTitleAppBar(BuildContext context, Function backClick,
     actions: [
       Row(
         children: [
+          if (trailing != null)
+            trailing.marginOnly(right: FetchPixels.getDefaultHorSpaceFigma(context)),
           (isCartAvailable)
               ? Align(
                   alignment: Alignment.centerRight,

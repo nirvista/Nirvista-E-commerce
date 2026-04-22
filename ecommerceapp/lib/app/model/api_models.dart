@@ -11,10 +11,10 @@ class ProductModel {
   final String? material;
   final double rating;
   List<VariantModel> variants;
-  final List<String> images;
-  final String? thumbnail;
-  final double? basePrice;
-  final double? salePrice;
+  List<String> images;
+  String? thumbnail;
+  double? basePrice;
+  double? salePrice;
 
 
   ProductModel({
@@ -156,6 +156,11 @@ class ProductModel {
 
   void copyFrom(ProductModel other) {
     variants = other.variants;
+    // Copy top-level fields too so enrichment actually "heals" the product for the UI
+    if (other.thumbnail != null) thumbnail = other.thumbnail;
+    if (other.images.isNotEmpty) images.clear(); images.addAll(other.images);
+    if (other.basePrice != null && other.basePrice! > 0) basePrice = other.basePrice;
+    if (other.salePrice != null && other.salePrice! > 0) salePrice = other.salePrice;
   }
 }
 
@@ -494,9 +499,10 @@ class OrderModel {
 
   factory OrderModel.fromJson(Map<String, dynamic> json) {
     String? derivedAddr;
-    if (json['address'] != null && json['address'] is Map) {
-      final a = json['address'];
-      derivedAddr = "${a['addressLine1'] ?? ''}${a['addressLine2'] != null ? ', ' + a['addressLine2'] : ''}, ${a['city'] ?? ''}, ${a['state'] ?? ''} - ${a['postal_code'] ?? ''}, ${a['country'] ?? ''}";
+    final addressData = json['shippingAddress'] ?? json['address'];
+    if (addressData != null && addressData is Map) {
+      final a = addressData;
+      derivedAddr = "${a['addressLine1'] ?? ''}${a['addressLine2'] != null && a['addressLine2'].toString().isNotEmpty ? ', ' + a['addressLine2'].toString() : ''}, ${a['city'] ?? ''}, ${a['state'] ?? ''} - ${a['postal_code'] ?? a['postalCode'] ?? ''}, ${a['country'] ?? ''}";
     }
     return OrderModel(
       id: json['id']?.toString() ?? '',
@@ -552,16 +558,16 @@ class AddressModel {
     return AddressModel(
       id: json['id']?.toString() ?? '',
       userId: json['userId']?.toString() ?? '',
-      addressLabel: json['addressLabel']?.toString() ?? 'Home',
-      recipientName: json['recipientName']?.toString() ?? '',
-      addressLine1: json['addressLine1']?.toString() ?? '',
+      addressLabel: json['addressLabel']?.toString() ?? json['label']?.toString() ?? 'Home',
+      recipientName: json['recipientName']?.toString() ?? json['name']?.toString() ?? '',
+      addressLine1: json['addressLine1']?.toString() ?? json['address']?.toString() ?? '',
       addressLine2: json['addressLine2']?.toString(),
       city: json['city']?.toString() ?? '',
       state: json['state']?.toString() ?? '',
-      postalCode: (json['postal_code'] ?? json['postalCode'])?.toString() ?? '',
+      postalCode: (json['postal_code'] ?? json['postalCode'] ?? json['zip'] ?? json['zipCode'])?.toString() ?? '',
       country: json["country"]?.toString() ?? '',
-      isDefaultBilling: json['isDefaultBilling'] == true || json['isDefaultBilling'] == 1,
-      isDefaultShipping: json['isDefaultShipping'] == true || json['isDefaultShipping'] == 1,
+      isDefaultBilling: json['isDefaultBilling'] == true || json['isDefaultBilling'] == 1 || json['is_default_billing'] == true,
+      isDefaultShipping: json['isDefaultShipping'] == true || json['isDefaultShipping'] == 1 || json['is_default_shipping'] == true,
     );
   }
 

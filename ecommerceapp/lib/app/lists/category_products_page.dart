@@ -12,6 +12,7 @@ import '../../app/model/api_models.dart';
 import '../../../services/product_api.dart';
 import '../../../services/category_api.dart';
 import '../../../services/brand_api.dart';
+import '../../../services/enrichment_service.dart';
 
 class CategoryProductsPage extends StatefulWidget {
   const CategoryProductsPage({Key? key}) : super(key: key);
@@ -45,7 +46,13 @@ class _CategoryProductsPageState extends State<CategoryProductsPage> {
   Future<void> _loadInitialProducts() async {
     String category = storageController.selectedCategory.value;
     
-    if (category == "best_selling" || category == "all" || category == "for_you" || category.isEmpty || category == "top_deals" || category == "new_arrivals") {
+    if (category == "best_selling") {
+      productsFuture = _fetchProducts(ProductApiService.getAllProducts());
+    } else if (category == "new_arrivals") {
+      productsFuture = _fetchAndSortProducts(ProductApiService.getAllProducts(), "new_arrivals");
+    } else if (category == "top_deals") {
+      productsFuture = _fetchAndSortProducts(ProductApiService.getAllProducts(), "top_deals");
+    } else if (category == "all" || category == "for_you" || category.isEmpty) {
       // Scrape from top categories (matches home screen fix)
       productsFuture = _scrapeAllProducts();
     } else if (category.startsWith("brand_")) {
@@ -77,6 +84,9 @@ class _CategoryProductsPageState extends State<CategoryProductsPage> {
       merged = merged.where((p) => p.variants.any((v) => v.discountPrice != null && v.discountPrice! > 0)).toList();
     }
     
+    // Relaxed cleanup: Only hide if the product is BOTH missing variants/price AND missing images.
+    merged.removeWhere((p) => (p.variants.isEmpty && p.originalPrice <= 0) && p.imageUrl.isEmpty);
+    
     loadedProducts = merged;
     return loadedProducts;
   }
@@ -92,11 +102,35 @@ class _CategoryProductsPageState extends State<CategoryProductsPage> {
         productsList = data['products'];
       }
       var prods = productsList.map((e) => ProductModel.fromJson(e)).toList();
+      
+      // Enrich with missing variants using the background enrichment service
+      await EnrichmentService.enrichProducts(prods);
+
+      // Cleanup broken products
+      prods.removeWhere((p) => p.variants.isEmpty && p.originalPrice <= 0 && p.imageUrl.isEmpty);
+      
       loadedProducts = prods;
       return prods;
     }
     loadedProducts = [];
     return [];
+  }
+
+  Future<List<ProductModel>> _fetchAndSortProducts(Future<Map<String, dynamic>> apiCall, String sortType) async {
+    final prods = await _fetchProducts(apiCall);
+    
+    if (sortType == "top_deals") {
+       prods.sort((a, b) {
+         int cmp = b.rating.compareTo(a.rating);
+         if (cmp != 0) return cmp;
+         return b.id.compareTo(a.id);
+       });
+    } else if (sortType == "new_arrivals") {
+       prods.sort((a, b) => b.id.compareTo(a.id));
+    }
+    
+    loadedProducts = prods;
+    return prods;
   }
 
   List<ProductModel> _getFilteredProducts() {
@@ -136,8 +170,6 @@ class _CategoryProductsPageState extends State<CategoryProductsPage> {
       categoryTitle = categoryTitle.toUpperCase();
     }
 
-    List<String> subCategories = subCategoriesMap[category] ?? ["All"];
-    
     // Extracted Unique Brands
     List<String> brands = loadedProducts.map((e) => e.brandId).toSet().toList();
     if (brands.isEmpty) {
@@ -281,18 +313,24 @@ class _CategoryProductsPageState extends State<CategoryProductsPage> {
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(10.w),
-                  child: CachedNetworkImage(
-                    imageUrl: product.imageUrl.isNotEmpty ? product.imageUrl : 'https://placehold.co/400',
-                    fit: BoxFit.cover,
-                    placeholder: (context, url) => Center(
-                      child: CircularProgressIndicator(
-                        color: accentColor,
+                  child: (product.imageUrl.isNotEmpty && !product.imageUrl.contains("example.com")) 
+                    ? CachedNetworkImage(
+                      imageUrl: product.imageUrl,
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) => Center(
+                        child: CircularProgressIndicator(
+                          color: accentColor,
+                          strokeWidth: 2,
+                        ),
                       ),
-                    ),
-                    errorWidget: (context, url, error) =>
-                        Icon(Icons.image_not_supported,
-                            color: getFontGreyColor(context)),
-                  ),
+                      errorWidget: (context, url, error) =>
+                          Icon(Icons.image_not_supported,
+                              color: getFontGreyColor(context)),
+                    )
+                    : Container(
+                        color: getGreyCardColor(context),
+                        child: Icon(Icons.shopping_bag_outlined, color: getFontGreyColor(context), size: 40.w),
+                      ),
                 ),
               ),
             ),
@@ -334,10 +372,13 @@ class _CategoryProductsPageState extends State<CategoryProductsPage> {
                   getCustomFont(
                       "₹${basePrice.toStringAsFixed(0)}",
                       11,
-                      getFontGreyColor(context),
+                      const Color(0xFF4B5563),
                       1,
                       fontWeight: FontWeight.w500,
-                      decoration: TextDecoration.lineThrough),
+                      decoration: TextDecoration.lineThrough,
+                      decorationColor: const Color(0xFF4B5563),
+                      decorationThickness: 1.2,
+                      txtHeight: 1.2),
               ],
             ),
             // Discount Badge

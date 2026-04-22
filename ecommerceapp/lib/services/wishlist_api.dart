@@ -183,14 +183,14 @@ class WishlistItem {
       'id': productId,
       'title': product.title,
       'originalPrice': variant.price,
-      'salePrice': variant.price,
+      'salePrice': variant.discountPrice ?? variant.price,
       'price': variant.price,
       'images': variant.images,
       'variants': [
         {
           'id': variantId,
           'originalPrice': variant.price,
-          'salePrice': variant.price,
+          'salePrice': variant.discountPrice ?? variant.price,
           'price': variant.price,
           'images': variant.images,
           'status': variant.status,
@@ -235,6 +235,7 @@ class WishlistVariant {
   final String id;
   final String variantName;
   final double price;
+  final double? discountPrice;
   final List<String> images;
   final String status;
 
@@ -242,17 +243,26 @@ class WishlistVariant {
     required this.id,
     required this.variantName,
     required this.price,
+    this.discountPrice,
     required this.images,
     required this.status,
   });
 
   factory WishlistVariant.fromJson(Map<String, dynamic> json) {
+    double price = json['price'] != null 
+          ? (json['price'] is num ? (json['price'] as num).toDouble() : double.tryParse(json['price'].toString().replaceAll(',', '')) ?? 0.0)
+          : 0.0;
+    double? discountPrice = (json['discountPrice'] ?? json['salePrice'] ?? json['discount_price'] ?? json['sale_price'] ?? json['selling_price']) != null 
+        ? (json['discountPrice'] ?? json['salePrice'] ?? json['discount_price'] ?? json['sale_price'] ?? json['selling_price']) is num 
+            ? (json['discountPrice'] ?? json['salePrice'] ?? json['discount_price'] ?? json['sale_price'] ?? json['selling_price']).toDouble() 
+            : double.tryParse((json['discountPrice'] ?? json['salePrice'] ?? json['discount_price'] ?? json['sale_price'] ?? json['selling_price']).toString().replaceAll(',', ''))
+        : null;
+
     return WishlistVariant(
       id: json['id'] ?? '',
       variantName: json['variantName'] ?? '',
-      price: json['price'] != null 
-          ? (json['price'] is num ? (json['price'] as num).toDouble() : double.tryParse(json['price'].toString().replaceAll(',', '')) ?? 0.0)
-          : 0.0,
+      price: price,
+      discountPrice: discountPrice,
       images: (json['images'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??

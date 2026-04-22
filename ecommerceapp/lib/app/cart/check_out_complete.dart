@@ -51,8 +51,7 @@ class _CheckOutComplete extends State<CheckOutComplete> {
   HomeController homeController = Get.find<HomeController>();
   CartController cartController = Get.find<CartController>();
   AlreadyInCart alreadyInCart = Get.find<AlreadyInCart>();
-  Rx<ModelShippingMethod?> selectedShippingMethod =
-      (null).obs;
+  Rx<ModelShippingMethod?> selectedShippingMethod = Rx<ModelShippingMethod?>(null);
   List<ModelShippingMethod> shippingMethods = [];
   RxBool shippingMthLoaded = false.obs;
 
@@ -60,7 +59,7 @@ class _CheckOutComplete extends State<CheckOutComplete> {
 
   ShippingAddressController shippingAddressController = Get.find<ShippingAddressController>();
 
-  Rx<ModelTax?> taxModel = (null).obs;
+  Rx<ModelTax?> taxModel = Rx<ModelTax?>(null);
 
   @override
   void initState() {

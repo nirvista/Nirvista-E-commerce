@@ -30,6 +30,9 @@ class _TrackOrder extends State<TrackOrder> {
   final orderController = Get.find<GlobalOrderController>();
   late String orderId;
 
+  final Rx<OrderModel?> detailedOrder = Rx<OrderModel?>(null);
+  final RxBool isLoadingDetails = true.obs;
+
   @override
   void initState() {
     super.initState();
@@ -37,7 +40,17 @@ class _TrackOrder extends State<TrackOrder> {
     OrderModel? initialOrder = Get.arguments as OrderModel?;
     if (initialOrder != null) {
       orderId = initialOrder.id;
+      _fetchOrderDetails();
     }
+  }
+
+  Future<void> _fetchOrderDetails() async {
+    final token = loginController.accessToken ?? '';
+    final res = await OrderApiService.getOrderById(token, orderId);
+    if (res['success'] && res['data'] != null) {
+      detailedOrder.value = OrderModel.fromJson(res['data']);
+    }
+    isLoadingDetails.value = false;
   }
 
   Future<void> _handleCancelOrder() async {
@@ -88,19 +101,31 @@ class _TrackOrder extends State<TrackOrder> {
           // ── Reactive: picks the order from the controller's list ──
           final currentOrder = orderController.userOrders.firstWhereOrNull((o) => o.id == orderId);
           
-          if (currentOrder == null) {
+          if (currentOrder == null && detailedOrder.value == null) {
             return Center(child: getCustomFont("Order not found", 18, getFontColor(context), 1));
           }
 
-          String dateStr = '';
-          if (currentOrder.createdAt.isNotEmpty) {
-            try {
-              final dt = DateTime.parse(currentOrder.createdAt);
-              dateStr = "${dt.day} ${_monthName(dt.month)}, ${dt.year}";
-            } catch (_) { dateStr = currentOrder.createdAt; }
+          if (isLoadingDetails.value) {
+            return Center(child: CircularProgressIndicator(color: accentColor));
           }
 
-          bool canCancel = currentOrder.orderStatus.toLowerCase() == 'pending' || currentOrder.orderStatus.toLowerCase() == 'processing';
+          // Use detailedOrder if available to show full product info; fallback to currentOrder
+          final displayOrder = detailedOrder.value ?? currentOrder!;
+          
+          // However, we want to maintain the reactive status from currentOrder
+          if (currentOrder != null) {
+            displayOrder.orderStatus = currentOrder.orderStatus;
+          }
+
+          String dateStr = '';
+          if (displayOrder.createdAt.isNotEmpty) {
+            try {
+              final dt = DateTime.parse(displayOrder.createdAt);
+              dateStr = "${dt.day} ${_monthName(dt.month)}, ${dt.year}";
+            } catch (_) { dateStr = displayOrder.createdAt; }
+          }
+
+          bool canCancel = displayOrder.orderStatus.toLowerCase() == 'pending' || displayOrder.orderStatus.toLowerCase() == 'processing';
 
           return Column(
             children: [
@@ -109,12 +134,12 @@ class _TrackOrder extends State<TrackOrder> {
                 child: ListView(
                   padding: EdgeInsets.zero,
                   children: [
-                    _buildHeaderInfo(context, margin, dateStr, currentOrder),
-                    _buildCustomerInfo(context, currentOrder),
+                    _buildHeaderInfo(context, margin, dateStr, displayOrder),
+                    _buildCustomerInfo(context, displayOrder),
                     getVerSpace(20.h),
-                    _buildOrderItems(context, currentOrder),
+                    _buildOrderItems(context, displayOrder),
                     getVerSpace(20.h),
-                    _buildPriceSummary(context, margin, currentOrder),
+                    _buildPriceSummary(context, margin, displayOrder),
                     if (canCancel) ...[
                       getVerSpace(20.h),
                       Padding(

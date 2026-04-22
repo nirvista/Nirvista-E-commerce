@@ -39,25 +39,41 @@ class ShippingAddressController extends GetxController {
 
   Future<void> fetchAddresses() async {
     final loginController = Get.find<LoginDataController>();
+    
+    // Fallback/Retry logic: if token is null, wait briefly as it might be initializing
+    if (loginController.accessToken == null) {
+      print("ShippingAddressController: Access token is null, waiting 500ms before retry...");
+      await Future.delayed(const Duration(milliseconds: 500));
+    }
+
     final token = loginController.accessToken;
-    if (token == null || token.isEmpty) return;
+    if (token == null || token.isEmpty) {
+      print("ShippingAddressController: Skipping fetch - no access token available.");
+      return;
+    }
 
     isLoading.value = true;
+    print("ShippingAddressController: Fetching addresses for user...");
     try {
       final res = await AddressApiService.getUserAddresses(token);
       if (res['success'] && res['data'] != null) {
         final list = (res['data'] as List).map((e) => AddressModel.fromJson(e)).toList();
         addresses.assignAll(list);
+        print("ShippingAddressController: Successfully fetched ${list.length} addresses.");
         
         // Auto-select default if none selected
         if (selectedAddress.value == null) {
           final def = list.where((a) => a.isDefaultShipping == true).toList();
           if (def.isNotEmpty) {
             selectedAddress.value = def.first;
+            print("ShippingAddressController: Auto-selected default address: ${def.first.id}");
           } else if (list.isNotEmpty) {
             selectedAddress.value = list.first;
+            print("ShippingAddressController: No default found, selected first address: ${list.first.id}");
           }
         }
+      } else {
+        print("ShippingAddressController: API failed - ${res['message']}");
       }
     } catch (e) {
       print("Error fetching addresses in shipping controller: $e");

@@ -200,22 +200,24 @@ class _TabSearchState extends State<TabSearch> {
         if (rawData is List) {
           productList = rawData;
         } else if (rawData is Map) {
-          // If the API returned a nested object, try to find the list inside
           final nested = rawData['data'] ?? rawData['products'] ?? rawData['results'] ?? rawData['items'];
           if (nested is List) {
             productList = nested;
           }
         }
 
-        setState(() {
-          _results = productList.map((e) => ProductModel.fromJson(e)).toList();
-          _isLoading = false;
-        });
+        List<ProductModel> parsedResults = productList.map((e) => ProductModel.fromJson(e)).toList();
 
-        // ── NEW: Background enrichment ──
-        EnrichmentService.enrichProducts(_results, onUpdate: () {
-          if (mounted) setState(() {});
-        });
+        // ── NEW: Await enrichment and filter placeholders ──
+        await EnrichmentService.enrichProducts(parsedResults);
+        parsedResults.removeWhere((p) => p.variants.isEmpty && p.originalPrice <= 0 && p.imageUrl.isEmpty);
+
+        if (mounted) {
+          setState(() {
+            _results = parsedResults;
+            _isLoading = false;
+          });
+        }
         // ───────────────────────────────
       } else {
         setState(() {
@@ -286,7 +288,7 @@ class _TabSearchState extends State<TabSearch> {
 
   PreferredSizeWidget _buildAppBar(BuildContext context, double margin) {
     return PreferredSize(
-      preferredSize: Size.fromHeight(64.h),
+      preferredSize: Size.fromHeight(72.h),
       child: SafeArea(
         child: Container(
           color: getCardColor(context),
@@ -296,24 +298,36 @@ class _TabSearchState extends State<TabSearch> {
               if (widget.showBack) ...[
                 GestureDetector(
                   onTap: () => Navigator.of(context).pop(),
-                  child: Icon(Icons.arrow_back_ios_new,
-                      color: getFontColor(context), size: 20.w),
+                  child: Container(
+                    padding: EdgeInsets.all(8.w),
+                    decoration: BoxDecoration(
+                      color: getGreyCardColor(context),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(Icons.arrow_back_ios_new,
+                        color: getFontColor(context), size: 18.w),
+                  ),
                 ),
                 SizedBox(width: 12.w),
               ],
               Expanded(
                 child: Container(
-                  height: 42.h,
+                  height: 52.h,
                   decoration: BoxDecoration(
                     color: getGreyCardColor(context),
-                    borderRadius: BorderRadius.circular(12.w),
+                    borderRadius: BorderRadius.circular(30.w),
+                    boxShadow: [
+                      BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2)),
+                    ],
                   ),
-                  padding: EdgeInsets.symmetric(horizontal: 12.w),
+                  padding: EdgeInsets.symmetric(horizontal: 16.w),
                   child: Row(
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       Icon(Icons.search,
-                          color: getFontGreyColor(context), size: 18.w),
-                      SizedBox(width: 8.w),
+                          color: accentColor, size: 20.w),
+                      SizedBox(width: 10.w),
                       Expanded(
                         child: TextField(
                           controller: _searchController,
@@ -323,11 +337,12 @@ class _TabSearchState extends State<TabSearch> {
                           decoration: InputDecoration(
                             hintText: 'Search products...',
                             hintStyle:
-                                TextStyle(color: getFontGreyColor(context)),
+                                TextStyle(color: getFontGreyColor(context).withOpacity(0.7), fontSize: 13.sp),
                             border: InputBorder.none,
                             isDense: true,
-                            contentPadding: EdgeInsets.zero,
+                            contentPadding: EdgeInsets.symmetric(vertical: 12.h),
                           ),
+                          textAlignVertical: TextAlignVertical.center,
                           onChanged: _onSearchChanged,
                           textInputAction: TextInputAction.search,
                           onSubmitted: (v) {
@@ -339,8 +354,12 @@ class _TabSearchState extends State<TabSearch> {
                       if (_searchController.text.isNotEmpty)
                         GestureDetector(
                           onTap: _clearSearch,
-                          child: Icon(Icons.close,
-                              color: getFontGreyColor(context), size: 18.w),
+                          child: Container(
+                            padding: EdgeInsets.all(4.w),
+                            decoration: BoxDecoration(color: getFontGreyColor(context).withOpacity(0.2), shape: BoxShape.circle),
+                            child: Icon(Icons.close,
+                                color: getFontGreyColor(context), size: 14.w),
+                          ),
                         ),
                     ],
                   ),
@@ -631,10 +650,15 @@ class _TabSearchState extends State<TabSearch> {
                     fontWeight: FontWeight.w700),
                 SizedBox(width: 6.w),
                 if (discountPercent > 0)
-                  getCustomFont('₹${basePrice.toStringAsFixed(0)}', 11,
-                      getFontGreyColor(context), 1,
-                      fontWeight: FontWeight.w500,
-                      decoration: TextDecoration.lineThrough),
+                  Text('₹${basePrice.toStringAsFixed(0)}',
+                      style: TextStyle(
+                        fontSize: 11.sp,
+                        color: const Color(0xFF757575),
+                        fontWeight: FontWeight.w500,
+                        decoration: TextDecoration.lineThrough,
+                        decorationColor: const Color(0xFF555555),
+                        decorationThickness: 2.0,
+                      )),
               ],
             ),
             if (discountPercent > 0)
@@ -643,13 +667,13 @@ class _TabSearchState extends State<TabSearch> {
                 padding:
                     EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
                 decoration: BoxDecoration(
-                  color: redColor,
-                  borderRadius: BorderRadius.circular(4.w),
+                  color: const Color(0xFFE0F2F1),
+                  borderRadius: BorderRadius.circular(20.w),
                 ),
                 child: getCustomFont(
                     '${discountPercent.toStringAsFixed(0)}% OFF',
                     9,
-                    Colors.white,
+                    const Color(0xFF004D40),
                     1,
                     fontWeight: FontWeight.w700),
               ),
