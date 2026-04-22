@@ -28,7 +28,7 @@ class LoginDataController extends GetxController {
       String? accessToken = getAccessToken();
       if (accessToken != null) {
         await dotenv.load(fileName: ".env");
-        String? baseUrl = dotenv.env['BASE_URL'];
+        String? baseUrl = dotenv.env['BASE_URL']?.trim();
         
         if (baseUrl != null && baseUrl.isNotEmpty) {
           final response = await http.get(

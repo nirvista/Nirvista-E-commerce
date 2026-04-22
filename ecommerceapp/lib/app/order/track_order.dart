@@ -74,10 +74,39 @@ class _TrackOrder extends State<TrackOrder> {
           const SnackBar(content: Text('Order Canceled successfully'), backgroundColor: Colors.green)
         );
         // Sync with global order list
-        orderController.updateOrderStatusLocally(currentOrder.id, 'canceled');
+        orderController.updateOrderStatusLocally(currentOrder.id, 'cancelled');
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(res['message'] ?? 'Failed to cancel order'), backgroundColor: Colors.red)
+        );
+      }
+    } catch (e) {
+      Navigator.pop(context);
+    }
+  }
+
+  Future<void> _handleReturnOrder() async {
+    final token = loginController.accessToken ?? '';
+    
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      final res = await OrderApiService.initiateReturn(token, orderId);
+      Navigator.pop(context); // hide loading
+
+      if (res['success']) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Return request initiated successfully'), backgroundColor: Colors.green)
+        );
+        // Update local status if necessary
+        orderController.updateOrderStatusLocally(orderId, 'return_initiated');
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(res['message'] ?? 'Failed to initiate return'), backgroundColor: Colors.red)
         );
       }
     } catch (e) {
@@ -125,7 +154,20 @@ class _TrackOrder extends State<TrackOrder> {
             } catch (_) { dateStr = displayOrder.createdAt; }
           }
 
-          bool canCancel = displayOrder.orderStatus.toLowerCase() == 'pending' || displayOrder.orderStatus.toLowerCase() == 'processing';
+          final status = displayOrder.orderStatus.toLowerCase();
+          bool canCancel = ['pending', 'processing', 'shipped', 'out_for_delivery', 'confirmed', 'reserved'].contains(status);
+          bool isDelivered = status == 'delivered';
+          
+          bool canReturn = false;
+          if (isDelivered) {
+            try {
+              final dt = DateTime.parse(displayOrder.createdAt);
+              final now = DateTime.now();
+              if (now.difference(dt).inDays <= 7) {
+                canReturn = true;
+              }
+            } catch (_) {}
+          }
 
           return Column(
             children: [
@@ -134,7 +176,8 @@ class _TrackOrder extends State<TrackOrder> {
                 child: ListView(
                   padding: EdgeInsets.zero,
                   children: [
-                    _buildHeaderInfo(context, margin, dateStr, displayOrder),
+                    _buildOrderStatusStepper(context, displayOrder),
+                    getVerSpace(20.h),
                     _buildCustomerInfo(context, displayOrder),
                     getVerSpace(20.h),
                     _buildOrderItems(context, displayOrder),
@@ -157,6 +200,32 @@ class _TrackOrder extends State<TrackOrder> {
                         }, EdgeInsets.zero),
                       ),
                     ],
+                    if (canReturn) ...[
+                      getVerSpace(20.h),
+                      Padding(
+                        padding: EdgeInsets.symmetric(horizontal: margin),
+                        child: getButtonFigma(context, accentColor, true, "Return Product", Colors.white, () {
+                          showGetDeleteDialog(
+                            context, 
+                            "Are you sure you want to return this product? You can return it within 1 week of delivery.", 
+                            "Return Product", 
+                            () { _handleReturnOrder(); },
+                            withCancelBtn: true,
+                            btnTextCancel: "No, Cancel",
+                            functionCancel: () {}
+                          );
+                        }, EdgeInsets.zero),
+                      ),
+                    ],
+                    if (isDelivered) ...[
+                      getVerSpace(20.h),
+                      Padding(
+                        padding: EdgeInsets.symmetric(horizontal: margin),
+                        child: getButtonFigma(context, Colors.blueGrey, true, "Download Invoice", Colors.white, () {
+                          OrderApiService.downloadInvoice(loginController.accessToken ?? '', displayOrder.id);
+                        }, EdgeInsets.zero),
+                      ),
+                    ],
                     getVerSpace(40.h),
                   ],
                 ),
@@ -171,6 +240,135 @@ class _TrackOrder extends State<TrackOrder> {
   String _monthName(int month) {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return months[month - 1];
+  }
+
+  int _getStepIndex(String status) {
+    status = status.toLowerCase();
+    if (status == 'delivered') return 3;
+    if (status == 'shipped') return 1;
+    // We can add 'out_for_delivery' if backend supports it later
+    if (status == 'confirmed' || status == 'processing' || status == 'reserved') return 0;
+    return 0;
+  }
+
+  String _getStatusDescription(String status) {
+    status = status.toLowerCase();
+    switch (status) {
+      case 'processing':
+      case 'confirmed':
+      case 'reserved':
+        return "Your order has been placed and is being processed.";
+      case 'shipped':
+        return "Package has been shipped and is on its way.";
+      case 'delivered':
+        return "Package has been delivered successfully.";
+      case 'cancelled':
+        return "This order has been cancelled.";
+      default:
+        return "Status: $status";
+    }
+  }
+
+  Widget _buildOrderStatusStepper(BuildContext context, OrderModel order) {
+    int currentStep = _getStepIndex(order.orderStatus);
+    bool isCancelled = order.orderStatus.toLowerCase() == 'cancelled';
+    Color activeColor = isCancelled ? Colors.red : accentColor;
+    double margin = FetchPixels.getDefaultHorSpaceFigma(context);
+
+    return Container(
+      color: getCardColor(context),
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(horizontal: margin, vertical: 24.h),
+      child: Column(
+        children: [
+          getCustomFont(
+            order.orderStatus.capitalizeFirst ?? order.orderStatus,
+            24,
+            isCancelled ? Colors.red : getFontColor(context),
+            1,
+            fontWeight: FontWeight.w800,
+            textAlign: TextAlign.center,
+          ),
+          getVerSpace(8.h),
+          getMultilineCustomFont(
+            _getStatusDescription(order.orderStatus),
+            14,
+            getFontGreyColor(context),
+            fontWeight: FontWeight.w400,
+            textAlign: TextAlign.center,
+          ),
+          getVerSpace(30.h),
+          if (!isCancelled) ...[
+            Row(
+              children: [
+                _buildStepCircle(0, currentStep, activeColor),
+                _buildStepLine(0, currentStep, activeColor),
+                _buildStepCircle(1, currentStep, activeColor),
+                _buildStepLine(1, currentStep, activeColor),
+                _buildStepCircle(2, currentStep, activeColor),
+                _buildStepLine(2, currentStep, activeColor),
+                _buildStepCircle(3, currentStep, activeColor),
+              ],
+            ),
+            getVerSpace(12.h),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _buildStepLabel("Ordered", 0, currentStep, context),
+                _buildStepLabel("Shipped", 1, currentStep, context),
+                _buildStepLabel("Out for delivery", 2, currentStep, context, textAlign: TextAlign.center),
+                _buildStepLabel("Delivered", 3, currentStep, context, textAlign: TextAlign.right),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStepCircle(int index, int currentStep, Color activeColor) {
+    bool isCompleted = index <= currentStep;
+    return Container(
+      width: 24.h,
+      height: 24.h,
+      decoration: BoxDecoration(
+        color: isCompleted ? activeColor : Colors.transparent,
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: isCompleted ? activeColor : Colors.grey.shade300,
+          width: 2,
+        ),
+      ),
+      child: isCompleted
+          ? Icon(Icons.check, color: Colors.white, size: 14.h)
+          : null,
+    );
+  }
+
+  Widget _buildStepLine(int index, int currentStep, Color activeColor) {
+    bool isCompleted = index < currentStep;
+    return Expanded(
+      child: Container(
+        height: 4.h,
+        color: isCompleted ? activeColor : Colors.grey.shade300,
+      ),
+    );
+  }
+
+  Widget _buildStepLabel(String label, int index, int currentStep, BuildContext context, {TextAlign textAlign = TextAlign.left}) {
+    bool isActive = index == currentStep;
+    bool isCompleted = index <= currentStep;
+    
+    return Expanded(
+      child: getCustomFont(
+        label,
+        12,
+        isActive ? getFontColor(context) : getFontGreyColor(context),
+        2,
+        fontWeight: isActive ? FontWeight.w700 : FontWeight.w400,
+        textAlign: textAlign,
+      ),
+    );
   }
 
   Widget _buildHeaderInfo(BuildContext context, double margin, String dateStr, OrderModel order) {
@@ -267,7 +465,7 @@ class _TrackOrder extends State<TrackOrder> {
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(8.w),
                       child: img.isNotEmpty 
-                        ? CachedNetworkImage(imageUrl: img, fit: BoxFit.cover, 
+                        ? CachedNetworkImage(imageUrl: img, fit: BoxFit.contain, 
                             placeholder: (context, url) => const Center(child: CircularProgressIndicator(strokeWidth: 2)),
                             errorWidget: (context, url, error) => const Icon(Icons.image_not_supported))
                         : const Icon(Icons.shopping_bag_outlined),

@@ -88,9 +88,8 @@ class TabProfile extends StatelessWidget {
                     Expanded(
                       flex: 1,
                       child: ListView(
-                        padding: EdgeInsets.zero,
                         children: [
-                          20.h.verticalSpace,
+                          40.h.verticalSpace,
                           buildRowWidget(context, "profile.svg", "My Profile", () {
                             if (isLoggedIn) {
                               Constant.sendToNext(context, myProfileRoute);

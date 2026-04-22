@@ -1,11 +1,15 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:url_launcher/url_launcher.dart';
-
+import 'package:path_provider/path_provider.dart';
+import 'package:open_file/open_file.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:universal_html/html.dart' as html;
 class OrderApiService {
   static String get baseUrl {
-    final url = dotenv.env['BASE_URL'];
+    final url = dotenv.env['BASE_URL']?.trim();
     if (url == null) {
       throw Exception("BASE_URL not found in .env file");
     }
@@ -29,6 +33,7 @@ class OrderApiService {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $accessToken',
+          'x-client-type': 'mobile',
         },
         body: jsonEncode(bodyData),
       );
@@ -64,6 +69,7 @@ class OrderApiService {
         headers: {
           'Authorization': 'Bearer $accessToken',
           'Content-Type': 'application/json',
+          'x-client-type': 'mobile',
         },
       );
       if (response.statusCode == 200 || response.statusCode == 201) {
@@ -93,6 +99,7 @@ class OrderApiService {
         headers: {
           'Authorization': 'Bearer $accessToken',
           'Content-Type': 'application/json',
+          'x-client-type': 'mobile',
         },
       );
       if (response.statusCode == 200 || response.statusCode == 201) {
@@ -122,6 +129,7 @@ class OrderApiService {
         headers: {
           'Authorization': 'Bearer $accessToken',
           'Content-Type': 'application/json',
+          'x-client-type': 'mobile',
         },
       );
       if (response.statusCode == 200 || response.statusCode == 201) {
@@ -150,6 +158,8 @@ class OrderApiService {
         Uri.parse('$baseUrl/api/orders/$orderId/status'),
         headers: {
           'Authorization': 'Bearer $accessToken',
+          'Content-Type': 'application/json',
+          'x-client-type': 'mobile',
         },
       );
       if (response.statusCode == 200 || response.statusCode == 201) {
@@ -179,6 +189,7 @@ class OrderApiService {
         headers: {
           'Authorization': 'Bearer $accessToken',
           'Content-Type': 'application/json',
+          'x-client-type': 'mobile',
         },
       );
       if (response.statusCode == 200 || response.statusCode == 201) {
@@ -201,12 +212,51 @@ class OrderApiService {
     }
   }
 
-  static Future<void> downloadInvoice(String accessToken, String orderId) async {
-    final url = Uri.parse('$baseUrl/api/orders/$orderId/invoice?token=$accessToken');
-    if (await canLaunchUrl(url)) {
-      await launchUrl(url, mode: LaunchMode.externalApplication);
+ static Future<void> downloadInvoice(String accessToken, String orderId) async {
+  try {
+    final response = await http.get(
+      Uri.parse('$baseUrl/api/orders/$orderId/invoice'),
+      headers: {
+        'Authorization': 'Bearer $accessToken',
+        'Content-Type': 'application/json',
+        'x-client-type': kIsWeb ? 'web' : 'mobile',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      final fileName = 'invoice_$orderId.pdf';
+
+      if (kIsWeb) {
+        // --- WEB EXECUTION ---
+        // Create a blob from the bytes and trigger a browser download
+        final blob = html.Blob([response.bodyBytes], 'application/pdf');
+        final url = html.Url.createObjectUrlFromBlob(blob);
+        final anchor = html.AnchorElement(href: url)
+          ..setAttribute("download", fileName)
+          ..click();
+        html.Url.revokeObjectUrl(url); // Clean up memory
+      } else {
+        // --- MOBILE EXECUTION (Android / iOS) ---
+        final directory = await getApplicationDocumentsDirectory();
+        final filePath = '${directory.path}/$fileName';
+        final file = File(filePath);
+
+        await file.writeAsBytes(response.bodyBytes);
+
+        final result = await OpenFile.open(filePath);
+        if (result.type != ResultType.done) {
+          throw 'Could not open the invoice file';
+        }
+      }
     } else {
-      throw 'Could not launch $url';
+      String msg = 'Failed to download invoice';
+      try {
+        msg = jsonDecode(response.body)['message'] ?? msg;
+      } catch (_) {}
+      throw msg;
     }
+  } catch (e) {
+    throw 'Error downloading invoice: ${e.toString()}';
   }
+}
 }

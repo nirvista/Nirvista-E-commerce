@@ -95,140 +95,147 @@ class _CartCommonWidgetState extends State<CartCommonWidget> {
         : (item.variant?.price ?? 0.0);
     String img = item.displayImage;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: getCardColor(context),
-        borderRadius: BorderRadius.circular(16.w),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      padding: EdgeInsets.all(12.w),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Product image
-          ClipRRect(
-            borderRadius: BorderRadius.circular(12.w),
-            child: Container(
-              width: 100.w,
-              height: 100.w,
-              color: getGreyCardColor(context),
-              child: img.isNotEmpty
-                  ? Image.network(
-                      img,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Icon(Icons.image_not_supported_outlined, size: 28.w, color: getFontGreyColor(context)),
-                    )
-                  : Icon(Icons.shopping_bag_outlined, size: 28.w, color: getFontGreyColor(context)),
+    return GestureDetector(
+      onTap: () {
+        if (item.product != null) {
+          Constant.sendToNext(context, productDetailScreenRoute, arguments: item.product);
+        }
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: getCardColor(context),
+          borderRadius: BorderRadius.circular(16.w),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
             ),
-          ),
-          SizedBox(width: 14.w),
-          // Details
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: getCustomFont(name, 14, getFontColor(context), 2, fontWeight: FontWeight.w700),
-                    ),
-                    GestureDetector(
-                      onTap: () => _confirmDeleteItem(context, item),
-                      child: Container(
-                        padding: EdgeInsets.all(4.w),
-                        decoration: BoxDecoration(
-                          color: Colors.redAccent.withOpacity(0.08),
-                          shape: BoxShape.circle,
+          ],
+        ),
+        padding: EdgeInsets.all(12.w),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Product image
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12.w),
+              child: Container(
+                width: 100.w,
+                height: 100.w,
+                color: getGreyCardColor(context),
+                child: img.isNotEmpty
+                    ? Image.network(
+                        img,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => Icon(Icons.image_not_supported_outlined, size: 28.w, color: getFontGreyColor(context)),
+                      )
+                    : Icon(Icons.shopping_bag_outlined, size: 28.w, color: getFontGreyColor(context)),
+              ),
+            ),
+            SizedBox(width: 14.w),
+            // Details
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: getCustomFont(name, 14, getFontColor(context), 2, fontWeight: FontWeight.w700),
+                      ),
+                      GestureDetector(
+                        onTap: () => _confirmDeleteItem(context, item),
+                        child: Container(
+                          padding: EdgeInsets.all(4.w),
+                          decoration: BoxDecoration(
+                            color: Colors.redAccent.withOpacity(0.08),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(Icons.delete_outline, size: 18.w, color: Colors.redAccent),
                         ),
-                        child: Icon(Icons.delete_outline, size: 18.w, color: Colors.redAccent),
                       ),
-                    ),
-                  ],
-                ),
-                SizedBox(height: 6.h),
-                if (variantName.isNotEmpty)
-                  Wrap(
-                    spacing: 6.w,
-                    children: variantName.split(",").map((v) => Container(
-                      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
-                      decoration: BoxDecoration(
-                        color: getGreyCardColor(context),
-                        borderRadius: BorderRadius.circular(20.w),
-                      ),
-                      child: getCustomFont(v.trim(), 10, getFontGreyColor(context), 1, fontWeight: FontWeight.w600),
-                    )).toList(),
+                    ],
                   ),
-                SizedBox(height: 12.h),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    getCustomFont("₹${price.toStringAsFixed(0)}", 18, getAccentColor(context), 1, fontWeight: FontWeight.w800),
-                    // Quantity controls
-                    Container(
-                      height: 34.h,
-                      decoration: BoxDecoration(
-                        color: getGreyCardColor(context),
-                        borderRadius: BorderRadius.circular(25.w),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          GestureDetector(
-                            onTap: () => cartController.decreaseQuantity(item.productId, item.variantId),
-                            child: Container(
-                              width: 34.w,
-                              height: 34.h,
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                shape: BoxShape.circle,
-                                border: Border.all(color: dividerColor.withOpacity(0.5)),
-                                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4)],
-                              ),
-                              child: Icon(Icons.remove, size: 14.w, color: getFontColor(context)),
-                            ),
-                          ),
-                          Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 12.w),
-                            child: getCustomFont("${item.quantity}", 14, getFontColor(context), 1, fontWeight: FontWeight.w800),
-                          ),
-                          GestureDetector(
-                            onTap: () {
-                              // If availableStock is 0 but item is already in cart, it likely means the stock data is missing or not fetched yet.
-                              // We only restrict if availableStock is clearly greater than 0 and the limit is actually reached.
-                              if (item.variant != null && item.variant!.availableStock > 0 && item.quantity >= item.variant!.availableStock) {
-                                showCustomToast("Maximum available stock reached");
-                                return;
-                              }
-                              cartController.increaseQuantity(item.productId, item.variantId);
-                            },
-                            child: Container(
-                              width: 34.w,
-                              height: 34.h,
-                              decoration: BoxDecoration(
-                                color: accentColor,
-                                shape: BoxShape.circle,
-                                boxShadow: [BoxShadow(color: accentColor.withOpacity(0.2), blurRadius: 4)],
-                              ),
-                              child: Icon(Icons.add, size: 14.w, color: Colors.white),
-                            ),
-                          ),
-                        ],
-                      ),
+                  SizedBox(height: 6.h),
+                  if (variantName.isNotEmpty)
+                    Wrap(
+                      spacing: 6.w,
+                      children: variantName.split(",").map((v) => Container(
+                        padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
+                        decoration: BoxDecoration(
+                          color: getGreyCardColor(context),
+                          borderRadius: BorderRadius.circular(20.w),
+                        ),
+                        child: getCustomFont(v.trim(), 10, getFontGreyColor(context), 1, fontWeight: FontWeight.w600),
+                      )).toList(),
                     ),
-                  ],
-                ),
-              ],
+                  SizedBox(height: 12.h),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      getCustomFont("₹${price.toStringAsFixed(0)}", 18, getAccentColor(context), 1, fontWeight: FontWeight.w800),
+                      // Quantity controls
+                      Container(
+                        height: 34.h,
+                        decoration: BoxDecoration(
+                          color: getGreyCardColor(context),
+                          borderRadius: BorderRadius.circular(25.w),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            GestureDetector(
+                              onTap: () => cartController.decreaseQuantity(item.productId, item.variantId),
+                              child: Container(
+                                width: 34.w,
+                                height: 34.h,
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: dividerColor.withOpacity(0.5)),
+                                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4)],
+                                ),
+                                child: Icon(Icons.remove, size: 14.w, color: getFontColor(context)),
+                              ),
+                            ),
+                            Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 12.w),
+                              child: getCustomFont("${item.quantity}", 14, getFontColor(context), 1, fontWeight: FontWeight.w800),
+                            ),
+                            GestureDetector(
+                              onTap: () {
+                                // If availableStock is 0 but item is already in cart, it likely means the stock data is missing or not fetched yet.
+                                // We only restrict if availableStock is clearly greater than 0 and the limit is actually reached.
+                                if (item.variant != null && item.variant!.availableStock > 0 && item.quantity >= item.variant!.availableStock) {
+                                  showCustomToast("Maximum available stock reached");
+                                  return;
+                                }
+                                cartController.increaseQuantity(item.productId, item.variantId);
+                              },
+                              child: Container(
+                                width: 34.w,
+                                height: 34.h,
+                                decoration: BoxDecoration(
+                                  color: accentColor,
+                                  shape: BoxShape.circle,
+                                  boxShadow: [BoxShadow(color: accentColor.withOpacity(0.2), blurRadius: 4)],
+                                ),
+                                child: Icon(Icons.add, size: 14.w, color: Colors.white),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

@@ -216,7 +216,7 @@ class _CategoryProductsPageState extends State<CategoryProductsPage> {
                             crossAxisCount: 2,
                             crossAxisSpacing: 12.w,
                             mainAxisSpacing: 12.w,
-                            childAspectRatio: 0.75,
+                            childAspectRatio: 0.65,
                           ),
                           itemCount: filtered.length,
                           itemBuilder: (context, index) {
@@ -316,7 +316,7 @@ class _CategoryProductsPageState extends State<CategoryProductsPage> {
                   child: (product.imageUrl.isNotEmpty && !product.imageUrl.contains("example.com")) 
                     ? CachedNetworkImage(
                       imageUrl: product.imageUrl,
-                      fit: BoxFit.cover,
+                      fit: BoxFit.contain,
                       placeholder: (context, url) => Center(
                         child: CircularProgressIndicator(
                           color: accentColor,
@@ -371,14 +371,14 @@ class _CategoryProductsPageState extends State<CategoryProductsPage> {
                 if (discountPercent > 0)
                   getCustomFont(
                       "₹${basePrice.toStringAsFixed(0)}",
-                      11,
+                      14,
                       const Color(0xFF4B5563),
                       1,
                       fontWeight: FontWeight.w500,
                       decoration: TextDecoration.lineThrough,
                       decorationColor: const Color(0xFF4B5563),
                       decorationThickness: 1.2,
-                      txtHeight: 1.2),
+                      txtHeight: 1.4),
               ],
             ),
             // Discount Badge

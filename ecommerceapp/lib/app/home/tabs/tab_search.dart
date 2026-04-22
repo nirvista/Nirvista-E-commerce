@@ -498,7 +498,7 @@ class _TabSearchState extends State<TabSearch> {
         crossAxisCount: 2,
         crossAxisSpacing: 12.w,
         mainAxisSpacing: 12.w,
-        childAspectRatio: 0.68,
+        childAspectRatio: 0.65,
       ),
       itemCount: _results.length,
       itemBuilder: (context, index) {
@@ -613,7 +613,7 @@ class _TabSearchState extends State<TabSearch> {
                     imageUrl: product.imageUrl.isNotEmpty
                         ? product.imageUrl
                         : 'https://placehold.co/400',
-                    fit: BoxFit.cover,
+                    fit: BoxFit.contain,
                     placeholder: (context, url) => Center(
                       child:
                           CircularProgressIndicator(color: accentColor),

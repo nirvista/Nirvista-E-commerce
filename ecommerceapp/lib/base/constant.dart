@@ -78,28 +78,28 @@ class Constant {
     return completer.future;
   }
 
-  static Color getOrderStatusColor(String status)
-  {
-    switch(status)
-    {
+  static Color getOrderStatusColor(String status) {
+    status = status.toLowerCase();
+    switch (status) {
       case "pending":
-        return "#FBBB00".toColor();
-       case "processing":
-        return "#FBBB00".toColor();
-       case "on-hold":
-        return "#FBBB00".toColor();
-       case "Delivered":
-        return "#04B155".toColor();
-       case "cancelled":
-        return "#FF6565".toColor();
-       case "refunded":
-        return "#FBBB00".toColor();
-       case "failed":
-        return "#FF6565".toColor();
-       case "trash":
-        return "#FBBB00".toColor();
+      case "reserved":
+      case "confirmed":
+      case "processing":
+        return const Color(0xFFF59E0B); // Amber/Orange
+      case "shipped":
+        return const Color(0xFF0D9488); // Teal/Blue-ish
+      case "delivered":
+        return const Color(0xFF22C55E); // Green
+      case "cancelled":
+      case "failed":
+        return const Color(0xFFEF4444); // Red
+      case "return_requested":
+      case "return_initiated":
+      case "returned":
+        return const Color(0xFF6366F1); // Indigo
+      default:
+        return const Color(0xFF6B8680); // Muted Grey
     }
-    return "#FBBB00".toColor();
   }
   static double parseWcPrice(String? price) =>
       (double.tryParse(price ?? "0") ?? 0);
