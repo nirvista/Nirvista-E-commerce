@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Plus, Edit, Trash2, X } from "lucide-react";
+import { Plus, Edit, Trash2, X, Search } from "lucide-react";
 import { getToken } from "../utils/auth";
 import { apiFetch } from "../utils/api";
 
@@ -9,6 +9,7 @@ export default function Categories() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null);
   
+  const [searchTerm, setSearchTerm] = useState("");
   const [modalType, setModalType] = useState(null); // 'create', 'edit'
   const [selectedCategory, setSelectedCategory] = useState(null);
   
@@ -144,6 +145,12 @@ export default function Categories() {
     }
   };
 
+  const filteredCategories = flatCategories.filter(cat => 
+    cat.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    cat.slug.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (cat.description && cat.description.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
+
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto w-full">
       <div className="flex justify-between items-center mb-6">
@@ -152,6 +159,21 @@ export default function Categories() {
           <Plus size={18} />
           Create Category
         </button>
+      </div>
+
+      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-slate-100 dark:border-gray-800 p-4 mb-6">
+        <div className="relative max-w-md">
+          <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <Search size={16} className="text-slate-400" />
+          </span>
+          <input 
+            type="text" 
+            value={searchTerm} 
+            onChange={(e) => setSearchTerm(e.target.value)} 
+            className="w-full pl-10 pr-3 py-2 border border-slate-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 dark:bg-gray-800 dark:text-white text-sm" 
+            placeholder="Search categories by name, slug, or description..." 
+          />
+        </div>
       </div>
 
       <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-slate-100 dark:border-gray-800 overflow-hidden">
@@ -170,12 +192,13 @@ export default function Categories() {
                 <tr><td colSpan="4" className="p-8 text-center text-slate-500">Loading categories...</td></tr>
               ) : errorMsg ? (
                 <tr><td colSpan="4" className="p-8 text-center text-red-500 font-medium bg-red-50 dark:bg-red-900/20">{errorMsg}</td></tr>
-              ) : flatCategories.length === 0 ? (
+              ) : filteredCategories.length === 0 ? (
                 <tr><td colSpan="4" className="p-8 text-center text-slate-500">No categories found.</td></tr>
               ) : (
-                flatCategories.map((cat) => (
+                filteredCategories.map((cat) => (
                   <tr key={cat.id} className="border-b border-slate-100 dark:border-gray-800 hover:bg-slate-50 dark:hover:bg-gray-800/50 transition">
                     <td className="p-4 text-slate-800 dark:text-gray-200 font-medium">
+                      {/* Maintain visual hierarchy if searching returns nested items */}
                       <span style={{ marginLeft: `${cat.level * 20}px` }}>
                         {cat.level > 0 ? "↳ " : ""}{cat.name}
                       </span>

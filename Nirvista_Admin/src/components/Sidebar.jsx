@@ -11,7 +11,8 @@ import {
   Package,
   Tag,
   FolderTree,
-  ShoppingCart
+  ShoppingCart,
+  Hash
 } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import './Sidebar.css';
@@ -46,6 +47,11 @@ const menu = [
     label: "Brands",
     icon: <Tag size={20} />,
     path: "/brands",
+  },
+  {
+    label: "Tags",
+    icon: <Hash size={20} />,
+    path: "/tags",
   }
 ];
 
