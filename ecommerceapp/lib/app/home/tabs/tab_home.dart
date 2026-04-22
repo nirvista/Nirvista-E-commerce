@@ -677,7 +677,7 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
                     }
                     var apiBrands = snapshot.data!;
                     var brands = [
-                      BrandModel(id: 'all', name: 'All', logoUrl: ''),
+                      BrandModel(id: 'all', name: 'All', logo: ''),
                       ...apiBrands
                     ];
                     return ListView.builder(

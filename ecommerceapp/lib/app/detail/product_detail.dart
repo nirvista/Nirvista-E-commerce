@@ -18,6 +18,7 @@ import 'package:pet_shop/base/pref_data.dart';
 import '../../services/product_api.dart';
 import 'package:pet_shop/app/detail/product_images_carousel.dart';
 import 'package:pet_shop/app/detail/rating_widget.dart';
+import '../../services/review_api.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   const ProductDetailScreen({Key? key}) : super(key: key);
@@ -41,6 +42,9 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
   RxString brandName = ''.obs;
   PrefData prefData = PrefData();
   ProductModel? product;
+  
+  List<ReviewModel> productReviews = [];
+  bool isLoadingReviews = false;
 
   @override
   void initState() {
@@ -51,6 +55,22 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
       _loadWishlistStatus(product!.id);
       _fetchBrandName(product!);
       _enrichProductDetail(product!.id);
+      _fetchReviews(product!.id);
+    }
+  }
+
+  void _fetchReviews(String productId) async {
+    setState(() => isLoadingReviews = true);
+    try {
+      final res = await ReviewApiService.getProductReviews(productId);
+      if (res['success'] && res['data'] != null && res['data']['data'] != null) {
+        final List reviewsData = res['data']['data'];
+        setState(() {
+          productReviews = reviewsData.map((e) => ReviewModel.fromJson(e)).toList();
+        });
+      }
+    } catch (_) {} finally {
+      if (mounted) setState(() => isLoadingReviews = false);
     }
   }
 
@@ -157,7 +177,10 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
                     if (product!.description != null && product!.description!.isNotEmpty)
                       _buildDescriptionSection(context, product!, margin),
                     SizedBox(height: 16.h),
-                    _buildProductRatingSection(context, product!, margin),
+                    if (productReviews.isNotEmpty) ...[
+                      _buildReviewsSection(context, margin),
+                      SizedBox(height: 20.h),
+                    ],
                     SizedBox(height: 20.h),
                   ],
                 ),
@@ -733,25 +756,54 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
   }
 
   // ═══════════════════════════════════════════════════════
-  // PRODUCT RATING SECTION - Let user rate the product
+  // REVIEWS SECTION
   // ═══════════════════════════════════════════════════════
 
-  Widget _buildProductRatingSection(
-      BuildContext context, ProductModel product, double margin) {
+  Widget _buildReviewsSection(BuildContext context, double margin) {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        getCustomFont("Rate This Product", 16, getFontColor(context), 1,
-            fontWeight: FontWeight.w700, textAlign: TextAlign.center),
-        SizedBox(height: 8.h),
-        StarRatingWidget(
-          initialRating: 0.0,
-          isReadOnly: false,
-          starSize: 32.0,
-          alignment: MainAxisAlignment.center,
-          showLabel: false,
-          onRatingChanged: (rating) {
-            // Handle rating submission
-            print("User rated product: $rating stars");
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: margin),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              getCustomFont(
+                "Customer Reviews",
+                16,
+                getFontColor(context),
+                1,
+                fontWeight: FontWeight.w700,
+              ),
+              getCustomFont(
+                "${productReviews.length} Reviews",
+                13,
+                getFontGreyColor(context),
+                1,
+                fontWeight: FontWeight.w600,
+              ),
+            ],
+          ),
+        ),
+        SizedBox(height: 12.h),
+        ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          padding: EdgeInsets.symmetric(horizontal: margin),
+          itemCount: productReviews.length > 3 ? 3 : productReviews.length,
+          itemBuilder: (context, index) {
+            final review = productReviews[index];
+            String formattedDate = "";
+            if (review.createdAt != null) {
+              formattedDate = "${review.createdAt!.day}/${review.createdAt!.month}/${review.createdAt!.year}";
+            }
+            return ProductReviewCard(
+              reviewerName: "Customer", // Since we don't fetch user info with reviews in backend currently
+              rating: review.rating.toDouble(),
+              reviewText: review.comment,
+              reviewHeadline: review.headline,
+              reviewDate: formattedDate,
+            );
           },
         ),
       ],

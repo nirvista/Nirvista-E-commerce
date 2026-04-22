@@ -10,6 +10,7 @@ import '../../base/widget_utils.dart';
 import '../../app/model/api_models.dart';
 import '../../services/order_api.dart';
 import '../../base/get/order_controller.dart';
+import '../detail/rating_widget.dart';
 
 class TrackOrder extends StatefulWidget {
   const TrackOrder({Key? key}) : super(key: key);
@@ -31,6 +32,7 @@ class _TrackOrder extends State<TrackOrder> {
   late String orderId;
 
   final Rx<OrderModel?> detailedOrder = Rx<OrderModel?>(null);
+  final RxMap<String, ReviewModel> userReviews = <String, ReviewModel>{}.obs;
   final RxBool isLoadingDetails = true.obs;
 
   @override
@@ -481,6 +483,53 @@ class _TrackOrder extends State<TrackOrder> {
                         getCustomFont("Qty: ${item.quantity}", 12, getFontGreyColor(context), 1),
                         if (item.variant?.variantName != null) 
                           getCustomFont("Variant: ${item.variant!.variantName}", 12, getFontGreyColor(context), 1),
+                        
+                        // Rating/Review Section
+                        if (order.orderStatus.toLowerCase() == 'delivered') ...[
+                          getVerSpace(8.h),
+                          Obx(() {
+                            final review = userReviews[item.productId];
+                            if (review != null) {
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: List.generate(5, (index) => Icon(
+                                      index < review.rating ? Icons.star : Icons.star_outline,
+                                      color: ratedColor,
+                                      size: 14.w,
+                                    )),
+                                  ),
+                                  getVerSpace(2.h),
+                                  getCustomFont(review.headline, 11, getFontColor(context), 1, fontWeight: FontWeight.w600),
+                                ],
+                              );
+                            } else {
+                              return GestureDetector(
+                                onTap: () {
+                                  showDialog(
+                                    context: context,
+                                    builder: (ctx) => ProductRatingDialog(
+                                      productId: item.productId,
+                                      userId: loginController.currentUser.value?.id ?? '',
+                                      onReviewSubmitted: (newReview) {
+                                        userReviews[item.productId] = newReview;
+                                      },
+                                    ),
+                                  );
+                                },
+                                child: Container(
+                                  padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
+                                  decoration: BoxDecoration(
+                                    border: Border.all(color: accentColor),
+                                    borderRadius: BorderRadius.circular(4.w),
+                                  ),
+                                  child: getCustomFont("Rate Product", 10, accentColor, 1, fontWeight: FontWeight.w600),
+                                ),
+                              );
+                            }
+                          }),
+                        ],
                       ],
                     ),
                   ),
