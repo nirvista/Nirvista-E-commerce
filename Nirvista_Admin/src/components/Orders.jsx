@@ -278,7 +278,7 @@ export default function Orders() {
                           </td>
                           <td className="p-4">
                             <span className="block text-sm text-slate-500 mb-0.5">{itemCount} items</span>
-                            <span className="block font-medium text-slate-800 dark:text-gray-200">${Number(order.totalAmount).toFixed(2)}</span>
+                            <span className="block font-medium text-slate-800 dark:text-gray-200">₹{Number(order.totalAmount).toFixed(2)}</span>
                           </td>
                           <td className="p-4 flex items-center justify-center">
                             <button
@@ -365,7 +365,7 @@ export default function Orders() {
 
                 <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-100 dark:border-gray-800">
                   <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total</span>
-                  <span className="font-bold text-lg text-slate-800 dark:text-gray-100">${Number(selectedOrder.totalAmount).toFixed(2)}</span>
+                  <span className="font-bold text-lg text-slate-800 dark:text-gray-100">₹{Number(selectedOrder.totalAmount).toFixed(2)}</span>
                 </div>
               </div>
             </div>
@@ -461,9 +461,9 @@ export default function Orders() {
                             </>
                           ) : <span className="text-slate-400 text-xs italic">Deleted Vendor</span>}
                         </td>
-                        <td className="p-4 text-right text-sm text-slate-700 dark:text-gray-300">${Number(item.priceAtPurchase).toFixed(2)}</td>
+                        <td className="p-4 text-right text-sm text-slate-700 dark:text-gray-300">₹{Number(item.priceAtPurchase).toFixed(2)}</td>
                         <td className="p-4 text-right text-sm font-semibold text-slate-800 dark:text-gray-200">x{item.quantity}</td>
-                        <td className="p-4 text-right text-sm font-bold text-slate-800 dark:text-gray-100">${(Number(item.priceAtPurchase) * item.quantity).toFixed(2)}</td>
+                        <td className="p-4 text-right text-sm font-bold text-slate-800 dark:text-gray-100">₹{(Number(item.priceAtPurchase) * item.quantity).toFixed(2)}</td>
                       </tr>
                     ))}
                   </tbody>

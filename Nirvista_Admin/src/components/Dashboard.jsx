@@ -67,7 +67,7 @@ export default function Dashboard() {
         <SummaryCard 
           icon={<TrendingUp size={24} className="text-emerald-600 dark:text-emerald-400" />} 
           title="Total Revenue" 
-          value={`$${summary.totalRevenue.toFixed(2)}`} 
+          value={`₹${summary.totalRevenue.toFixed(2)}`} 
           bgClass="bg-emerald-50 dark:bg-emerald-900/20" 
         />
         <SummaryCard 
@@ -102,7 +102,7 @@ export default function Dashboard() {
                 return (
                   <div key={idx} className="chart-bar-group flex-1 flex flex-col items-center justify-end h-full group relative">
                     <div className="chart-tooltip opacity-0 group-hover:opacity-100 transition-opacity absolute -top-8 bg-slate-800 text-white text-xs py-1 px-2 rounded pointer-events-none z-10 whitespace-nowrap">
-                       ${data.sales.toFixed(2)}
+                       ₹{data.sales.toFixed(2)}
                     </div>
                     <div 
                       className="w-full bg-teal-500/80 hover:bg-teal-400 dark:bg-teal-600 dark:hover:bg-teal-500 rounded-t-sm transition-all duration-300"
@@ -183,7 +183,7 @@ export default function Dashboard() {
                     </div>
                     <div className="text-right">
                        <p className="text-xs font-semibold text-slate-500 dark:text-gray-400 uppercase tracking-wider">Revenue</p>
-                       <p className="text-sm font-bold text-slate-800 dark:text-gray-100">${vendor.revenue.toFixed(2)}</p>
+                       <p className="text-sm font-bold text-slate-800 dark:text-gray-100">₹{vendor.revenue.toFixed(2)}</p>
                     </div>
                  </div>
                ))

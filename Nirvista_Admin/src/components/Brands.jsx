@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Plus, Edit, Trash2, X } from "lucide-react";
+import { Plus, Edit, Trash2, X, Search } from "lucide-react";
 import { getToken } from "../utils/auth";
 import { apiFetch } from "../utils/api";
 
@@ -8,6 +8,7 @@ export default function Brands() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null);
   
+  const [searchTerm, setSearchTerm] = useState("");
   const [modalType, setModalType] = useState(null); // 'create', 'edit'
   const [selectedBrand, setSelectedBrand] = useState(null);
   
@@ -125,6 +126,11 @@ export default function Brands() {
     }
   };
 
+  const filteredBrands = brands.filter(brand => 
+    brand.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (brand.description && brand.description.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
+
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto w-full">
       <div className="flex justify-between items-center mb-6">
@@ -133,6 +139,21 @@ export default function Brands() {
           <Plus size={18} />
           Create Brand
         </button>
+      </div>
+
+      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-slate-100 dark:border-gray-800 p-4 mb-6">
+        <div className="relative max-w-md">
+          <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <Search size={16} className="text-slate-400" />
+          </span>
+          <input 
+            type="text" 
+            value={searchTerm} 
+            onChange={(e) => setSearchTerm(e.target.value)} 
+            className="w-full pl-10 pr-3 py-2 border border-slate-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 dark:bg-gray-800 dark:text-white text-sm" 
+            placeholder="Search brands by name or description..." 
+          />
+        </div>
       </div>
 
       <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-slate-100 dark:border-gray-800 overflow-hidden">
@@ -151,10 +172,10 @@ export default function Brands() {
                 <tr><td colSpan="4" className="p-8 text-center text-slate-500">Loading brands...</td></tr>
               ) : errorMsg ? (
                 <tr><td colSpan="4" className="p-8 text-center text-red-500 font-medium bg-red-50 dark:bg-red-900/20">{errorMsg}</td></tr>
-              ) : brands.length === 0 ? (
+              ) : filteredBrands.length === 0 ? (
                 <tr><td colSpan="4" className="p-8 text-center text-slate-500">No brands found.</td></tr>
               ) : (
-                brands.map((brand) => (
+                filteredBrands.map((brand) => (
                   <tr key={brand.id} className="border-b border-slate-100 dark:border-gray-800 hover:bg-slate-50 dark:hover:bg-gray-800/50 transition">
                     <td className="p-4">
                       {brand.logoUrl ? (

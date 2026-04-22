@@ -12,6 +12,7 @@ import WishlistItem from './wishlistItemModel.js';
 import Order from './orderModel.js';
 import OrderItem from './orderItemModel.js';
 import VendorProfile from './vendorProfileModel.js';
+import Review from './reviewModel.js';
 
 // --- Cart ---
 Cart.hasMany(CartItem, { foreignKey: 'cartId', as: 'items' });
@@ -58,6 +59,11 @@ Tag.belongsToMany(Product, {
     foreignKey: "tagId"
 });
 
+// --- Reviews ---
+Product.hasMany(Review, { foreignKey: 'productId', as: 'reviews', onDelete: 'CASCADE' });
+Review.belongsTo(Product, { foreignKey: 'productId', as: 'product'});
+Review.belongsTo(User, { foreignKey: 'userId', as: 'user'});
+
 // --- Wishlist ---
 User.hasOne(Wishlist, { foreignKey: 'userId', as: 'wishlist' });
 Wishlist.belongsTo(User, { foreignKey: 'userId' });
@@ -89,5 +95,5 @@ OrderItem.belongsTo(User, { foreignKey: 'vendorId', as: 'vendor' });
 export {
     Cart, CartItem, Product, User, UserAddress, ProductVariant,
     Category, Brand, Tag, Wishlist, WishlistItem, Order, OrderItem,
-    VendorProfile
+    VendorProfile, Review
 };

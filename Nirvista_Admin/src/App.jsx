@@ -13,6 +13,7 @@ import Products from "./components/Products";
 import Categories from "./components/Categories";
 import Brands from "./components/Brands";
 import Orders from "./components/Orders";
+import Tags from "./components/Tags";
 
 function ProtectedLayout({ sidebarOpen, setSidebarOpen, theme, setTheme }) {
   return (
@@ -73,6 +74,7 @@ export default function App() {
           <Route path="/products" element={<Products />} />
           <Route path="/categories" element={<Categories />} />
           <Route path="/brands" element={<Brands />} />
+          <Route path="/tags" element={<Tags />} />
           {/* Add more protected routes here */}
         </Route>
         <Route path="*" element={<Navigate to="/" />} />
