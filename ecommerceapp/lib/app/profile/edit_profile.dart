@@ -189,7 +189,7 @@ class _EditProfile extends State<EditProfile> {
 
                 try {
                   await dotenv.load(fileName: ".env");
-                  String? baseUrl = dotenv.env['BASE_URL'];
+                  String? baseUrl = dotenv.env['BASE_URL']?.trim();
                   String? accessToken = loginController.accessToken;
 
                   if (baseUrl == null || baseUrl.isEmpty) {

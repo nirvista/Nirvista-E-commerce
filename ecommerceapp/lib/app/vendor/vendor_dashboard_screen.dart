@@ -1082,6 +1082,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
     final skuC      = TextEditingController();
     final stockC    = TextEditingController();
     final urlC      = TextEditingController();
+    final materialC = TextEditingController();
     String? selectedBrandId;
     String? selectedCategoryId;
     final List<Map<String, dynamic>> variants    = [];
@@ -1146,6 +1147,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
               'description': descC.text.trim(),
               'categoryId' : selectedCategoryId,
               'brandId'    : selectedBrandId,
+              'material'   : materialC.text.trim(),
               'variants'   : [defaultVariant, ...variants],
             };
 
@@ -1190,6 +1192,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
             _dInput(priceC,    'Base Price (₹) *',   Icons.currency_rupee_rounded, numeric: true),
             _dInput(discountC, 'Discount Price (₹)', Icons.tag_rounded, numeric: true),
             _dInput(skuC,      'SKU / Variant Name', Icons.qr_code_2_rounded),
+            _dInput(materialC, 'Material (e.g. cotton, leather)', Icons.texture_rounded),
             _dInput(stockC,    'Initial Stock',      Icons.inventory_2_rounded, numeric: true),
             _sectionLabel('Product Images'),
             _ImagePickerAdder(
@@ -1843,9 +1846,25 @@ class _ProductCard extends StatelessWidget {
     final variants     = product['variants'] as List? ?? [];
     final firstVariant = variants.isNotEmpty ? variants.first as Map<String, dynamic> : null;
     final images       = <String>[];
-    if (product['imageUrls'] is List) images.addAll((product['imageUrls'] as List).map((e) => e.toString()));
-    if (images.isEmpty && firstVariant != null && firstVariant['images'] is List) {
-      images.addAll((firstVariant['images'] as List).map((e) => e.toString()));
+    if (product['imageUrls'] is List) {
+      images.addAll((product['imageUrls'] as List).map((e) => e.toString()));
+    }
+    if (images.isEmpty && product['images'] is List) {
+      images.addAll((product['images'] as List).map((e) => e.toString()));
+    }
+    // Fall back to scanning ALL variants — the backend stores URLs in variant.images
+    if (images.isEmpty) {
+      for (final v in variants) {
+        if (v is Map<String, dynamic> && v['images'] is List) {
+          final vImgs = (v['images'] as List)
+              .map((e) => e.toString())
+              .where((s) => s.isNotEmpty);
+          if (vImgs.isNotEmpty) {
+            images.addAll(vImgs);
+            break;
+          }
+        }
+      }
     }
     final status = product['listingStatus']?.toString();
     final sku    = firstVariant?['sku'] ?? firstVariant?['variantName'] ?? '—';

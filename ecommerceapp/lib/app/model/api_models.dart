@@ -80,7 +80,7 @@ class ProductModel {
 
   static String? _parseImage(dynamic e) {
     if (e == null) return null;
-    final String baseUrl = dotenv.env['BASE_URL'] ?? '';
+    final String baseUrl = (dotenv.env['BASE_URL'] ?? '').trim();
     
     String? path;
     if (e is Map) {

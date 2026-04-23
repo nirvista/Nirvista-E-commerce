@@ -35,3 +35,5 @@ String paymentMethodScreenRoute="keyPaymentMethodScreenRoute";
 String categoryProductsPageRoute="keyCategoryProductsPageRoute";
 String customerCareScreenRoute="keyCustomerCareScreenRoute";
 String vendorDashboardRoute="keyVendorDashboardRoute";
+String vendorProfileRoute="keyVendorProfileRoute";
+String vendorApprovalRoute="keyVendorApprovalRoute"; 

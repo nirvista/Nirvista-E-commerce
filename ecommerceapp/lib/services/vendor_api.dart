@@ -55,6 +55,46 @@ class VendorApiService {
       response.statusCode >= 200 && response.statusCode < 300;
 
   // ─────────────────────────────────────────────────────────────────────────────
+  //  VENDOR PROFILE  &  CURRENT USER
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /// POST /api/vendor/profile
+  /// Creates the vendor profile for the currently authenticated vendor.
+  /// Backend returns 400 "Vendor profile already exists" if one is present.
+  static Future<Map<String, dynamic>> createVendorProfile(
+    String accessToken,
+    Map<String, dynamic> payload,
+  ) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/profile'),
+        headers: _headers(accessToken),
+        body: jsonEncode(payload),
+      );
+      if (_isOk(response)) return _success(response);
+      return _failure(response, 'Failed to create vendor profile');
+    } catch (e) {
+      return {'success': false, 'message': 'Error: $e'};
+    }
+  }
+
+  /// GET /api/auth/me — returns the current user including userStatus.
+  /// Used after login to decide where to route a vendor
+  /// (pending → profile screen, active → dashboard, suspended → blocked).
+  static Future<Map<String, dynamic>> getCurrentUser(String accessToken) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$_baseUrl/api/auth/me'),
+        headers: _headers(accessToken),
+      );
+      if (_isOk(response)) return _success(response);
+      return _failure(response, 'Failed to fetch current user');
+    } catch (e) {
+      return {'success': false, 'message': 'Error: $e'};
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
   //  PRODUCTS
   // ─────────────────────────────────────────────────────────────────────────────
 
