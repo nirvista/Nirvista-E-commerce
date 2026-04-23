@@ -4115,7 +4115,7 @@ Widget buildBestSellingItem(BuildContext context, WooProduct product,
         children: [
           getSmoothImage(context, product.images[0].src ?? "", 112.w,
               double.infinity, 18.w,
-              fit: BoxFit.cover),
+              fit: BoxFit.contain),
           12.w.horizontalSpace,
           Expanded(
             flex: 1,
@@ -4199,7 +4199,7 @@ Widget buildCartItem(
         children: [
           getSmoothImage(context, product.images[0].src ?? "", 112.w,
               double.infinity, 18.w,
-              fit: BoxFit.cover),
+              fit: BoxFit.contain),
           12.w.horizontalSpace,
           Expanded(
             flex: 1,
@@ -4291,7 +4291,7 @@ Widget buildBuyNowCartItem(
         children: [
           getSmoothImage(context, product.images![0].src ?? "", 112.w,
               double.infinity, 18.w,
-              fit: BoxFit.cover),
+              fit: BoxFit.contain),
           12.w.horizontalSpace,
           Expanded(
             flex: 1,
@@ -4608,7 +4608,7 @@ Widget buildNewArrivalItem(
                       double.infinity,
                       double.infinity,
                       22.w,
-                      fit: BoxFit.cover)
+                      fit: BoxFit.contain)
                   // getCircularNetworkImage(context, double.infinity,
                   //     double.infinity, 22.h, product.images[0].src ?? "",
                   //     boxFit: BoxFit.cover),
@@ -4838,18 +4838,26 @@ Widget getDefaultHeader(BuildContext context, String title, Function function,
     ValueChanged<String>? onSubmit,
     TextEditingController? controller}) {
   double horSpace = FetchPixels.getDefaultHorSpaceFigma(context);
+  bool isDefault = (color == Colors.white);
   return Container(
-    color: (color == Colors.white) ? getCardColor(context) : color,
+    decoration: isDefault ? const BoxDecoration(
+      gradient: LinearGradient(
+        colors: [Color(0xFF14B8A6), Color(0xFF0D9488), Color(0xFF0F766E)],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ),
+      borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
+    ) : BoxDecoration(color: color),
     child: Column(
       children: [
         Container(
           width: double.infinity,
-          color: (color == Colors.white) ? getCardColor(context) : color,
+          color: Colors.transparent,
           padding: EdgeInsets.only(
             top: Constant.getToolbarTopHeight(context) + 14.h,
+            bottom: isShowSearch ? 0 : 14.h,
           ),
           margin: EdgeInsets.symmetric(horizontal: horSpace),
-          // height: toolbarHeight,
           child: Stack(
             alignment: Alignment.center,
             children: [
@@ -4857,10 +4865,10 @@ Widget getDefaultHeader(BuildContext context, String title, Function function,
                 visible: isShowBack,
                 child: Align(
                     alignment: Alignment.centerLeft,
-                    child: getBackIcon(context, function)),
+                    child: getBackIcon(context, function, colors: isDefault ? Colors.white : null)),
               ),
               Center(
-                  child: getCustomFont(title, 24, getFontColor(context), 1,
+                  child: getCustomFont(title, 22, isDefault ? Colors.white : getFontColor(context), 1,
                       fontWeight: FontWeight.w700,
                       textAlign: TextAlign.center)),
               Align(
@@ -4868,7 +4876,7 @@ Widget getDefaultHeader(BuildContext context, String title, Function function,
                 child: (withFilter)
                     ? InkWell(
                         child: getSvgImageWithSize(
-                            context, "filter.svg", 24.h, 24.h),
+                            context, "filter.svg", 24.h, 24.h, color: isDefault ? Colors.white : null),
                         onTap: () {
                           filterFun!();
                         },

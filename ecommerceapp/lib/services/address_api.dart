@@ -4,7 +4,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class AddressApiService {
   static String get baseUrl {
-    final url = dotenv.env['BASE_URL'];
+    final url = dotenv.env['BASE_URL']?.trim();
     if (url == null) {
       throw Exception("BASE_URL not found in .env file");
     }

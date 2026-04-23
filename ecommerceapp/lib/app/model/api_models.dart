@@ -1,21 +1,21 @@
 import 'dart:convert';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:collection/collection.dart';
 
 class ProductModel {
-  final String id;
-  final String title;
-  final String? description;
-  final String categoryId;
-  final String brandId;
-  final String brandName;
-  final String? material;
-  final double rating;
+  String id;
+  String title;
+  String? description;
+  String categoryId;
+  String brandId;
+  String brandName;
+  String? material;
+  double rating;
   List<VariantModel> variants;
   List<String> images;
   String? thumbnail;
   double? basePrice;
   double? salePrice;
-
 
   ProductModel({
     required this.id,
@@ -25,7 +25,7 @@ class ProductModel {
     required this.brandId,
     this.brandName = '',
     this.material,
-    required this.rating,
+    this.rating = 0.0,
     this.variants = const [],
     this.images = const [],
     this.thumbnail,
@@ -33,49 +33,39 @@ class ProductModel {
     this.salePrice,
   });
 
-
-
   factory ProductModel.fromJson(Map<String, dynamic> json) {
-    // Try to get brand name from nested 'brand' object or root-level 'brandName'
-    String parsedBrandName = json['brandName']?.toString() ?? '';
-    if (parsedBrandName.isEmpty && json['brand'] != null && json['brand'] is Map) {
-      parsedBrandName = json['brand']['name']?.toString() ?? '';
+    // Robust parsing for price and rating which might come as strings or numbers
+    double parseDouble(dynamic value) {
+      if (value == null) return 0.0;
+      if (value is num) return value.toDouble();
+      return double.tryParse(value.toString()) ?? 0.0;
     }
+
+    // Try to get brand name from nested 'brand' object or root-level 'brandName'
+    String bName = json['brandName']?.toString() ?? '';
+    if (bName.isEmpty && json['brand'] != null && json['brand'] is Map) {
+      bName = json['brand']['name']?.toString() ?? '';
+    }
+
     return ProductModel(
       id: json['id']?.toString() ?? '',
-      title: json['title']?.toString() ?? '',
+      title: json['title']?.toString() ?? json['name']?.toString() ?? '',
       description: json['description']?.toString(),
-      categoryId: json['categoryId']?.toString() ?? '',
-      brandId: json['brandId']?.toString() ?? '',
-      brandName: parsedBrandName,
+      categoryId: json['categoryId']?.toString() ?? json['category']?.toString() ?? '',
+      brandId: json['brandId']?.toString() ?? json['brand_id']?.toString() ?? '',
+      brandName: bName,
       material: json['material']?.toString(),
-      rating: json['rating'] != null 
-          ? (json['rating'] is num ? (json['rating'] as num).toDouble() : double.tryParse(json['rating'].toString().replaceAll(',', '')) ?? 0.0)
-          : 0.0,
-      variants: (json['variants'] != null && json['variants'] is List)
-          ? (json['variants'] as List).map((i) => VariantModel.fromJson(i)).toList()
+      rating: parseDouble(json['rating'] ?? json['averageRating']),
+      variants: json['variants'] != null
+          ? (json['variants'] as List).map((v) => VariantModel.fromJson(v)).toList()
           : [],
       images: json['images'] != null
-          ? (json['images'] is List 
-              ? (json['images'] as List).map((i) => _parseImage(i) ?? '').where((s) => s.isNotEmpty).toList()
-              : [_parseImage(json['images']) ?? ''].where((s) => s.isNotEmpty).toList())
+          ? (json['images'] as List).map((e) => _parseImage(e)).whereNotNull().toList()
           : [],
-      thumbnail: _parseImage(json['image'] ?? json['thumbnail'] ?? json['productImage'] ?? json['imageUrl'] ?? json['mainImage'] ?? json['featuredImage'] ?? json['image_url'] ?? json['img_url']),
-      basePrice: _parseNum(json['price'] ?? json['originalPrice'] ?? json['basePrice'] ?? json['mrp'] ?? json['actual_price']),
-      salePrice: _parseNum(json['discountPrice'] ?? json['salePrice'] ?? json['discount_price'] ?? json['sale_price'] ?? json['selling_price']),
+      thumbnail: _parseImage(json['thumbnail'] ?? json['image'] ?? json['imageUrl'] ?? json['productImage']),
+      basePrice: parseDouble(json['basePrice'] ?? json['originalPrice'] ?? json['price']),
+      salePrice: parseDouble(json['salePrice'] ?? json['discountPrice'] ?? json['currentPrice']),
     );
-  }
-
-  static double? _parseNum(dynamic v) {
-    if (v == null) return null;
-    if (v is num) return v.toDouble();
-    if (v is Map) {
-      // Handle cases like {"amount": 100, "original_price": 120}
-      final nested = v['amount'] ?? v['price'] ?? v['value'] ?? v['mrp'] ?? v['current'];
-      if (nested != null) return _parseNum(nested);
-    }
-    String s = v.toString().replaceAll(RegExp(r'[^0-9.]'), '');
-    return double.tryParse(s);
   }
 
   static String? _parseImage(dynamic e) {
@@ -108,8 +98,6 @@ class ProductModel {
     }
     return cleanPath;
   }
-
-
 
   // Helpers for UI
   double get currentPrice {
@@ -163,7 +151,6 @@ class ProductModel {
     if (other.salePrice != null && other.salePrice! > 0) salePrice = other.salePrice;
   }
 }
-
 
 class VariantModel {
   final String id;
@@ -251,7 +238,7 @@ class VariantModel {
     return VariantModel(
       id: json['id']?.toString() ?? '',
       productId: json['productId']?.toString() ?? '',
-      variantName: json['variantName']?.toString(),
+      variantName: json['variantName']?.toString() ?? json['name']?.toString(),
       price: price,
       discountPrice: discountPrice,
       images: parsedImages,
@@ -269,17 +256,15 @@ class VariantModel {
 class CategoryModel {
   final String id;
   final String name;
-  final String slug;
   final String? description;
-  final String? parentId;
+  final String? image;
   final List<CategoryModel> children;
 
   CategoryModel({
     required this.id,
     required this.name,
-    required this.slug,
     this.description,
-    this.parentId,
+    this.image,
     this.children = const [],
   });
 
@@ -287,9 +272,8 @@ class CategoryModel {
     return CategoryModel(
       id: json['id']?.toString() ?? '',
       name: json['name']?.toString() ?? '',
-      slug: json['slug']?.toString() ?? '',
       description: json['description']?.toString(),
-      parentId: json['parentId']?.toString(),
+      image: ProductModel._parseImage(json['image'] ?? json['thumbnail'] ?? json['imageUrl']),
       children: json['children'] != null
           ? (json['children'] as List).map((i) => CategoryModel.fromJson(i)).toList()
           : [],
@@ -301,21 +285,23 @@ class BrandModel {
   final String id;
   final String name;
   final String? description;
-  final String? logoUrl;
+  final String? logo;
 
   BrandModel({
     required this.id,
     required this.name,
     this.description,
-    this.logoUrl,
+    this.logo,
   });
+
+  String get logoUrl => logo ?? '';
 
   factory BrandModel.fromJson(Map<String, dynamic> json) {
     return BrandModel(
       id: json['id']?.toString() ?? '',
       name: json['name']?.toString() ?? '',
       description: json['description']?.toString(),
-      logoUrl: json['logoUrl']?.toString(),
+      logo: ProductModel._parseImage(json['logo'] ?? json['thumbnail'] ?? json['imageUrl']),
     );
   }
 }
@@ -366,7 +352,6 @@ class CartItemModel {
       ),
     );
   }
-
 
   String get displayImage {
     if (variant != null && variant!.images.isNotEmpty) {
@@ -448,76 +433,65 @@ class OrderItemModel {
       returnedQuantity: json['returnedQuantity'] != null ? (json['returnedQuantity'] is num ? (json['returnedQuantity'] as num).toInt() : int.tryParse(json['returnedQuantity'].toString()) ?? 0) : 0,
       product: json['product'] != null ? ProductModel.fromJson(json['product']) : null,
       variant: json['variant'] != null ? VariantModel.fromJson(json['variant']) : null,
-      image: ProductModel._parseImage(json['image'] ?? json['thumbnail'] ?? json['productImage'] ?? json['imageUrl'] ?? json['mainImage'] ?? json['variantImage'] ?? json['src']),
+      image: ProductModel._parseImage(json['image'] ?? json['thumbnail'] ?? json['imageUrl'] ?? json['productImage']),
     );
   }
 
 
   String get displayImage {
-    if (variant != null && variant!.images.isNotEmpty) {
-      return variant!.images.first;
-    }
-    if (product != null && product!.imageUrl.isNotEmpty) {
-      return product!.imageUrl;
-    }
-    if (image != null && image!.isNotEmpty) {
-      return image!;
-    }
+    if (image != null && image!.isNotEmpty) return image!;
+    if (variant != null && variant!.images.isNotEmpty) return variant!.images.first;
+    if (product != null && product!.imageUrl.isNotEmpty) return product!.imageUrl;
     return '';
   }
-
 }
 
 class OrderModel {
   final String id;
   final String userId;
-  final String addressId;
   final double totalAmount;
   String orderStatus;
-  final String paymentMethod;
   final String paymentStatus;
-  final String? razorpayOrderId;
-  final String? razorpayPaymentId;
-  final String createdAt;
+  final String paymentMethod;
   final String? shippingAddress;
+  final String createdAt;
   final List<OrderItemModel> items;
 
   OrderModel({
     required this.id,
     required this.userId,
-    required this.addressId,
     required this.totalAmount,
     required this.orderStatus,
-    required this.paymentMethod,
     required this.paymentStatus,
-    this.razorpayOrderId,
-    this.razorpayPaymentId,
-    required this.createdAt,
+    required this.paymentMethod,
     this.shippingAddress,
+    required this.createdAt,
     this.items = const [],
   });
 
   factory OrderModel.fromJson(Map<String, dynamic> json) {
-    String? derivedAddr;
-    final addressData = json['shippingAddress'] ?? json['address'];
-    if (addressData != null && addressData is Map) {
-      final a = addressData;
-      derivedAddr = "${a['addressLine1'] ?? ''}${a['addressLine2'] != null && a['addressLine2'].toString().isNotEmpty ? ', ' + a['addressLine2'].toString() : ''}, ${a['city'] ?? ''}, ${a['state'] ?? ''} - ${a['postal_code'] ?? a['postalCode'] ?? ''}, ${a['country'] ?? ''}";
+    String? parsedAddress;
+    if (json['shippingAddress'] != null) {
+      if (json['shippingAddress'] is Map<String, dynamic>) {
+        try {
+          parsedAddress = AddressModel.fromJson(json['shippingAddress'] as Map<String, dynamic>).fullAddress;
+        } catch (_) {
+          parsedAddress = json['shippingAddress'].toString();
+        }
+      } else {
+        parsedAddress = json['shippingAddress'].toString();
+      }
     }
+
     return OrderModel(
       id: json['id']?.toString() ?? '',
       userId: json['userId']?.toString() ?? '',
-      addressId: json['addressId']?.toString() ?? '',
-     totalAmount: json['totalAmount'] != null 
-      ? (json['totalAmount'] is num ? (json['totalAmount'] as num).toDouble() : double.tryParse(json['totalAmount'].toString()) ?? 0.0)
-      : 0.0,
-      orderStatus: json['orderStatus']?.toString() ?? 'processing',
-      paymentMethod: json['paymentMethod']?.toString() ?? 'cod',
+      totalAmount: json['totalAmount'] != null ? (json['totalAmount'] is num ? (json['totalAmount'] as num).toDouble() : double.tryParse(json['totalAmount'].toString()) ?? 0.0) : 0.0,
+      orderStatus: json['orderStatus']?.toString() ?? 'pending',
       paymentStatus: json['paymentStatus']?.toString() ?? 'pending',
-      razorpayOrderId: json['razorpayOrderId']?.toString(),
-      razorpayPaymentId: json['razorpayPaymentId']?.toString(),
+      paymentMethod: json['paymentMethod']?.toString() ?? 'cod',
+      shippingAddress: parsedAddress,
       createdAt: json['createdAt']?.toString() ?? '',
-      shippingAddress: derivedAddr,
       items: json['items'] != null
           ? (json['items'] as List).map((i) => OrderItemModel.fromJson(i)).toList()
           : [],
@@ -617,5 +591,43 @@ class WishlistItemModel {
       return product!.imageUrl;
     }
     return '';
+  }
+}
+
+class ReviewModel {
+  final String id;
+  final String productId;
+  final String userId;
+  final String headline;
+  final String comment;
+  final int rating;
+  final List<String> media;
+  final String status;
+  final DateTime? createdAt;
+
+  ReviewModel({
+    required this.id,
+    required this.productId,
+    required this.userId,
+    required this.headline,
+    required this.comment,
+    required this.rating,
+    this.media = const [],
+    this.status = 'pending',
+    this.createdAt,
+  });
+
+  factory ReviewModel.fromJson(Map<String, dynamic> json) {
+    return ReviewModel(
+      id: json['id']?.toString() ?? '',
+      productId: json['productId']?.toString() ?? '',
+      userId: json['userId']?.toString() ?? '',
+      headline: json['headline']?.toString() ?? '',
+      comment: json['comment']?.toString() ?? '',
+      rating: json['rating'] is int ? json['rating'] : int.tryParse(json['rating']?.toString() ?? '0') ?? 0,
+      media: json['media'] != null ? List<String>.from(json['media']) : [],
+      status: json['status']?.toString() ?? 'pending',
+      createdAt: json['createdAt'] != null ? DateTime.tryParse(json['createdAt'].toString()) : null,
+    );
   }
 }

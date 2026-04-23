@@ -1,5 +1,3 @@
-import 'package:collection/collection.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
@@ -18,6 +16,9 @@ import '../../services/brand_api.dart';
 import 'package:pet_shop/base/get/wishlist_controller.dart';
 import 'package:pet_shop/base/pref_data.dart';
 import '../../services/product_api.dart';
+import 'package:pet_shop/app/detail/product_images_carousel.dart';
+import 'package:pet_shop/app/detail/rating_widget.dart';
+import '../../services/review_api.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   const ProductDetailScreen({Key? key}) : super(key: key);
@@ -41,6 +42,9 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
   RxString brandName = ''.obs;
   PrefData prefData = PrefData();
   ProductModel? product;
+  
+  List<ReviewModel> productReviews = [];
+  bool isLoadingReviews = false;
 
   @override
   void initState() {
@@ -51,15 +55,54 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
       _loadWishlistStatus(product!.id);
       _fetchBrandName(product!);
       _enrichProductDetail(product!.id);
+      _fetchReviews(product!.id);
+    }
+  }
+
+  void _fetchReviews(String productId) async {
+    setState(() => isLoadingReviews = true);
+    try {
+      final res = await ReviewApiService.getProductReviews(productId);
+      if (res['success'] && res['data'] != null && res['data']['data'] != null) {
+        final List reviewsData = res['data']['data'];
+        setState(() {
+          productReviews = reviewsData.map((e) => ReviewModel.fromJson(e)).toList();
+        });
+      }
+    } catch (_) {} finally {
+      if (mounted) setState(() => isLoadingReviews = false);
     }
   }
 
   void _initializeSelection(ProductModel product) {
-    if (product.variants.isNotEmpty) {
-      var v = product.variants.first;
-      selectedVariantId.value = v.id;
-      if (v.color != null) selectedColor.value = v.color!;
-      if (v.size != null) selectedSize.value = v.size!;
+    if (product.variants.isEmpty) return;
+
+    // Pick first available color IF nothing selected
+    if (selectedColor.value.isEmpty) {
+      var vWithColor = product.variants.firstWhereOrNull(
+          (v) => v.color != null && v.color!.trim().isNotEmpty);
+      if (vWithColor != null) {
+        selectedColor.value = vWithColor.color!.trim();
+        storageController.setSelectedColor(selectedColor.value);
+      }
+    }
+
+    // Pick first available size IF nothing selected
+    if (selectedSize.value.isEmpty) {
+      var vWithSize = product.variants.firstWhereOrNull(
+          (v) => v.size != null && v.size!.trim().isNotEmpty);
+      if (vWithSize != null) {
+        selectedSize.value = vWithSize.size!.trim();
+        storageController.setSelectedSize(selectedSize.value);
+      }
+    }
+
+    // After setting defaults, try to find a variant matching the selection
+    final match = _getSelectedVariant(product);
+    if (match != null) {
+      selectedVariantId.value = match.id;
+    } else {
+      selectedVariantId.value = product.variants.first.id;
     }
   }
 
@@ -71,6 +114,7 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
         final fullProduct = ProductModel.fromJson(res['data']);
         setState(() {
           product = product!.merge(fullProduct);
+          _initializeSelection(product!); // Re-initialize selection with new data
         });
       }
     } catch (_) {}
@@ -95,18 +139,7 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
     } catch (_) {}
   }
 
-  void _toggleWishlist(String productId) async {
-    List<String> favList = await prefData.getFavouriteList();
 
-    if (favList.contains(productId)) {
-      favList.remove(productId);
-    } else {
-      favList.add(productId);
-    }
-
-    await prefData.setFavouriteList(favList);
-    isWishlisted.value = !isWishlisted.value;
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -143,6 +176,11 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
                     SizedBox(height: 16.h),
                     if (product!.description != null && product!.description!.isNotEmpty)
                       _buildDescriptionSection(context, product!, margin),
+                    SizedBox(height: 16.h),
+                    if (productReviews.isNotEmpty) ...[
+                      _buildReviewsSection(context, margin),
+                      SizedBox(height: 20.h),
+                    ],
                     SizedBox(height: 20.h),
                   ],
                 ),
@@ -183,21 +221,28 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
 
   Widget _buildTopBar(BuildContext context, double margin) {
     return Container(
-      color: getCardColor(context),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF14B8A6), Color(0xFF0D9488), Color(0xFF0F766E)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
+      ),
       padding: EdgeInsets.symmetric(horizontal: margin, vertical: 12.h),
       child: Row(
         children: [
           GestureDetector(
             onTap: () => Constant.backToPrev(context),
             child: Icon(Icons.arrow_back,
-                color: getFontColor(context), size: 24.w),
+                color: Colors.white, size: 24.w),
           ),
           SizedBox(width: 12.w),
           Expanded(
             child: getCustomFont(
               product!.title,
               16,
-              getFontColor(context),
+              Colors.white,
               1,
               fontWeight: FontWeight.w700,
               overflow: TextOverflow.ellipsis,
@@ -209,7 +254,7 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
               Constant.sendToNext(context, myCartScreenRoute);
             },
             child: Icon(Icons.shopping_cart_outlined,
-                color: getFontColor(context), size: 24.w),
+                color: Colors.white, size: 24.w),
           ),
         ],
       ),
@@ -217,7 +262,7 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
   }
 
   // ═══════════════════════════════════════════════════════
-  // PRODUCT IMAGE — heart button wired to WishlistController
+  // PRODUCT IMAGE CAROUSEL with multiple images and zoom
   // ═══════════════════════════════════════════════════════
 
   Widget _buildProductImage(
@@ -226,83 +271,46 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
     final String? firstVariantId =
         product.variants.isNotEmpty ? product.variants.first.id : null;
 
-    return Stack(
-      children: [
-        Obx(() {
-          // Fix: Ensure Obx always has a listener even if variants are empty
-          selectedVariantId.value; 
+    return Obx(() {
+      // Fix: Ensure Obx always has a listener even if variants are empty
+      selectedVariantId.value;
 
-          // ── Reactive: picks image from the currently selected variant ──
-          final variant = _getSelectedVariant(product);
-          final String displayUrl = (variant != null && variant.images.isNotEmpty)
-              ? variant.images.first
-              : (product.imageUrl.isNotEmpty ? product.imageUrl : "https://placehold.co/400");
+      // ── Reactive: collects all images from the currently selected variant ──
+      final variant = _getSelectedVariant(product);
+      
+      // Get all images for the carousel
+      List<String> carouselImages = [];
+      
+      // Add variant images if available
+      if (variant != null && variant.images.isNotEmpty) {
+        carouselImages.addAll(variant.images);
+      }
+      
+      // Add product-level images
+      if (product.images.isNotEmpty) {
+        carouselImages.addAll(product.images);
+      }
+      
+      // Add main image if available
+      if (product.imageUrl.isNotEmpty && !carouselImages.contains(product.imageUrl)) {
+        carouselImages.insert(0, product.imageUrl);
+      }
+      
+      // Ensure we have at least one image
+      if (carouselImages.isEmpty) {
+        carouselImages.add("https://placehold.co/400");
+      }
 
-          return Container(
-            width: double.infinity,
-            height: 300.h,
-            color: getGreyCardColor(context),
-            child: ClipRRect(
-              child: CachedNetworkImage(
-                imageUrl: displayUrl,
-                fit: BoxFit.cover,
-                placeholder: (context, url) => Center(
-                    child: CircularProgressIndicator(color: accentColor)),
-                errorWidget: (context, url, error) =>
-                    Icon(Icons.image_not_supported, size: 50.w),
-              ),
-            ),
-          );
-        }),
-
-        // ── Heart button — observes WishlistController ──
-        Positioned(
-          top: 12.h,
-          right: 12.w,
-          child: Obx(
-            () {
-              final wished = wishlistController.isWishlisted(product.id);
-              return GestureDetector(
-                onTap: () => wishlistController.toggleWishlist(
-                  product.id,
-                  variantId: firstVariantId,
-                ),
-                child: Container(
-                  width: 48.w,
-                  height: 48.w,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.2),
-                        blurRadius: 8.w,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Center(
-                    child: AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 250),
-                      transitionBuilder: (child, animation) => ScaleTransition(
-                        scale: animation,
-                        child: child,
-                      ),
-                      child: Icon(
-                        wished ? Icons.favorite : Icons.favorite_border,
-                        key: ValueKey(wished),
-                        color: wished ? accentColor : getFontGreyColor(context),
-                        size: 24.w,
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
+      return ProductImagesCarousel(
+        images: carouselImages,
+        containerHeight: 300,
+        isWishlisted: wishlistController.isWishlisted(product.id),
+        onHeartTap: () => wishlistController.toggleWishlist(
+          product.id,
+          variantId: firstVariantId,
         ),
-      ],
-    );
+      );
+    });
   }
 
   // ═══════════════════════════════════════════════════════
@@ -339,6 +347,8 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
 
   Widget _buildColorsSection(BuildContext context, ProductModel product,
       List<String> colors, double margin) {
+    if (colors.isEmpty) return const SizedBox.shrink();
+
     return Container(
       margin: EdgeInsets.symmetric(horizontal: margin, vertical: 12.h),
       child: Column(
@@ -348,44 +358,51 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
               getFontColor(context), 1,
               fontWeight: FontWeight.w600)),
           SizedBox(height: 12.h),
-          SizedBox(
-            height: 60.w,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              itemCount: colors.length,
-              itemBuilder: (context, index) {
-                final color = colors[index];
-                return Obx(() => GestureDetector(
-                      onTap: () {
-                        selectedColor.value = color;
-                        selectedVariantId.value = ""; // Reset to allow best-match search
-                        storageController.setSelectedColor(color);
-                      },
-                      child: Container(
-                        width: 60.w,
-                        height: 60.w,
-                        margin: EdgeInsets.only(right: 12.w),
-                        decoration: BoxDecoration(
-                          border: Border.all(
-                            color: selectedColor.value == color
-                                ? accentColor
-                                : dividerColor,
-                            width: selectedColor.value == color ? 3 : 1,
-                          ),
-                          borderRadius: BorderRadius.circular(10.w),
-                          color: getGreyCardColor(context),
+          Obx(() {
+            // Ensure Obx has a variable to watch even if list is empty
+            selectedColor.value;
+            
+            return SizedBox(
+              height: 60.w,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                itemCount: colors.length,
+                itemBuilder: (context, index) {
+                  final color = colors[index];
+                  final isSelected =
+                      selectedColor.value.trim().toLowerCase() ==
+                          color.trim().toLowerCase();
+
+                  return GestureDetector(
+                    onTap: () {
+                      selectedColor.value = color;
+                      selectedVariantId.value =
+                          ""; // Reset to allow best-match search
+                      storageController.setSelectedColor(color);
+                    },
+                    child: Container(
+                      width: 60.w,
+                      height: 60.w,
+                      margin: EdgeInsets.only(right: 12.w),
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                          color: isSelected ? accentColor : dividerColor,
+                          width: isSelected ? 3 : 1,
                         ),
-                        child: Center(
-                          child: getCustomFont(
-                              color, 12, getFontColor(context), 1,
-                              fontWeight: FontWeight.w600,
-                              textAlign: TextAlign.center),
-                        ),
+                        borderRadius: BorderRadius.circular(10.w),
+                        color: getGreyCardColor(context),
                       ),
-                    ));
-              },
-            ),
-          ),
+                      child: Center(
+                        child: getCustomFont(color, 12, getFontColor(context), 1,
+                            fontWeight: FontWeight.w600,
+                            textAlign: TextAlign.center),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            );
+          }),
         ],
       ),
     );
@@ -397,6 +414,8 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
 
   Widget _buildSizesSection(BuildContext context, ProductModel product,
       List<String> sizes, double margin) {
+    if (sizes.isEmpty) return const SizedBox.shrink();
+
     return Container(
       margin: EdgeInsets.symmetric(horizontal: margin, vertical: 12.h),
       child: Column(
@@ -415,35 +434,42 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
             ],
           ),
           SizedBox(height: 12.h),
-          Obx(() => Wrap(
-                spacing: 10.w,
-                runSpacing: 10.h,
-                children: sizes.map((size) {
-                  final isSelected = selectedSize.value == size;
-                  return GestureDetector(
-                    onTap: () {
-                      selectedSize.value = size;
-                      selectedVariantId.value = ""; // Reset to allow best-match search
-                      storageController.setSelectedSize(size);
-                    },
-                    child: Container(
-                      padding: EdgeInsets.symmetric(
-                          horizontal: 20.w, vertical: 10.h),
-                      decoration: BoxDecoration(
-                        color: isSelected ? accentColor : Colors.transparent,
-                        border: Border.all(
-                          color: isSelected ? accentColor : dividerColor,
-                          width: 1.5,
-                        ),
-                        borderRadius: BorderRadius.circular(8.w),
+          Obx(() {
+            // Ensure Obx has a variable to watch
+            selectedSize.value;
+
+            return Wrap(
+              spacing: 10.w,
+              runSpacing: 10.h,
+              children: sizes.map((size) {
+                final isSelected = selectedSize.value.trim().toLowerCase() ==
+                    size.trim().toLowerCase();
+                return GestureDetector(
+                  onTap: () {
+                    selectedSize.value = size;
+                    selectedVariantId.value =
+                        ""; // Reset to allow best-match search
+                    storageController.setSelectedSize(size);
+                  },
+                  child: Container(
+                    padding:
+                        EdgeInsets.symmetric(horizontal: 20.w, vertical: 10.h),
+                    decoration: BoxDecoration(
+                      color: isSelected ? accentColor : Colors.transparent,
+                      border: Border.all(
+                        color: isSelected ? accentColor : dividerColor,
+                        width: 1.5,
                       ),
-                      child: getCustomFont(size, 12,
-                          isSelected ? Colors.white : getFontColor(context), 1,
-                          fontWeight: FontWeight.w600),
+                      borderRadius: BorderRadius.circular(8.w),
                     ),
-                  );
-                }).toList(),
-              )),
+                    child: getCustomFont(size, 12,
+                        isSelected ? Colors.white : getFontColor(context), 1,
+                        fontWeight: FontWeight.w600),
+                  ),
+                );
+              }).toList(),
+            );
+          }),
         ],
       ),
     );
@@ -683,38 +709,105 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
 
   VariantModel? _getSelectedVariant(ProductModel product) {
     if (product.variants.isEmpty) return null;
-    
-    // Exact match search
-    final exactMatch = product.variants.firstWhereOrNull(
-      (v) => (v.id.trim() == (selectedVariantId.value.isEmpty ? v.id.trim() : selectedVariantId.value.trim())) && 
-             (v.color?.trim() == selectedColor.value.trim() || (v.color == null && selectedColor.value.isEmpty)) && 
-             (v.size?.trim() == selectedSize.value.trim() || (v.size == null && selectedSize.value.isEmpty))
-    );
 
+    final sColor = selectedColor.value.trim().toLowerCase();
+    final sSize = selectedSize.value.trim().toLowerCase();
+
+    // 1. EXACT MATCH: Both color and size match
+    final exactMatch = product.variants.firstWhereOrNull((v) {
+      final vColor = v.color?.trim().toLowerCase() ?? "";
+      final vSize = v.size?.trim().toLowerCase() ?? "";
+      return vColor == sColor && vSize == sSize;
+    });
     if (exactMatch != null) return exactMatch;
 
-    // Fallback: If only color matches OR only size matches
-    final partialMatch = product.variants.firstWhereOrNull(
-      (v) => (v.color?.trim() == selectedColor.value.trim() && selectedColor.value.isNotEmpty) || 
-             (v.size?.trim() == selectedSize.value.trim() && selectedSize.value.isNotEmpty)
-    );
+    // 2. PARTIAL MATCH: Color match (often color is the primary selection)
+    if (sColor.isNotEmpty) {
+      final colorMatch = product.variants.firstWhereOrNull((v) {
+        final vColor = v.color?.trim().toLowerCase() ?? "";
+        return vColor == sColor;
+      });
+      if (colorMatch != null) return colorMatch;
+    }
 
-    return partialMatch ?? product.variants.first;
+    // 3. PARTIAL MATCH: Size match
+    if (sSize.isNotEmpty) {
+      final sizeMatch = product.variants.firstWhereOrNull((v) {
+        final vSize = v.size?.trim().toLowerCase() ?? "";
+        return vSize == sSize;
+      });
+      if (sizeMatch != null) return sizeMatch;
+    }
+
+    // 4. FALLBACK: First variant
+    return product.variants.first;
   }
 
   int _getCartQuantity(ProductModel product) {
-    try {
-      final cartController = Get.find<CartController>();
-      final cart = cartController.cartModel.value;
-      if (cart == null) return 0;
-      final variant = _getSelectedVariant(product);
-      if (variant == null) return 0;
-      final items = cart.items
-          .where((i) => i.productId == product.id && i.variantId == variant.id)
-          .toList();
-      if (items.isNotEmpty) return items.first.quantity;
-    } catch (_) {}
-    return 0;
+    final cartController = Get.find<CartController>();
+    final cartItems = cartController.cartModel.value?.items ?? [];
+    int qty = 0;
+    for (var item in cartItems) {
+      if (item.productId == product.id) {
+        qty += item.quantity;
+      }
+    }
+    return qty;
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // REVIEWS SECTION
+  // ═══════════════════════════════════════════════════════
+
+  Widget _buildReviewsSection(BuildContext context, double margin) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: margin),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              getCustomFont(
+                "Customer Reviews",
+                16,
+                getFontColor(context),
+                1,
+                fontWeight: FontWeight.w700,
+              ),
+              getCustomFont(
+                "${productReviews.length} Reviews",
+                13,
+                getFontGreyColor(context),
+                1,
+                fontWeight: FontWeight.w600,
+              ),
+            ],
+          ),
+        ),
+        SizedBox(height: 12.h),
+        ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          padding: EdgeInsets.symmetric(horizontal: margin),
+          itemCount: productReviews.length > 3 ? 3 : productReviews.length,
+          itemBuilder: (context, index) {
+            final review = productReviews[index];
+            String formattedDate = "";
+            if (review.createdAt != null) {
+              formattedDate = "${review.createdAt!.day}/${review.createdAt!.month}/${review.createdAt!.year}";
+            }
+            return ProductReviewCard(
+              reviewerName: "Customer", // Since we don't fetch user info with reviews in backend currently
+              rating: review.rating.toDouble(),
+              reviewText: review.comment,
+              reviewHeadline: review.headline,
+              reviewDate: formattedDate,
+            );
+          },
+        ),
+      ],
+    );
   }
 
   Widget _buildBottomButtons(BuildContext context, ProductModel product) {
@@ -725,32 +818,17 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
         top: false,
         child: Obx(() {
           final cartController = Get.find<CartController>();
-          final _cart = cartController.cartModel.value;
           int cartQty = _getCartQuantity(product);
           bool isInCart = cartQty > 0;
           
           VariantModel? variant = _getSelectedVariant(product);
-          bool isOutOfStock = false; // Always active as requested
           bool hasReachedMaxStock = variant != null && cartQty >= variant.availableStock;
 
           return Row(
             children: [
               // Left: "Add to Cart" OR quantity +/- selector
               Expanded(
-                child: isOutOfStock 
-                    ? Container(
-                        padding: EdgeInsets.symmetric(vertical: 12.h),
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade400,
-                          borderRadius: BorderRadius.circular(8.w),
-                        ),
-                        child: Center(
-                          child: getCustomFont("Out of Stock", 14,
-                              Colors.white, 1,
-                              fontWeight: FontWeight.w700),
-                        ),
-                      )
-                    : isInCart
+                child: isInCart
                         ? Container(
                             padding: EdgeInsets.symmetric(vertical: 6.h),
                             decoration: BoxDecoration(
@@ -844,7 +922,7 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
               // Right: Buy Now
               Expanded(
                 child: GestureDetector(
-                  onTap: isOutOfStock ? null : () async {
+                  onTap: () async {
                     if (variant == null) {
                       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select valid options'), backgroundColor: Colors.orange));
                       return;
@@ -875,13 +953,13 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
                   child: Container(
                     padding: EdgeInsets.symmetric(vertical: 12.h),
                     decoration: BoxDecoration(
-                      color: isOutOfStock ? Colors.grey.shade300 : ratedColor,
+                      color: accentColor,
                       borderRadius: BorderRadius.circular(8.w),
                     ),
                     child: Center(
                       child: getCustomFont(
-                          isOutOfStock ? "Unavailable" : "Buy at \u20B9${product.currentPrice.toStringAsFixed(0)}", 14,
-                          isOutOfStock ? Colors.grey : Colors.black, 1,
+                          "Buy at \u20B9${product.currentPrice.toStringAsFixed(0)}", 14,
+                          Colors.white, 1,
                           fontWeight: FontWeight.w700),
                     ),
                   ),

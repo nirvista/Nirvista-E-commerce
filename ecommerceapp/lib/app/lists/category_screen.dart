@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
@@ -9,6 +10,7 @@ import 'package:pet_shop/base/widget_utils.dart';
 import '../../app/model/api_models.dart';
 import '../../../services/category_api.dart';
 import 'package:pet_shop/base/get/storage_controller.dart';
+import 'package:pet_shop/base/get/wishlist_controller.dart';
 
 class CategoryScreen extends StatefulWidget {
   const CategoryScreen({Key? key}) : super(key: key);
@@ -17,297 +19,267 @@ class CategoryScreen extends StatefulWidget {
   State<CategoryScreen> createState() => _CategoryScreenState();
 }
 
-class _CategoryScreenState extends State<CategoryScreen> with TickerProviderStateMixin {
-  // StorageController storeController = Get.find<StorageController>();
-
-  // ProductDataController productController = Get.find<ProductDataController>();
-
-  // HomeController homeController = Get.find<HomeController>();
+class _CategoryScreenState extends State<CategoryScreen>
+    with TickerProviderStateMixin {
   StorageController storageController = Get.find<StorageController>();
-  //
-  // final controller = Get.find<BottomItemSelectionController>();
-  //
-  // int flashSale = 17;
-  
+
+  final wishlistController = Get.isRegistered<WishlistController>()
+      ? Get.find<WishlistController>()
+      : Get.put(WishlistController());
+
   RxInt selectedId = 0.obs;
   Future<List<CategoryModel>>? categoriesFuture;
 
   @override
   void initState() {
     super.initState();
-    categoriesFuture = fetchCategories();
+    categoriesFuture = _fetchCategories();
   }
 
-  Future<List<CategoryModel>> fetchCategories() async {
+  Future<List<CategoryModel>> _fetchCategories() async {
     final result = await CategoryApiService.getAllCategories();
     if (result['success']) {
-      return (result['data'] as List).map((c) => CategoryModel.fromJson(c)).toList();
+      return (result['data'] as List)
+          .map((c) => CategoryModel.fromJson(c))
+          .toList();
     }
     return [];
   }
 
-  // RxList<String> favProductList = <String>[].obs;
-  //
-  // void getFavDataList() async {
-  //   favProductList.value = await PrefData().getFavouriteList();
-  //   print("getvals========${favProductList.length}");
-  // }
-  //
-  // checkInFavouriteList(WooProduct cat) async {
-  //   if (favProductList.contains(cat.id.toString())) {
-  //     favProductList.remove(cat.id.toString());
-  //   } else {
-  //     favProductList.add(cat.id!.toString());
-  //   }
-  // }
-  //
-  // RxString imageUrl = ''.obs;
-  //
-  // List<WooProductCategory> catList = [];
-  //
-  // List<ModelSubCategory> subCategory = DataFile.getAllSubCategory();
-  // List<ModelCategory> allCategory = DataFile.getAllCategory();
-
-
   @override
   Widget build(BuildContext context) {
-    double margin = FetchPixels.getDefaultHorSpaceFigma(context);
-    int crossCount = 2;
-    double screenWidth = context.width - 200.w - (margin * 3) + margin;
-    double itemWidth = screenWidth / crossCount;
-    double itemHeight = 102.w;
-
     Constant.setupSize(context);
+    double margin = FetchPixels.getDefaultHorSpaceFigma(context);
 
     return Scaffold(
       backgroundColor: getScaffoldColor(context),
-      appBar: AppBar(
-        backgroundColor: getCardColor(context),
-        elevation: 0,
-        automaticallyImplyLeading: false, // Explicitly remove back button
-        leading: null, 
-        title: getCustomFont("Categories", 18, getFontColor(context), 1,
-            fontWeight: FontWeight.w700),
-        centerTitle: true,
-      ),
       body: Column(
         children: [
-          20.h.verticalSpace,
+          // ── Teal gradient header — matches home tab exactly ──────────────
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xFF14B8A6), Color(0xFF0D9488), Color(0xFF0F766E)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Color(0x1A0D9488),
+                  blurRadius: 12,
+                  offset: Offset(0, 4),
+                ),
+              ],
+            ),
+            padding: EdgeInsets.fromLTRB(margin, 48.h, margin, 16.h),
+            child: Row(
+              children: [
+                GestureDetector(
+                  onTap: () => Constant.backToPrev(context),
+                  child: Container(
+                    width: 36.w,
+                    height: 36.w,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.18),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(Icons.arrow_back_ios_new_rounded,
+                        color: Colors.white, size: 16.w),
+                  ),
+                ),
+                SizedBox(width: 14.w),
+                Text(
+                  'Categories',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 20.sp,
+                    letterSpacing: 0.2,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // ── Body ─────────────────────────────────────────────────────────
           Expanded(
             child: FutureBuilder<List<CategoryModel>>(
               future: categoriesFuture,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return Center(child: CircularProgressIndicator(color: accentColor));
+                  return Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        CircularProgressIndicator(
+                            color: accentColor, strokeWidth: 2.5),
+                        SizedBox(height: 12.h),
+                        Text('Loading…',
+                            style: TextStyle(
+                                color: getFontGreyColor(context),
+                                fontSize: 13.sp,
+                                fontWeight: FontWeight.w500)),
+                      ],
+                    ),
+                  );
                 }
-                if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
-                  return Center(child: getCustomFont("No categories found", 16, getFontGreyColor(context), 1));
+                if (snapshot.hasError ||
+                    !snapshot.hasData ||
+                    snapshot.data!.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.category_outlined,
+                            color: getFontGreyColor(context), size: 48.h),
+                        SizedBox(height: 12.h),
+                        Text('No categories found',
+                            style: TextStyle(
+                                color: getFontGreyColor(context),
+                                fontSize: 14.sp,
+                                fontWeight: FontWeight.w500)),
+                      ],
+                    ),
+                  );
                 }
 
-                List<CategoryModel> allCategory = snapshot.data!;
-                
+                final allCategory = snapshot.data!;
+
                 return Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // ── LEFT SIDEBAR ────────────────────────────────────
                     Container(
-                      width: 100.w,
+                      width: 90.w,
                       height: double.infinity,
                       color: getCardColor(context),
-                      child: SizedBox(
-                        width: double.infinity,
-                        child: ListView.builder(
-                          primary: true,
-                          shrinkWrap: true,
-                          itemCount: allCategory.length,
-                          itemBuilder: (context, index) {
-                            CategoryModel category = allCategory[index];
-                            return Obx(() => InkWell(
-                                  onTap: () {
-                                    selectedId.value = index;
-                                  },
-                                  child: Container(
-                                    margin: EdgeInsets.symmetric(
-                                        horizontal: 20.h, vertical: 5.h),
-                                    padding: EdgeInsets.symmetric(
-                                        horizontal: 10.h, vertical: 10.h),
-                                    decoration: getButtonDecoration(
-                                      (selectedId.value == index)
-                                          ? getAccentColor(context).withOpacity(0.1)
-                                          : Colors.transparent,
-                                      withCorners: true,
-                                      corner: 6.w,
-                                      withBorder: false,
-                                      borderColor: getDividerColor(context),
+                      child: ListView.builder(
+                        padding: EdgeInsets.only(top: 8.h, bottom: 8.h),
+                        itemCount: allCategory.length,
+                        itemBuilder: (context, index) {
+                          final category = allCategory[index];
+                          return Obx(() {
+                            final active = selectedId.value == index;
+                            return GestureDetector(
+                              onTap: () => selectedId.value = index,
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 200),
+                                curve: Curves.easeOut,
+                                margin: EdgeInsets.symmetric(
+                                    horizontal: 6.w, vertical: 2.h),
+                                decoration: BoxDecoration(
+                                  color: active
+                                      ? accentColor.withOpacity(0.1)
+                                      : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(8.w),
+                                ),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    // Active indicator bar
+                                    Container(
+                                      width: 3.w,
+                                      height: 40.h,
+                                      decoration: BoxDecoration(
+                                        color: active
+                                            ? accentColor
+                                            : Colors.transparent,
+                                        borderRadius:
+                                            BorderRadius.circular(2.w),
+                                      ),
                                     ),
-                                    child: getCustomFont(
-                                      category.name,
-                                      16,
-                                      (selectedId.value == index)
-                                          ? getAccentColor(context)
-                                          : getFontColor(context),
-                                      3,
-                                      fontWeight: FontWeight.w500,
-                                      txtHeight: 1.5,
-                                      textAlign: TextAlign.start,
+                                    SizedBox(width: 8.w),
+                                    // Label — always visible
+                                    Expanded(
+                                      child: Text(
+                                        category.name,
+                                        maxLines: 3,
+                                        overflow: TextOverflow.ellipsis,
+                                        textAlign: TextAlign.start,
+                                        style: TextStyle(
+                                          color: active
+                                              ? accentColor
+                                              : getFontColor(context),
+                                          fontWeight: active
+                                              ? FontWeight.w700
+                                              : FontWeight.w500,
+                                          fontSize: 11.sp,
+                                          height: 1.35,
+                                        ),
+                                      ),
                                     ),
-                                  ),
-                                ));
-                          },
-                        ),
+                                    SizedBox(width: 6.w),
+                                  ],
+                                ),
+                              ),
+                            );
+                          });
+                        },
                       ),
                     ),
-                    10.h.horizontalSpace,
+
+                    // Thin divider
+                    Container(
+                        width: 1,
+                        color: dividerColor),
+
+                    // ── RIGHT CONTENT AREA ──────────────────────────────
                     Expanded(
-                      flex: 1,
                       child: Obx(() {
-                        // Watch for changes in selectedId to update subcategories
-                        if (allCategory.isEmpty) return SizedBox();
-                        CategoryModel selectedCat = allCategory[selectedId.value];
-                        List<CategoryModel> subCategory = selectedCat.children;
-                        
-                        if (subCategory.isEmpty) {
-                          // No subcategories to show, display products instead!
-                          return FutureBuilder<Map<String, dynamic>>(
-                            future: CategoryApiService.getProductsByCategory(selectedCat.id),
-                            builder: (context, snapshot) {
-                              if (snapshot.connectionState == ConnectionState.waiting) {
-                                return Center(child: CircularProgressIndicator(color: accentColor));
-                              }
-                              if (snapshot.hasError || !snapshot.hasData) {
-                                return Center(child: getCustomFont("No products found", 14, getFontGreyColor(context), 1));
-                              }
-                              var res = snapshot.data!;
-                              if (!res['success']) {
-                                return Center(child: getCustomFont("No products found", 14, getFontGreyColor(context), 1));
-                              }
-                              List<dynamic> productsList = [];
-                              if (res['data'] is List) {
-                                productsList = res['data'];
-                              } else if (res['data'] is Map && res['data']['products'] is List) {
-                                productsList = res['data']['products'];
-                              }
-                              var products = productsList.map((e) => ProductModel.fromJson(e)).toList();
-                              
-                              // Filter out empty mock products
-                              products.removeWhere((p) => p.variants.isEmpty && p.originalPrice <= 0 && p.imageUrl.isEmpty);
-                              
-                              if (products.isEmpty) {
-                                return Center(child: getCustomFont("No products found", 14, getFontGreyColor(context), 1));
-                              }
-                              
-                              return GridView.builder(
-                                padding: EdgeInsets.all(margin),
-                                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: 2,
-                                  crossAxisSpacing: 10.w,
-                                  mainAxisSpacing: 10.w,
-                                  childAspectRatio: 0.75,
-                                ),
-                                itemCount: products.length,
-                                itemBuilder: (context, idx) {
-                                  var product = products[idx];
-                                  double currentPrice = product.currentPrice;
-                                  
-                                  return InkWell(
-                                    onTap: () {
-                                      storageController.setSelectedProductModel(product);
-                                      Constant.sendToNext(context, productDetailScreenRoute);
-                                    },
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                        color: getCardColor(context),
-                                        borderRadius: BorderRadius.circular(12.w),
-                                        border: Border.all(color: dividerColor, width: 0.5),
-                                      ),
-                                      padding: EdgeInsets.all(8.w),
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Expanded(
-                                            child: Container(
-                                              width: double.infinity,
-                                              decoration: BoxDecoration(
-                                                borderRadius: BorderRadius.circular(10.w),
-                                                color: getGreyCardColor(context),
-                                              ),
-                                              child: product.imageUrl.isNotEmpty
-                                                ? ClipRRect(
-                                                    borderRadius: BorderRadius.circular(10.w),
-                                                    child: Image.network(product.imageUrl, fit: BoxFit.cover, errorBuilder: (c, e, s) => Icon(Icons.image_not_supported)),
-                                                  )
-                                                : Icon(Icons.image_not_supported, color: getFontGreyColor(context)),
-                                            ),
-                                          ),
-                                          SizedBox(height: 8.h),
-                                          getCustomFont(product.title, 12, getFontColor(context), 2,
-                                              fontWeight: FontWeight.w600, overflow: TextOverflow.ellipsis),
-                                          SizedBox(height: 4.h),
-                                          getCustomFont("₹${currentPrice.toStringAsFixed(0)}", 13, accentColor, 1,
-                                              fontWeight: FontWeight.w700),
-                                        ],
-                                      ),
-                                    ),
-                                  );
-                                }
-                              );
-                            }
-                          );
-                        }
-                        
-                        return Container(
-                          color: getCardColor(context),
-                          child: GridView.count(
-                            crossAxisCount: 3,
-                            mainAxisSpacing: margin,
-                            crossAxisSpacing: margin,
-                            padding: EdgeInsets.only(
-                                left: margin, right: margin, top: 20.h, bottom: 15.h),
-                            childAspectRatio: itemWidth / itemHeight,
-                            children: List.generate(
-                              subCategory.length,
-                              (index) {
-                                CategoryModel subCat = subCategory[index];
-                                return InkWell(
-                                  onTap: () {
-                                    storageController.setSelectedCategory(subCat.id);
-                                    storageController.setSelectedCategoryName(subCat.name);
-                                    // Normally you would pass the category info
-                                    Constant.sendToNext(context, categoryProductsPageRoute);
-                                  },
-                                  child: SizedBox(
-                                    height: itemHeight,
-                                    width: itemWidth,
-                                    child: Column(
-                                      mainAxisAlignment: MainAxisAlignment.end,
-                                      children: [
-                                        Expanded(
-                                          flex: 1,
-                                          child: Container(
-                                            height: double.infinity,
-                                            width: double.infinity,
-                                            padding: EdgeInsets.all(8.h),
-                                            decoration: getButtonDecoration(
-                                                getGreyCardColor(context),
-                                                withCorners: true,
-                                                corner: 12.h),
-                                            child: Icon(Icons.category, color: getFontGreyColor(context)),
-                                          ),
-                                        ),
-                                        7.h.verticalSpace,
-                                        getCustomFont(
-                                          subCat.name,
-                                          15,
-                                          getFontColor(context),
-                                          1,
-                                          fontWeight: FontWeight.w500,
-                                        )
-                                      ],
+                        if (allCategory.isEmpty) return const SizedBox();
+                        final selectedCat = allCategory[selectedId.value];
+                        final subCategory = selectedCat.children;
+
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Section header — same style as home tab
+                            Container(
+                              color: getCardColor(context),
+                              padding: EdgeInsets.fromLTRB(
+                                  margin, 14.h, margin, 14.h),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 4.w,
+                                    height: 20.h,
+                                    decoration: BoxDecoration(
+                                      color: accentColor,
+                                      borderRadius:
+                                          BorderRadius.circular(2.w),
                                     ),
                                   ),
-                                );
-                              },
+                                  SizedBox(width: 10.w),
+                                  Expanded(
+                                    child: Text(
+                                      selectedCat.name,
+                                      style: TextStyle(
+                                        fontSize: 15.sp,
+                                        fontWeight: FontWeight.w800,
+                                        color: getFontColor(context),
+                                      ),
+                                    ),
+                                  ),
+                                  if (subCategory.isNotEmpty)
+                                    Text(
+                                      '${subCategory.length} sub',
+                                      style: TextStyle(
+                                          fontSize: 11.sp,
+                                          color: getFontGreyColor(context),
+                                          fontWeight: FontWeight.w500),
+                                    ),
+                                ],
+                              ),
                             ),
-                          ),
+
+                            Expanded(
+                              child: subCategory.isEmpty
+                                  ? _buildDirectProductsView(
+                                      selectedCat, margin)
+                                  : _buildSubcategoryGrid(
+                                      subCategory, margin),
+                            ),
+                          ],
                         );
                       }),
                     ),
@@ -317,6 +289,339 @@ class _CategoryScreenState extends State<CategoryScreen> with TickerProviderStat
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  // ── Sub-category grid — same card style as home popular picks ─────────────
+  Widget _buildSubcategoryGrid(List<CategoryModel> subs, double margin) {
+    return GridView.builder(
+      padding: EdgeInsets.all(margin),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 10.w,
+        mainAxisSpacing: 10.h,
+        childAspectRatio: 1.05,
+      ),
+      itemCount: subs.length,
+      itemBuilder: (context, index) {
+        final sub = subs[index];
+        return GestureDetector(
+          onTap: () {
+            storageController.setSelectedCategory(sub.id);
+            storageController.setSelectedCategoryName(sub.name);
+            Constant.sendToNext(context, categoryProductsPageRoute);
+          },
+          child: Container(
+            decoration: BoxDecoration(
+              color: getCardColor(context),
+              borderRadius: BorderRadius.circular(14.w),
+              boxShadow: [
+                BoxShadow(
+                  color: accentColor.withOpacity(0.07),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Padding(
+                  padding: EdgeInsets.fromLTRB(10.w, 12.h, 10.w, 6.h),
+                  child: Text(
+                    sub.name,
+                    maxLines: 3,
+                    textAlign: TextAlign.center,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: getFontColor(context),
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12.sp,
+                      height: 1.35,
+                    ),
+                  ),
+                ),
+                SizedBox(height: 6.h),
+                // "Browse" pill — same as home tab category chips
+                Container(
+                  padding:
+                      EdgeInsets.symmetric(horizontal: 10.w, vertical: 3.h),
+                  decoration: BoxDecoration(
+                    color: accentColor.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(20.w),
+                  ),
+                  child: Text(
+                    'Browse →',
+                    style: TextStyle(
+                      color: accentColor,
+                      fontSize: 9.sp,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // ── Direct products view — same card as home _buildProductCard ─────────────
+  Widget _buildDirectProductsView(CategoryModel cat, double margin) {
+    return FutureBuilder<Map<String, dynamic>>(
+      future: CategoryApiService.getProductsByCategory(cat.id),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Center(
+              child: CircularProgressIndicator(
+                  color: accentColor, strokeWidth: 2.5));
+        }
+        if (snapshot.hasError || !snapshot.hasData) {
+          return Center(
+              child: Text('No products found',
+                  style: TextStyle(
+                      color: getFontGreyColor(context), fontSize: 14.sp)));
+        }
+        final res = snapshot.data!;
+        if (!res['success']) {
+          return Center(
+              child: Text('No products found',
+                  style: TextStyle(
+                      color: getFontGreyColor(context), fontSize: 14.sp)));
+        }
+        List<dynamic> productsList = [];
+        if (res['data'] is List) {
+          productsList = res['data'];
+        } else if (res['data'] is Map && res['data']['products'] is List) {
+          productsList = res['data']['products'];
+        }
+        final products =
+            productsList.map((e) => ProductModel.fromJson(e)).toList()
+                ..removeWhere((p) =>
+                    p.variants.isEmpty &&
+                    p.originalPrice <= 0 &&
+                    p.imageUrl.isEmpty);
+
+        if (products.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.shopping_bag_outlined,
+                    color: getFontGreyColor(context), size: 48.h),
+                SizedBox(height: 12.h),
+                Text('No products in this category',
+                    style: TextStyle(
+                        color: getFontGreyColor(context), fontSize: 14.sp)),
+              ],
+            ),
+          );
+        }
+
+        return GridView.builder(
+          padding: EdgeInsets.all(margin),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: 10.w,
+            mainAxisSpacing: 10.h,
+            childAspectRatio: 0.65,
+          ),
+          itemCount: products.length,
+          itemBuilder: (context, idx) =>
+              _buildProductCard(context, products[idx]),
+        );
+      },
+    );
+  }
+
+  // ── Product card — exact same design as home tab ───────────────────────────
+  Widget _buildProductCard(BuildContext context, ProductModel product) {
+    double basePrice = product.originalPrice;
+    double currentPrice = product.currentPrice;
+    double discountPercent = 0.0;
+    if (basePrice <= 0) basePrice = currentPrice;
+    if (currentPrice <= 0) currentPrice = basePrice;
+    if (basePrice > 0 && currentPrice > 0 && basePrice > currentPrice) {
+      discountPercent = ((basePrice - currentPrice) / basePrice) * 100;
+    } else {
+      basePrice = currentPrice;
+    }
+
+    return GestureDetector(
+      onTap: () {
+        storageController.setSelectedProductModel(product);
+        Constant.sendToNext(context, productDetailScreenRoute);
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: getCardColor(context),
+          borderRadius: BorderRadius.circular(14.w),
+          boxShadow: [
+            BoxShadow(
+              color: accentColor.withOpacity(0.07),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // ── Image with heart overlay ──
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final imgH = (constraints.maxWidth * 0.75).clamp(80.0, 130.0);
+                return Stack(
+                  children: [
+                    ClipRRect(
+                      borderRadius:
+                          BorderRadius.vertical(top: Radius.circular(14.w)),
+                      child: Container(
+                        height: imgH,
+                        width: double.infinity,
+                        color: getGreyCardColor(context),
+                        child: (product.imageUrl.isNotEmpty &&
+                                !product.imageUrl.contains('example.com'))
+                            ? CachedNetworkImage(
+                                imageUrl: product.imageUrl,
+                                fit: BoxFit.cover,
+                                placeholder: (_, __) => Center(
+                                  child: CircularProgressIndicator(
+                                      color: accentColor, strokeWidth: 2),
+                                ),
+                                errorWidget: (_, __, ___) => Icon(
+                                    Icons.shopping_bag_outlined,
+                                    color: getFontGreyColor(context),
+                                    size: 32.w),
+                              )
+                            : Icon(Icons.shopping_bag_outlined,
+                                color: getFontGreyColor(context), size: 32.w),
+                      ),
+                    ),
+                    // Heart icon — top right
+                    Positioned(
+                      top: 6.h,
+                      right: 6.w,
+                      child: GestureDetector(
+                        onTap: () {
+                          if (product.variants.isNotEmpty) {
+                            wishlistController.toggleWishlist(product.id, variantId: product.variants[0].id);
+                          } else {
+                            Get.snackbar("Error", "No variants available for this product", 
+                              backgroundColor: Colors.redAccent, colorText: Colors.white);
+                          }
+                        },
+                        child: Obx(() {
+                          bool isWished = wishlistController.isWishlisted(product.id);
+                          return Container(
+                            width: 28.w,
+                            height: 28.w,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                    color: Colors.black.withOpacity(0.08),
+                                    blurRadius: 6)
+                              ],
+                            ),
+                            child: Icon(
+                              isWished ? Icons.favorite : Icons.favorite_border,
+                              color: accentColor, 
+                              size: 15.w
+                            ),
+                          );
+                        }),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+            // ── Info ──
+            Padding(
+              padding: EdgeInsets.fromLTRB(8.w, 8.h, 8.w, 10.h),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (product.brandName.isNotEmpty)
+                    Text(product.brandName,
+                        style: TextStyle(
+                            fontSize: 10.sp,
+                            color: getFontGreyColor(context),
+                            fontWeight: FontWeight.w500)),
+                  SizedBox(height: 3.h),
+                  Text(product.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          fontSize: 12.sp,
+                          color: getFontColor(context),
+                          fontWeight: FontWeight.w600,
+                          height: 1.3)),
+                  SizedBox(height: 5.h),
+                  Row(
+                    children: [
+                      Icon(Icons.star_rounded,
+                          color: ratedColor, size: 12.w),
+                      SizedBox(width: 3.w),
+                      Text(product.rating.toStringAsFixed(1),
+                          style: TextStyle(
+                              fontSize: 10.sp,
+                              color: getFontColor(context),
+                              fontWeight: FontWeight.w500)),
+                    ],
+                  ),
+                  SizedBox(height: 6.h),
+                  Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 5.w,
+                    runSpacing: 3.h,
+                    children: [
+                      Text('₹${currentPrice.toStringAsFixed(0)}',
+                          style: TextStyle(
+                              fontSize: 14.sp,
+                              color: accentColor,
+                              fontWeight: FontWeight.w800)),
+                      if (discountPercent > 0) ...[
+                        Text('₹${basePrice.toStringAsFixed(0)}',
+                            style: TextStyle(
+                              fontSize: 11.sp,
+                              color: const Color(0xFF4B5563),
+                              decoration: TextDecoration.lineThrough,
+                              decorationColor: const Color(0xFF4B5563),
+                              decorationThickness: 2.0,
+                              fontWeight: FontWeight.w500,
+                              height: 1.0,
+                            )),
+                        Container(
+                          padding: EdgeInsets.symmetric(
+                              horizontal: 5.w, vertical: 2.h),
+                          decoration: BoxDecoration(
+                            color: accentColor.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(4.w),
+                          ),
+                          child: Text(
+                            '${discountPercent.toStringAsFixed(0)}% off',
+                            style: TextStyle(
+                                fontSize: 9.sp,
+                                color: accentColor,
+                                fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

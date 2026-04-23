@@ -235,7 +235,7 @@ class TabFavourite extends StatelessWidget {
                       child: imageUrl.isNotEmpty
                           ? CachedNetworkImage(
                               imageUrl: imageUrl,
-                              fit: BoxFit.cover,
+                              fit: BoxFit.contain,
                               placeholder: (_, __) => Center(
                                 child: CircularProgressIndicator(
                                     color: accentColor, strokeWidth: 2),
@@ -296,6 +296,18 @@ class TabFavourite extends StatelessWidget {
                                   decorationThickness: 1.2,
                                   height: 1.4,
                                   fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              SizedBox(width: 8.w),
+                              Container(
+                                padding: EdgeInsets.symmetric(horizontal: 5.w, vertical: 2.h),
+                                decoration: BoxDecoration(
+                                  color: accentColor.withOpacity(0.12),
+                                  borderRadius: BorderRadius.circular(4.w),
+                                ),
+                                child: Text(
+                                  "${(item.variant.price > 0) ? (((item.variant.price - item.variant.discountPrice!) / item.variant.price) * 100).toStringAsFixed(0) : '0'}% off",
+                                  style: TextStyle(fontSize: 9.sp, color: accentColor, fontWeight: FontWeight.w700),
                                 ),
                               ),
                             ],

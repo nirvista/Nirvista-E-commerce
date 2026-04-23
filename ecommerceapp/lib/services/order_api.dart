@@ -1,19 +1,19 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:open_file/open_file.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:universal_html/html.dart' as html;
 
 class OrderApiService {
   static String get baseUrl {
-    final rawUrl = dotenv.env['BASE_URL']?.trim();
-    if (rawUrl == null || rawUrl.isEmpty) {
+    final url = dotenv.env['BASE_URL']?.trim();
+    if (url == null) {
       throw Exception("BASE_URL not found in .env file");
     }
-    final withoutTrailingSlash = rawUrl.replaceAll(RegExp(r'/+$'), '');
-    if (withoutTrailingSlash.endsWith('/api')) {
-      return withoutTrailingSlash.substring(0, withoutTrailingSlash.length - 4);
-    }
-    return withoutTrailingSlash;
+    return url;
   }
 
   static Future<Map<String, dynamic>> createOrder({
@@ -33,6 +33,7 @@ class OrderApiService {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $accessToken',
+          'x-client-type': kIsWeb ? 'web' : 'mobile',
         },
         body: jsonEncode(bodyData),
       );
@@ -57,8 +58,7 @@ class OrderApiService {
     }
   }
 
-  static Future<Map<String, dynamic>> getUserOrders(String accessToken,
-      {String? status}) async {
+  static Future<Map<String, dynamic>> getUserOrders(String accessToken, {String? status}) async {
     try {
       String url = '$baseUrl/api/orders';
       if (status != null && status.isNotEmpty) {
@@ -69,6 +69,7 @@ class OrderApiService {
         headers: {
           'Authorization': 'Bearer $accessToken',
           'Content-Type': 'application/json',
+          'x-client-type': kIsWeb ? 'web' : 'mobile',
         },
       );
       if (response.statusCode == 200 || response.statusCode == 201) {
@@ -91,14 +92,14 @@ class OrderApiService {
     }
   }
 
-  static Future<Map<String, dynamic>> getOrderById(
-      String accessToken, String orderId) async {
+  static Future<Map<String, dynamic>> getOrderById(String accessToken, String orderId) async {
     try {
       final response = await http.get(
         Uri.parse('$baseUrl/api/orders/$orderId'),
         headers: {
           'Authorization': 'Bearer $accessToken',
           'Content-Type': 'application/json',
+          'x-client-type': kIsWeb ? 'web' : 'mobile',
         },
       );
       if (response.statusCode == 200 || response.statusCode == 201) {
@@ -121,14 +122,14 @@ class OrderApiService {
     }
   }
 
-  static Future<Map<String, dynamic>> cancelOrder(
-      String accessToken, String orderId) async {
+  static Future<Map<String, dynamic>> cancelOrder(String accessToken, String orderId) async {
     try {
       final response = await http.put(
         Uri.parse('$baseUrl/api/orders/$orderId/cancel'),
         headers: {
           'Authorization': 'Bearer $accessToken',
           'Content-Type': 'application/json',
+          'x-client-type': kIsWeb ? 'web' : 'mobile',
         },
       );
       if (response.statusCode == 200 || response.statusCode == 201) {
@@ -151,13 +152,14 @@ class OrderApiService {
     }
   }
 
-  static Future<Map<String, dynamic>> getOrderStatus(
-      String accessToken, String orderId) async {
+  static Future<Map<String, dynamic>> getOrderStatus(String accessToken, String orderId) async {
     try {
       final response = await http.get(
         Uri.parse('$baseUrl/api/orders/$orderId/status'),
         headers: {
           'Authorization': 'Bearer $accessToken',
+          'Content-Type': 'application/json',
+          'x-client-type': kIsWeb ? 'web' : 'mobile',
         },
       );
       if (response.statusCode == 200 || response.statusCode == 201) {
@@ -180,14 +182,14 @@ class OrderApiService {
     }
   }
 
-  static Future<Map<String, dynamic>> initiateReturn(
-      String accessToken, String orderId) async {
+  static Future<Map<String, dynamic>> initiateReturn(String accessToken, String orderId) async {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/api/orders/$orderId/return'),
         headers: {
           'Authorization': 'Bearer $accessToken',
           'Content-Type': 'application/json',
+          'x-client-type': kIsWeb ? 'web' : 'mobile',
         },
       );
       if (response.statusCode == 200 || response.statusCode == 201) {
@@ -210,14 +212,63 @@ class OrderApiService {
     }
   }
 
-  static Future<void> downloadInvoice(
-      String accessToken, String orderId) async {
-    final url =
-        Uri.parse('$baseUrl/api/orders/$orderId/invoice?token=$accessToken');
-    if (await canLaunchUrl(url)) {
-      await launchUrl(url, mode: LaunchMode.externalApplication);
-    } else {
-      throw 'Could not launch $url';
+  static Future<void> downloadInvoice(String accessToken, String orderId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/orders/$orderId/invoice'),
+        headers: {
+          'Authorization': 'Bearer $accessToken',
+          'Content-Type': 'application/json',
+          'x-client-type': kIsWeb ? 'web' : 'mobile',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final fileName = 'invoice_$orderId.pdf';
+
+        if (kIsWeb) {
+          // ==========================================
+          // WEB EXECUTION (Chrome, Safari, Edge, etc.)
+          // ==========================================
+          
+          // Convert the bytes into a Blob (Binary Large Object)
+          final blob = html.Blob([response.bodyBytes], 'application/pdf');
+          
+          // Create a temporary object URL
+          final url = html.Url.createObjectUrlFromBlob(blob);
+          
+          // Create an invisible HTML anchor tag <a> and simulate a click
+          html.AnchorElement(href: url)
+            ..setAttribute("download", fileName)
+            ..click();
+            
+          // Clean up the URL to free memory
+          html.Url.revokeObjectUrl(url);
+
+        } else {
+          // ==========================================
+          // MOBILE EXECUTION (Android / iOS)
+          // ==========================================
+          final directory = await getApplicationDocumentsDirectory();
+          final filePath = '${directory.path}/$fileName';
+          final file = File(filePath);
+
+          await file.writeAsBytes(response.bodyBytes);
+
+          final result = await OpenFile.open(filePath);
+          if (result.type != ResultType.done) {
+            throw 'Could not open the invoice file';
+          }
+        }
+      } else {
+        String msg = 'Failed to download invoice';
+        try {
+          msg = jsonDecode(response.body)['message'] ?? msg;
+        } catch (_) {}
+        throw msg;
+      }
+    } catch (e) {
+      throw 'Error downloading invoice: ${e.toString()}';
     }
   }
 }

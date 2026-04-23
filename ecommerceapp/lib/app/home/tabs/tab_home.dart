@@ -21,6 +21,7 @@ import '../../../base/get/product_data.dart';
 import '../../model/api_models.dart';
 import '../../../base/get/cart_contr/shipping_add_controller.dart';
 import '../../../base/get/login_data_controller.dart';
+import '../../../base/get/wishlist_controller.dart';
 
 class TabHome extends StatefulWidget {
   const TabHome({Key? key}) : super(key: key);
@@ -36,10 +37,13 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
   final controller = Get.find<BottomItemSelectionController>();
   final loginController = Get.find<LoginDataController>();
 
-  // Replaced local userCity with ShippingAddressController observation
   final shippingController = Get.isRegistered<ShippingAddressController>()
       ? Get.find<ShippingAddressController>()
       : Get.put(ShippingAddressController());
+
+  final wishlistController = Get.isRegistered<WishlistController>()
+      ? Get.find<WishlistController>()
+      : Get.put(WishlistController());
   
   // Reactive product lists
   RxList<ProductModel> bestSellingList = <ProductModel>[].obs;
@@ -588,7 +592,7 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
           }),
           SizedBox(height: 16.h),
           SizedBox(
-            height: 220.w,
+            height: 240.w,
             child: Obx(() {
               if (isSectionLoading.value) {
                 return Center(child: CircularProgressIndicator(color: accentColor));
@@ -623,7 +627,7 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
           }),
           SizedBox(height: 16.h),
           SizedBox(
-            height: 220.w,
+            height: 240.w,
             child: Obx(() {
               if (isSectionLoading.value) {
                 return Center(child: CircularProgressIndicator(color: accentColor));
@@ -673,7 +677,7 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
                     }
                     var apiBrands = snapshot.data!;
                     var brands = [
-                      BrandModel(id: 'all', name: 'All', logoUrl: ''),
+                      BrandModel(id: 'all', name: 'All', logo: ''),
                       ...apiBrands
                     ];
                     return ListView.builder(
@@ -724,7 +728,7 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
           Obx(() {
             if (selectedBrand.value.isEmpty) return SizedBox();
             return SizedBox(
-              height: 200.w,
+              height: 240.w,
               child: FutureBuilder<Map<String, dynamic>>(
                 future: () async {
                   if (selectedBrand.value == 'all') {
@@ -812,7 +816,7 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
                 crossAxisCount: 2,
                 crossAxisSpacing: 12.w,
                 mainAxisSpacing: 12.w,
-                childAspectRatio: 0.94,
+                childAspectRatio: 0.65,
               ),
               itemCount: popularPicksList.take(4).length,
               itemBuilder: (context, index) =>
@@ -872,7 +876,7 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
                     child: (product.imageUrl.isNotEmpty && !product.imageUrl.contains("example.com"))
                         ? CachedNetworkImage(
                             imageUrl: product.imageUrl,
-                            fit: BoxFit.cover,
+                            fit: BoxFit.contain,
                             placeholder: (_, __) => Center(
                               child: CircularProgressIndicator(color: accentColor, strokeWidth: 2),
                             ),
@@ -886,15 +890,32 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
                 Positioned(
                   top: 6.h,
                   right: 6.w,
-                  child: Container(
-                    width: 28.w,
-                    height: 28.w,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 6)],
-                    ),
-                    child: Icon(Icons.favorite_border, color: accentColor, size: 15.w),
+                  child: GestureDetector(
+                    onTap: () {
+                      if (product.variants.isNotEmpty) {
+                        wishlistController.toggleWishlist(product.id, variantId: product.variants[0].id);
+                      } else {
+                        Get.snackbar("Error", "No variants available for this product", 
+                          backgroundColor: Colors.redAccent, colorText: Colors.white);
+                      }
+                    },
+                    child: Obx(() {
+                      bool isWished = wishlistController.isWishlisted(product.id);
+                      return Container(
+                        width: 28.w,
+                        height: 28.w,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 6)],
+                        ),
+                        child: Icon(
+                          isWished ? Icons.favorite : Icons.favorite_border, 
+                          color: accentColor, 
+                          size: 15.w
+                        ),
+                      );
+                    }),
                   ),
                 ),
               ],
@@ -932,15 +953,15 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
                       Text("₹${currentPrice.toStringAsFixed(0)}",
                           style: TextStyle(fontSize: 14.sp, color: accentColor, fontWeight: FontWeight.w800)),
                       if (discountPercent > 0) ...[
-                        Text("₹${basePrice.toStringAsFixed(0)}",
+                        Text("\u20b9${basePrice.toStringAsFixed(0)}",
                             style: TextStyle(
                               fontSize: 11.sp,
                               color: const Color(0xFF4B5563),
                               decoration: TextDecoration.lineThrough,
                               decorationColor: const Color(0xFF4B5563),
-                              decorationThickness: 1.2,
-                              height: 1.4,
+                              decorationThickness: 2.0,
                               fontWeight: FontWeight.w500,
+                              height: 1.0,
                             )),
                         Container(
                           padding: EdgeInsets.symmetric(horizontal: 5.w, vertical: 2.h),
