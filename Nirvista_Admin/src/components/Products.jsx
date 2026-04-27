@@ -52,6 +52,10 @@ export default function Products() {
     }
   }, [view, selectedProduct, activeFilters]);
 
+  useEffect(() => {
+    setReviewPage(1);
+  },  [selectedProduct, reviewFilters]);
+
   // --- API Calls ---
 
   const flattenTree = (nodes, level = 0) => {
