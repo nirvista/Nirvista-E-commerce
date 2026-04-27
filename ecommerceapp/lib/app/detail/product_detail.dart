@@ -106,16 +106,23 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
     }
   }
 
-  // --- Background enrichment (optional, non-blocking) ---
+  // --- Background enrichment: fetches full product detail (including all variant
+  //     images) and merges it into the local product state so the carousel
+  //     updates the moment the data arrives. ---
   void _enrichProductDetail(String productId) async {
     try {
       final res = await ProductApiService.getProductById(productId);
-      if (res['success'] && res['data'] != null) {
+      if (res['success'] == true && res['data'] != null) {
         final fullProduct = ProductModel.fromJson(res['data']);
-        setState(() {
-          product = product!.merge(fullProduct);
-          _initializeSelection(product!); // Re-initialize selection with new data
-        });
+        if (mounted) {
+          setState(() {
+            // merge() preserves any fields the lightweight API already filled
+            // while overwriting with richer data (images, variants) from the
+            // full product endpoint.
+            product = product!.merge(fullProduct);
+            _initializeSelection(product!);
+          });
+        }
       }
     } catch (_) {}
   }
@@ -267,7 +274,6 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
 
   Widget _buildProductImage(
       BuildContext context, ProductModel product, double margin) {
-    // The first variant id (if available) tells the API which variant to save.
     final String? firstVariantId =
         product.variants.isNotEmpty ? product.variants.first.id : null;
 
@@ -275,31 +281,44 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
       // Fix: Ensure Obx always has a listener even if variants are empty
       selectedVariantId.value;
 
-      // ── Reactive: collects all images from the currently selected variant ──
+      // ── Collect images from all sources in priority order ────────────────
+      final List<String> carouselImages = [];
+      final Set<String> seen = {};
+
+      void _addIfNew(String url) {
+        final trimmed = url.trim();
+        if (trimmed.isNotEmpty &&
+            !trimmed.contains('example.com') &&
+            !trimmed.contains('placehold.co') &&
+            seen.add(trimmed)) {
+          carouselImages.add(trimmed);
+        }
+      }
+
+      // 1. Currently selected variant images (highest priority — show
+      //    the correct colour/size images first)
       final variant = _getSelectedVariant(product);
-      
-      // Get all images for the carousel
-      List<String> carouselImages = [];
-      
-      // Add variant images if available
-      if (variant != null && variant.images.isNotEmpty) {
-        carouselImages.addAll(variant.images);
+      if (variant != null) {
+        for (final img in variant.images) _addIfNew(img);
       }
-      
-      // Add product-level images
-      if (product.images.isNotEmpty) {
-        carouselImages.addAll(product.images);
+
+      // 2. Product-level images (e.g. enriched from full product API)
+      for (final img in product.images) _addIfNew(img);
+
+      // 3. Main thumbnail URL
+      if (product.imageUrl.isNotEmpty) _addIfNew(product.imageUrl);
+
+      // 4. Images from ALL other variants as supplemental gallery images
+      for (final v in product.variants) {
+        if (v == variant) continue; // already added above
+        for (final img in v.images) _addIfNew(img);
       }
-      
-      // Add main image if available
-      if (product.imageUrl.isNotEmpty && !carouselImages.contains(product.imageUrl)) {
-        carouselImages.insert(0, product.imageUrl);
-      }
-      
-      // Ensure we have at least one image
+
+      // Fallback placeholder only when no real image is available
       if (carouselImages.isEmpty) {
-        carouselImages.add("https://placehold.co/400");
+        carouselImages.add('https://placehold.co/400');
       }
+      // ─────────────────────────────────────────────────────────────────────
 
       return ProductImagesCarousel(
         images: carouselImages,

@@ -16,119 +16,214 @@ class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
 
   @override
-  State<StatefulWidget> createState() {
-    return _LoginScreen();
-  }
+  State<StatefulWidget> createState() => _LoginScreen();
 }
 
 class _LoginScreen extends State<LoginScreen> {
-  backClick(BuildContext context) {
-    Constant.backToFinish(context);
-  }
+  void backClick(BuildContext context) => Constant.backToFinish(context);
 
-  RxBool showPass = false.obs;
-  RxBool isLoading = false.obs;
+  final RxBool showPass = false.obs;
+  final RxBool isLoading = false.obs;
 
-  TextEditingController emailController = TextEditingController();
-  TextEditingController passController = TextEditingController();
+  final TextEditingController emailController = TextEditingController();
+  final TextEditingController passController = TextEditingController();
 
   String? userType;
 
+  // ── Email validator ──────────────────────────────────────────────────────────
+  bool _isValidEmail(String email) {
+    final emailRegex =
+        RegExp(r'^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$');
+    return emailRegex.hasMatch(email.trim());
+  }
+
+  // ── Unified field style ──────────────────────────────────────────────────────
+  // Used for BOTH plain-text fields and password fields so every input
+  // looks identical (same border radius, border colour, background, font).
+  InputDecoration _fieldDecoration({
+    required BuildContext context,
+    required String hint,
+    Widget? suffix,
+  }) {
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: TextStyle(
+        fontSize: 14.sp,
+        color: getFontColor(context).withOpacity(0.45),
+        fontWeight: FontWeight.w400,
+      ),
+      contentPadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 16.h),
+      filled: true,
+      fillColor: getCardColor(context),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12.r),
+        borderSide:
+            BorderSide(color: getAccentColor(context).withOpacity(0.35), width: 1.2),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12.r),
+        borderSide:
+            BorderSide(color: getAccentColor(context).withOpacity(0.35), width: 1.2),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12.r),
+        borderSide: BorderSide(color: getAccentColor(context), width: 1.5),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12.r),
+        borderSide: const BorderSide(color: Colors.red, width: 1.2),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12.r),
+        borderSide: const BorderSide(color: Colors.red, width: 1.5),
+      ),
+      suffixIcon: suffix,
+      suffixIconConstraints: BoxConstraints(minWidth: 44.w, minHeight: 44.h),
+    );
+  }
+
+  // ── Plain text field (email, name, phone …) ──────────────────────────────────
+  Widget _buildTextField({
+    required BuildContext context,
+    required String hint,
+    required TextEditingController controller,
+    required double horSpace,
+    TextInputType keyboardType = TextInputType.text,
+    String? Function(String?)? validator,
+  }) {
+    return Container(
+      margin: EdgeInsets.symmetric(horizontal: horSpace),
+      child: TextFormField(
+        controller: controller,
+        keyboardType: keyboardType,
+        validator: validator,
+        style: TextStyle(
+          fontSize: 14.sp,
+          color: getFontColor(context),
+          fontWeight: FontWeight.w400,
+        ),
+        decoration: _fieldDecoration(context: context, hint: hint),
+      ),
+    );
+  }
+
+  // ── Password field (with eye icon) ───────────────────────────────────────────
+  Widget _buildPasswordField({
+    required BuildContext context,
+    required String hint,
+    required TextEditingController controller,
+    required RxBool showPassObs,
+    required double horSpace,
+    String? Function(String?)? validator,
+  }) {
+    return Obx(() => Container(
+          margin: EdgeInsets.symmetric(horizontal: horSpace),
+          child: TextFormField(
+            controller: controller,
+            obscureText: !showPassObs.value,
+            validator: validator,
+            style: TextStyle(
+              fontSize: 14.sp,
+              color: getFontColor(context),
+              fontWeight: FontWeight.w400,
+            ),
+            decoration: _fieldDecoration(
+              context: context,
+              hint: hint,
+              suffix: GestureDetector(
+                onTap: () => showPassObs.value = !showPassObs.value,
+                child: Padding(
+                  padding: EdgeInsets.only(right: 14.w),
+                  child: Icon(
+                    showPassObs.value
+                        ? Icons.visibility_outlined
+                        : Icons.visibility_off_outlined,
+                    color: getAccentColor(context),
+                    size: 22.sp,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ));
+  }
+
   @override
   Widget build(BuildContext context) {
-    RxBool agreeTerm = false.obs;
-
+    final RxBool agreeTerm = false.obs;
     Constant.setupSize(context);
-    double horSpace = FetchPixels.getDefaultHorSpaceFigma(context);
+    final double horSpace = FetchPixels.getDefaultHorSpaceFigma(context);
 
     return buildTitleDefaultWidget(
       context,
       "Login",
-      () {
-        backClick(context);
-      },
+      () => backClick(context),
       Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          /// EMAIL
+          // ── Email ────────────────────────────────────────────────────────────
           getCustomFont("Email", 16, getFontColor(context), 1,
                   fontWeight: FontWeight.w400)
               .marginSymmetric(horizontal: horSpace),
           8.h.verticalSpace,
-          getDefaultTextFiled(
-              context,
-              "Enter Email Address",
-              emailController,
-              getFontColor(context), (value) {}, validator: (email) {
-            if (email!.isNotEmpty) {
+          _buildTextField(
+            context: context,
+            hint: "Enter Email Address",
+            controller: emailController,
+            horSpace: horSpace,
+            keyboardType: TextInputType.emailAddress,
+            validator: (email) {
+              if (email == null || email.isEmpty) return 'Please enter email address';
+              if (!_isValidEmail(email))
+                return 'Please enter a valid email';
               return null;
-            } else {
-              return 'Please enter email address';
-            }
-          }),
+            },
+          ),
 
           20.h.verticalSpace,
 
-          /// PASSWORD
+          // ── Password ─────────────────────────────────────────────────────────
           getCustomFont("Password", 16, getFontColor(context), 1,
                   fontWeight: FontWeight.w400)
               .marginSymmetric(horizontal: horSpace),
           8.h.verticalSpace,
-          ObxValue((p0) {
-            return getPassTextFiled(
-              context,
-              "Enter Password",
-              passController,
-              getFontColor(context),
-              showPass.value,
-              () {
-                showPass.value = !showPass.value;
-              },
-              validator: (password) {
-                if (password!.isNotEmpty) {
-                  return null;
-                } else {
-                  return 'Please enter password';
-                }
-              },
-            );
-          }, showPass),
+          _buildPasswordField(
+            context: context,
+            hint: "Enter Password",
+            controller: passController,
+            showPassObs: showPass,
+            horSpace: horSpace,
+            validator: (v) =>
+                (v == null || v.isEmpty) ? 'Please enter password' : null,
+          ),
 
           20.h.verticalSpace,
 
-          /// REMEMBER + FORGOT
+          // ── Remember me + Forgot password ────────────────────────────────────
           Row(
             children: [
-              ObxValue((p0) {
-                return Checkbox(
+              ObxValue(
+                (p0) => Checkbox(
                   visualDensity: VisualDensity.compact,
-                  side: BorderSide(
-                      color: getAccentColor(context), width: 1.h),
+                  side: BorderSide(color: getAccentColor(context), width: 1.h),
                   activeColor: getAccentColor(context),
                   shape: RoundedRectangleBorder(
-                      borderRadius:
-                          BorderRadius.all(Radius.circular(6.h))),
-                  onChanged: (value) {
-                    agreeTerm.value = value!;
-                  },
+                      borderRadius: BorderRadius.all(Radius.circular(6.h))),
+                  onChanged: (v) => agreeTerm.value = v!,
                   value: agreeTerm.value,
-                );
-              }, agreeTerm),
+                ),
+                agreeTerm,
+              ),
               getCustomFont("Remember me", 14, getFontColor(context), 1,
                   fontWeight: FontWeight.w400),
               Expanded(
                 child: Align(
                   alignment: Alignment.centerRight,
                   child: InkWell(
-                    onTap: () {
-                      Constant.sendToNext(
-                          context, forgotPassScreenRoute);
-                    },
+                    onTap: () =>
+                        Constant.sendToNext(context, forgotPassScreenRoute),
                     child: getCustomFont(
-                        "Forgot password ?",
-                        16,
-                        getFontColor(context),
-                        1,
+                        "Forgot password ?", 16, getFontColor(context), 1,
                         fontWeight: FontWeight.w400),
                   ),
                 ).paddingOnly(right: horSpace),
@@ -138,10 +233,9 @@ class _LoginScreen extends State<LoginScreen> {
 
           20.h.verticalSpace,
 
-          /// USER TYPE
+          // ── User Type ────────────────────────────────────────────────────────
           Center(
-            child: getCustomFont("Select User Type", 16,
-                getFontColor(context), 1,
+            child: getCustomFont("Select User Type", 16, getFontColor(context), 1,
                 fontWeight: FontWeight.w500),
           ),
           8.h.verticalSpace,
@@ -152,11 +246,7 @@ class _LoginScreen extends State<LoginScreen> {
                 value: "customer",
                 groupValue: userType,
                 activeColor: getAccentColor(context),
-                onChanged: (String? value) {
-                  setState(() {
-                    userType = value!;
-                  });
-                },
+                onChanged: (v) => setState(() => userType = v!),
               ),
               getCustomFont("Customer", 14, getFontColor(context), 1),
               20.w.horizontalSpace,
@@ -164,11 +254,7 @@ class _LoginScreen extends State<LoginScreen> {
                 value: "vendor",
                 groupValue: userType,
                 activeColor: getAccentColor(context),
-                onChanged: (String? value) {
-                  setState(() {
-                    userType = value!;
-                  });
-                },
+                onChanged: (v) => setState(() => userType = v!),
               ),
               getCustomFont("Vendor", 14, getFontColor(context), 1),
             ],
@@ -176,9 +262,9 @@ class _LoginScreen extends State<LoginScreen> {
 
           20.h.verticalSpace,
 
-          /// LOGIN BUTTON
-          ObxValue((loading) {
-            return getButtonFigma(
+          // ── Log In button ────────────────────────────────────────────────────
+          ObxValue(
+            (loading) => getButtonFigma(
               context,
               getAccentColor(context),
               true,
@@ -187,9 +273,13 @@ class _LoginScreen extends State<LoginScreen> {
               isLoading.value
                   ? () {}
                   : () async {
-                      /// VALIDATION
                       if (emailController.text.isEmpty) {
                         _snack("Please enter email");
+                        return;
+                      }
+                      if (!_isValidEmail(emailController.text)) {
+                        _snack(
+                            "Please enter a valid email");
                         return;
                       }
                       if (passController.text.isEmpty) {
@@ -202,7 +292,6 @@ class _LoginScreen extends State<LoginScreen> {
                       }
 
                       isLoading.value = true;
-
                       try {
                         final result = await ApiService.userLogin(
                           email: emailController.text.trim(),
@@ -211,25 +300,20 @@ class _LoginScreen extends State<LoginScreen> {
 
                         if (result['success']) {
                           final userData = result['data']['user'];
-                          final accessToken =
-                              result['data']['accessToken'];
-                          final refreshToken =
-                              result['data']['refreshToken'];
+                          final accessToken = result['data']['accessToken'];
+                          final refreshToken = result['data']['refreshToken'];
 
                           final serverRole =
                               userData['userRole'].toString().toLowerCase();
-                          final selectedRole =
-                              userType!.toLowerCase();
+                          final selectedRole = userType!.toLowerCase();
 
-                          /// ROLE CHECK
                           if (serverRole != selectedRole) {
                             isLoading.value = false;
-                            _snack(
-                                "This account is registered as $serverRole");
+                            _snack("This account is registered as $serverRole");
                             return;
                           }
 
-                          User loggedInUser = User(
+                          final loggedInUser = User(
                             id: userData['id'],
                             name: userData['name'],
                             email: userData['email'],
@@ -237,14 +321,11 @@ class _LoginScreen extends State<LoginScreen> {
                             userRole: userData['userRole'],
                           );
 
-                          final loginController =
-                              Get.find<LoginDataController>();
+                          final loginController = Get.find<LoginDataController>();
 
-                          /// 🚨 VENDOR STATUS CHECK
                           if (serverRole == 'vendor') {
                             final meResult =
-                                await VendorApiService.getCurrentUser(
-                                    accessToken);
+                                await VendorApiService.getCurrentUser(accessToken);
 
                             if (meResult['success'] != true) {
                               _snack("Unable to verify vendor status");
@@ -252,41 +333,32 @@ class _LoginScreen extends State<LoginScreen> {
                               return;
                             }
 
-                            final status = meResult['data']
-                                    ?['userStatus']
+                            final status = meResult['data']?['userStatus']
                                 ?.toString()
                                 .toLowerCase();
 
                             if (status != 'active') {
-                              _snack(
-                                status == 'pending'
-                                    ? "Your account is under review. Wait for admin approval."
-                                    : "Account is $status",
-                              );
+                              _snack(status == 'pending'
+                                  ? "Your account is under review. Wait for admin approval."
+                                  : "Account is $status");
                               isLoading.value = false;
                               return;
                             }
                           }
 
-                          /// SAVE USER (ONLY IF ALLOWED)
-                          loginController.saveUser(
-                            loggedInUser,
-                            accessToken: accessToken,
-                            refreshToken: refreshToken,
-                          );
+                          loginController.saveUser(loggedInUser,
+                              accessToken: accessToken,
+                              refreshToken: refreshToken);
 
                           _snack("Login successful");
 
-                          /// NAVIGATION
                           if (serverRole == 'vendor') {
-                            Constant.sendToNext(
-                                context, vendorDashboardRoute);
+                            Constant.sendToNext(context, vendorDashboardRoute);
                           } else {
-                            Constant.sendToNext(
-                                context, homeScreenRoute);
+                            Constant.sendToNext(context, homeScreenRoute);
                           }
                         } else {
-                          _snack(result['message'] ?? 'Login failed');
+                          _snack(result['message']?.toString() ?? 'Login failed');
                         }
                       } catch (e) {
                         _snack("Error: $e");
@@ -294,28 +366,24 @@ class _LoginScreen extends State<LoginScreen> {
                         isLoading.value = false;
                       }
                     },
-              EdgeInsets.symmetric(
-                  horizontal: horSpace, vertical: 60.h),
-            );
-          }, isLoading),
+              EdgeInsets.symmetric(horizontal: horSpace, vertical: 60.h),
+            ),
+            isLoading,
+          ),
 
           30.h.verticalSpace,
 
-          /// SIGNUP
+          // ── Sign up link ─────────────────────────────────────────────────────
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               getCustomFont(
-                  "Don't have an account?", 16,
-                  getFontBlackColor(context), 1),
+                  "Don't have an account?", 16, getFontBlackColor(context), 1),
               InkWell(
-                onTap: () {
-                  Constant.sendToNext(context, registrationRoute);
-                },
-                child: getCustomFont(
-                    " Sign up", 18, accentColor, 1,
+                onTap: () => Constant.sendToNext(context, registrationRoute),
+                child: getCustomFont(" Sign up", 18, accentColor, 1,
                     fontWeight: FontWeight.w700),
-              )
+              ),
             ],
           ),
         ],
@@ -323,9 +391,6 @@ class _LoginScreen extends State<LoginScreen> {
     );
   }
 
-  void _snack(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg)),
-    );
-  }
+  void _snack(String msg) =>
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
 }
