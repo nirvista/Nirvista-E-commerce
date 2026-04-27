@@ -205,7 +205,7 @@ export default function Vendors() {
       (vendor.email && vendor.email.toLowerCase().includes(term)) ||
       (vendor.vendorProfile?.storeName && vendor.vendorProfile.storeName.toLowerCase().includes(term));
     
-    const matchesStatus = statusFilter === "" || (vendor.userStatus && vendor.userStatus.toLowerCase() === statusFilter.toLowerCase());
+    const matchesStatus = statusFilter === "" || (vendor.vendorProfile?.vendorStatus && vendor.vendorProfile.vendorStatus.toLowerCase() === statusFilter.toLowerCase());
 
     return matchesSearch && matchesStatus;
   });
@@ -256,10 +256,10 @@ export default function Vendors() {
             className="w-full px-3 py-2 border border-slate-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 dark:bg-gray-800 dark:text-white text-sm"
           >
             <option value="">All Statuses</option>
-            <option value="active">Active</option>
+            <option value="approved">Approved</option>
             <option value="pending">Pending</option>
             <option value="suspended">Suspended</option>
-            <option value="deleted">Deleted</option>
+            <option value="rejected">Rejected</option>
           </select>
         </div>
 
@@ -307,18 +307,18 @@ export default function Vendors() {
                     <td className="p-4 text-slate-600 dark:text-gray-400">{vendor.phone}</td>
                     <td className="p-4">
                       <select
-                          value={vendor.userStatus?.toLowerCase()}
-                          onChange={(e) => handleStatusChange(vendor.id || vendor._id, e.target.value)}
-                          className={`px-2 py-1.5 text-xs rounded-full font-semibold outline-none cursor-pointer border border-transparent hover:border-slate-300 dark:hover:border-gray-600 appearance-none text-center ${
-                            (vendor.userStatus?.toLowerCase() === 'active' || vendor.userStatus?.toLowerCase() === 'approved') ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
-                            (vendor.userStatus?.toLowerCase() === 'suspended' || vendor.userStatus?.toLowerCase() === 'deleted' || vendor.userStatus?.toLowerCase() === 'rejected') ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : 
-                            'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
-                          }`}
-                        >
-                          <option value="active" className="bg-white text-slate-800 dark:bg-gray-800 dark:text-gray-100">Active</option>
-                          <option value="pending" className="bg-white text-slate-800 dark:bg-gray-800 dark:text-gray-100">Pending</option>
-                          <option value="suspended" className="bg-white text-slate-800 dark:bg-gray-800 dark:text-gray-100">Suspended</option>
-                          <option value="deleted" className="bg-white text-slate-800 dark:bg-gray-800 dark:text-gray-100">Deleted</option>
+                        value={vendor.vendorProfile?.vendorStatus?.toLowerCase() || 'pending'}
+                        onChange={(e) => handleStatusChange(vendor.id || vendor._id, e.target.value)}
+                        className={`px-2 py-1.5 text-xs rounded-full font-semibold outline-none cursor-pointer border border-transparent hover:border-slate-300 dark:hover:border-gray-600 appearance-none text-center ${
+                          (vendor.vendorProfile?.vendorStatus?.toLowerCase() === 'approved') ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                          (vendor.vendorProfile?.vendorStatus?.toLowerCase() === 'suspended' || vendor.vendorProfile?.vendorStatus?.toLowerCase() === 'rejected') ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : 
+                          'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                        }`}
+                      >
+                        <option value="approved" className="bg-white text-slate-800 dark:bg-gray-800 dark:text-gray-100">Approved</option>
+                        <option value="pending" className="bg-white text-slate-800 dark:bg-gray-800 dark:text-gray-100">Pending</option>
+                        <option value="suspended" className="bg-white text-slate-800 dark:bg-gray-800 dark:text-gray-100">Suspended</option>
+                        <option value="rejected" className="bg-white text-slate-800 dark:bg-gray-800 dark:text-gray-100">Rejected</option>
                       </select>
                     </td>
                     <td className="p-4 flex items-center justify-center gap-3">
