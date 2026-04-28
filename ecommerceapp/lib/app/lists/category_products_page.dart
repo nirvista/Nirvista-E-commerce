@@ -13,6 +13,7 @@ import '../../../services/product_api.dart';
 import '../../../services/category_api.dart';
 import '../../../services/brand_api.dart';
 import '../../../services/enrichment_service.dart';
+import 'package:pet_shop/base/get/wishlist_controller.dart';
 
 class CategoryProductsPage extends StatefulWidget {
   const CategoryProductsPage({Key? key}) : super(key: key);
@@ -23,6 +24,10 @@ class CategoryProductsPage extends StatefulWidget {
 
 class _CategoryProductsPageState extends State<CategoryProductsPage> {
   StorageController storageController = Get.find<StorageController>();
+  final wishlistController = Get.isRegistered<WishlistController>()
+      ? Get.find<WishlistController>()
+      : Get.put(WishlistController());
+      
   RxString selectedSubCategory = "all".obs;
   
   Future<List<ProductModel>>? productsFuture;
@@ -265,23 +270,19 @@ class _CategoryProductsPageState extends State<CategoryProductsPage> {
     );
   }
 
-  Widget _buildProductCard(
-      BuildContext context, ProductModel product) {
+  Widget _buildProductCard(BuildContext context, ProductModel product) {
     double basePrice = product.originalPrice;
     double currentPrice = product.currentPrice;
     double discountPercent = 0.0;
-    
-    // Add safety check for zero or negative prices
     if (basePrice <= 0) basePrice = currentPrice;
     if (currentPrice <= 0) currentPrice = basePrice;
-    
     if (basePrice > 0 && currentPrice > 0 && basePrice > currentPrice) {
-      discountPercent = (((basePrice - currentPrice) / basePrice) * 100).toDouble();
+      discountPercent = ((basePrice - currentPrice) / basePrice) * 100;
     } else {
       basePrice = currentPrice;
     }
 
-    return InkWell(
+    return GestureDetector(
       onTap: () {
         storageController.setSelectedProductModel(product);
         Constant.sendToNext(context, productDetailScreenRoute);
@@ -289,114 +290,188 @@ class _CategoryProductsPageState extends State<CategoryProductsPage> {
       child: Container(
         decoration: BoxDecoration(
           color: getCardColor(context),
-          borderRadius: BorderRadius.circular(12.w),
-          border: Border.all(color: dividerColor, width: 0.5),
+          borderRadius: BorderRadius.circular(14.w),
           boxShadow: [
             BoxShadow(
-              color: accentColor.withOpacity(0.15),
-              blurRadius: 8.w,
-              offset: Offset(0, 4),
+              color: accentColor.withOpacity(0.07),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
-        padding: EdgeInsets.all(8.w),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            // Image
-            Expanded(
-              child: Container(
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(10.w),
-                  color: getGreyCardColor(context),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(10.w),
-                  child: (product.imageUrl.isNotEmpty && !product.imageUrl.contains("example.com")) 
-                    ? CachedNetworkImage(
-                      imageUrl: product.imageUrl,
-                      fit: BoxFit.contain,
-                      placeholder: (context, url) => Center(
-                        child: CircularProgressIndicator(
-                          color: accentColor,
-                          strokeWidth: 2,
-                        ),
-                      ),
-                      errorWidget: (context, url, error) =>
-                          Icon(Icons.image_not_supported,
-                              color: getFontGreyColor(context)),
-                    )
-                    : Container(
+            // ── Image with heart overlay ──
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final imgH = (constraints.maxWidth * 0.75).clamp(80.0, 130.0);
+                return Stack(
+                  children: [
+                    ClipRRect(
+                      borderRadius:
+                          BorderRadius.vertical(top: Radius.circular(14.w)),
+                      child: Container(
+                        height: imgH,
+                        width: double.infinity,
                         color: getGreyCardColor(context),
-                        child: Icon(Icons.shopping_bag_outlined, color: getFontGreyColor(context), size: 40.w),
+                        child: (product.imageUrl.isNotEmpty &&
+                                !product.imageUrl.contains('example.com'))
+                            ? CachedNetworkImage(
+                                imageUrl: product.imageUrl,
+                                fit: BoxFit.contain,
+                                placeholder: (_, __) => Center(
+                                  child: CircularProgressIndicator(
+                                      color: accentColor, strokeWidth: 2),
+                                ),
+                                errorWidget: (_, __, ___) => Icon(
+                                    Icons.shopping_bag_outlined,
+                                    color: getFontGreyColor(context),
+                                    size: 32.w),
+                              )
+                            : Icon(Icons.shopping_bag_outlined,
+                                color: getFontGreyColor(context), size: 32.w),
                       ),
-                ),
+                    ),
+                    // Heart icon — top right
+                    Positioned(
+                      top: 6.h,
+                      right: 6.w,
+                      child: GestureDetector(
+                        onTap: () {
+                          if (product.variants.isNotEmpty) {
+                            wishlistController.toggleWishlist(product.id, variantId: product.variants[0].id);
+                          } else {
+                            Get.snackbar("Error", "No variants available for this product", 
+                              backgroundColor: Colors.redAccent, colorText: Colors.white);
+                          }
+                        },
+                        child: Obx(() {
+                          bool isWished = wishlistController.isWishlisted(product.id);
+                          return Container(
+                            width: 28.w,
+                            height: 28.w,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                    color: Colors.black.withOpacity(0.08),
+                                    blurRadius: 6)
+                              ],
+                            ),
+                            child: Icon(
+                              isWished ? Icons.favorite : Icons.favorite_border,
+                              color: accentColor, 
+                              size: 15.w
+                            ),
+                          );
+                        }),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+            // ── Info ──
+            Padding(
+              padding: EdgeInsets.fromLTRB(8.w, 8.h, 8.w, 10.h),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (product.brandName.isNotEmpty)
+                    Text(product.brandName,
+                        style: TextStyle(
+                            fontSize: 10.sp,
+                            color: getFontGreyColor(context),
+                            fontWeight: FontWeight.w500)),
+                  SizedBox(height: 3.h),
+                  Text(product.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          fontSize: 12.sp,
+                          color: getFontColor(context),
+                          fontWeight: FontWeight.w600,
+                          height: 1.3)),
+                  SizedBox(height: 5.h),
+                  Row(
+                    children: [
+                      Icon(Icons.star_rounded,
+                          color: ratedColor, size: 12.w),
+                      SizedBox(width: 3.w),
+                      Text(product.rating.toStringAsFixed(1),
+                          style: TextStyle(
+                              fontSize: 10.sp,
+                              color: getFontColor(context),
+                              fontWeight: FontWeight.w500)),
+                    ],
+                  ),
+                  SizedBox(height: 6.h),
+                  Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 5.w,
+                    runSpacing: 3.h,
+                    children: [
+                      Text('₹${currentPrice.toStringAsFixed(0)}',
+                          style: TextStyle(
+                              fontSize: 14.sp,
+                              color: accentColor,
+                              fontWeight: FontWeight.w800)),
+                      if (discountPercent > 0) ...[
+                        Text('₹${basePrice.toStringAsFixed(0)}',
+                            style: TextStyle(
+                              fontSize: 11.sp,
+                              color: const Color(0xFF4B5563),
+                              decoration: TextDecoration.lineThrough,
+                              decorationColor: const Color(0xFF4B5563),
+                              decorationThickness: 2.0,
+                              fontWeight: FontWeight.w500,
+                              height: 1.0,
+                            )),
+                        Container(
+                          padding: EdgeInsets.symmetric(
+                              horizontal: 5.w, vertical: 2.h),
+                          decoration: BoxDecoration(
+                            color: accentColor.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(4.w),
+                          ),
+                          child: Text(
+                            '${discountPercent.toStringAsFixed(0)}% off',
+                            style: TextStyle(
+                                fontSize: 9.sp,
+                                color: accentColor,
+                                fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  Builder(
+                    builder: (context) {
+                      int totalStock = product.variants.fold(0, (sum, v) => sum + v.availableStock);
+                      bool isOutOfStock = product.variants.isNotEmpty && 
+                          product.variants.every((v) => v.status == 'out-of-stock' || v.availableStock <= 0);
+                      
+                      if (isOutOfStock || (product.variants.isNotEmpty && totalStock <= 0)) {
+                        return Padding(
+                          padding: EdgeInsets.only(top: 6.h),
+                          child: getCustomFont("Out of Stock", 10, Colors.redAccent, 1, fontWeight: FontWeight.w600),
+                        );
+                      } else if (totalStock > 0 && totalStock < 10) {
+                        return Padding(
+                          padding: EdgeInsets.only(top: 6.h),
+                          child: getCustomFont("Limited stocks available", 10, Colors.orange, 1, fontWeight: FontWeight.w600),
+                        );
+                      }
+                      return const SizedBox.shrink();
+                    },
+                  ),
+                ],
               ),
             ),
-            SizedBox(height: 8.h),
-            // Brand
-            getCustomFont(product.brandName, 11, getFontGreyColor(context), 1,
-                fontWeight: FontWeight.w500),
-            SizedBox(height: 4.h),
-            // Product Name
-            getCustomFont(product.title, 12, getFontColor(context), 2,
-                fontWeight: FontWeight.w600,
-                overflow: TextOverflow.ellipsis),
-            SizedBox(height: 4.h),
-            // Rating
-            Row(
-              children: [
-                Icon(Icons.star, color: ratedColor, size: 12.w),
-                SizedBox(width: 4.w),
-                getCustomFont(
-                    product.rating.toStringAsFixed(1),
-                    11,
-                    getFontColor(context),
-                    1,
-                    fontWeight: FontWeight.w500),
-              ],
-            ),
-            SizedBox(height: 8.h),
-            // Price Row
-            Row(
-              children: [
-                getCustomFont(
-                    "₹${currentPrice.toStringAsFixed(0)}",
-                    13,
-                    accentColor,
-                    1,
-                    fontWeight: FontWeight.w700),
-                SizedBox(width: 6.w),
-                if (discountPercent > 0)
-                  getCustomFont(
-                      "₹${basePrice.toStringAsFixed(0)}",
-                      14,
-                      const Color(0xFF4B5563),
-                      1,
-                      fontWeight: FontWeight.w500,
-                      decoration: TextDecoration.lineThrough,
-                      decorationColor: const Color(0xFF4B5563),
-                      decorationThickness: 1.2,
-                      txtHeight: 1.4),
-              ],
-            ),
-            // Discount Badge
-            if (discountPercent > 0)
-              Container(
-                margin: EdgeInsets.only(top: 6.h),
-                padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
-                decoration: BoxDecoration(
-                  color: redColor,
-                  borderRadius: BorderRadius.circular(4.w),
-                ),
-                child: getCustomFont(
-                    "${discountPercent.toStringAsFixed(0)}% OFF",
-                    9,
-                    Colors.white,
-                    1,
-                    fontWeight: FontWeight.w700),
-              ),
           ],
         ),
       ),

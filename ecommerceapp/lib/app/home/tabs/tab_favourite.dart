@@ -177,7 +177,8 @@ class TabFavourite extends StatelessWidget {
   ) {
     final imageUrl =
         item.variant.images.isNotEmpty ? item.variant.images[0] : '';
-    final isInStock = item.variant.status == 'in-stock';
+    final bool isOutOfStock = item.variant.status == 'out-of-stock';
+    final bool canAddToCart = !isOutOfStock;
 
     return Dismissible(
       key: ValueKey(item.id), // FIX: ValueKey is more robust than Key()
@@ -293,7 +294,7 @@ class TabFavourite extends StatelessWidget {
                                   color: const Color(0xFF4B5563),
                                   decoration: TextDecoration.lineThrough,
                                   decorationColor: const Color(0xFF4B5563),
-                                  decorationThickness: 1.2,
+                                  decorationThickness: 2.0,
                                   height: 1.4,
                                   fontWeight: FontWeight.w500,
                                 ),
@@ -313,29 +314,29 @@ class TabFavourite extends StatelessWidget {
                             ],
                           ],
                         ),
-                        SizedBox(height: 6.h),
-                        Row(
-                          children: [
-                            Container(
-                              width: 8.w,
-                              height: 8.w,
-                              decoration: BoxDecoration(
-                                color: isInStock
-                                    ? greenColor
-                                    : Colors.redAccent,
-                                shape: BoxShape.circle,
+                        if (isOutOfStock) ...[
+                          SizedBox(height: 6.h),
+                          Row(
+                            children: [
+                              Container(
+                                width: 8.w,
+                                height: 8.w,
+                                decoration: const BoxDecoration(
+                                  color: Colors.redAccent,
+                                  shape: BoxShape.circle,
+                                ),
                               ),
-                            ),
-                            SizedBox(width: 6.w),
-                            getCustomFont(
-                              isInStock ? "In Stock" : "Out of Stock",
-                              11,
-                              isInStock ? greenColor : Colors.redAccent,
-                              1,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ],
-                        ),
+                              SizedBox(width: 6.w),
+                              getCustomFont(
+                                "Out of Stock",
+                                11,
+                                Colors.redAccent,
+                                1,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ],
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -403,17 +404,17 @@ class TabFavourite extends StatelessWidget {
                   Expanded(
                     flex: 2,
                     child: GestureDetector(
-                      onTap: isInStock
+                      onTap: canAddToCart
                           ? () => ctrl.moveToCart(item, index)
                           : null,
                       child: Container(
                         padding: EdgeInsets.symmetric(vertical: 10.h),
                         decoration: BoxDecoration(
-                          color: isInStock
+                          color: canAddToCart
                               ? accentColor
                               : getFontGreyColor(context).withOpacity(0.3),
                           borderRadius: BorderRadius.circular(10.w),
-                          boxShadow: isInStock
+                          boxShadow: canAddToCart
                               ? [
                                   BoxShadow(
                                     color: accentColor.withOpacity(0.3),
@@ -430,7 +431,7 @@ class TabFavourite extends StatelessWidget {
                                 color: Colors.white, size: 16.w),
                             SizedBox(width: 6.w),
                             getCustomFont(
-                              isInStock ? "Move to Cart" : "Out of Stock",
+                              canAddToCart ? "Move to Cart" : "Out of Stock",
                               13,
                               Colors.white,
                               1,

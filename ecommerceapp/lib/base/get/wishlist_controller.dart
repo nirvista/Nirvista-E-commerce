@@ -86,14 +86,24 @@ class WishlistController extends GetxController {
   // ═══════════════════════════════════════════════════════
 
   Future<void> toggleWishlist(String productId, {String? variantId}) async {
-    if (wishedProductIds.contains(productId)) {
-      await _removeByProductId(productId);
+    bool currentlyWishlisted = isWishlisted(productId, variantId: variantId);
+    if (currentlyWishlisted) {
+      if (variantId != null && variantId.isNotEmpty) {
+        await _removeByVariantId(productId, variantId);
+      } else {
+        await _removeByProductId(productId);
+      }
     } else {
       await _addToWishlist(productId, variantId: variantId);
     }
   }
 
-  bool isWishlisted(String productId) => wishedProductIds.contains(productId);
+  bool isWishlisted(String productId, {String? variantId}) {
+    if (variantId != null && variantId.isNotEmpty) {
+      return items.any((item) => item.productId == productId && item.variantId == variantId);
+    }
+    return wishedProductIds.contains(productId);
+  }
 
   // ═══════════════════════════════════════════════════════
   // REMOVE
@@ -218,7 +228,14 @@ class WishlistController extends GetxController {
   }
 
   Future<void> _removeByProductId(String productId) async {
-    final index = items.indexWhere((i) => i.product.id == productId);
+    final index = items.indexWhere((i) => i.productId == productId);
+    if (index == -1) return;
+    final item = items[index];
+    await removeItem(item, index);
+  }
+
+  Future<void> _removeByVariantId(String productId, String variantId) async {
+    final index = items.indexWhere((i) => i.productId == productId && i.variantId == variantId);
     if (index == -1) return;
     final item = items[index];
     await removeItem(item, index);

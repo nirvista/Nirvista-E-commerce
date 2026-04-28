@@ -206,18 +206,34 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
         .map((v) => v.color!.trim())
         .toSet()
         .toList();
-    List<String> uniqueSizes = product.variants
-        .where((v) => v.size != null && v.size!.isNotEmpty)
-        .map((v) => v.size!.trim())
-        .toSet()
-        .toList();
 
     return Column(
       children: [
         if (uniqueColors.isNotEmpty)
           _buildColorsSection(context, product, uniqueColors, margin),
-        if (uniqueSizes.isNotEmpty)
-          _buildSizesSection(context, product, uniqueSizes, margin),
+        Obx(() {
+          final currentColor = selectedColor.value.trim().toLowerCase();
+          List<String> availableSizes = product.variants
+              .where((v) => v.size != null && v.size!.isNotEmpty && 
+                            (currentColor.isEmpty || (v.color?.trim().toLowerCase() ?? "") == currentColor))
+              .map((v) => v.size!.trim())
+              .toSet()
+              .toList();
+
+          if (availableSizes.isNotEmpty && 
+              !availableSizes.any((s) => s.toLowerCase() == selectedSize.value.trim().toLowerCase())) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              selectedSize.value = availableSizes.first;
+              storageController.setSelectedSize(availableSizes.first);
+              selectedVariantId.value = "";
+            });
+          }
+
+          if (availableSizes.isNotEmpty) {
+            return _buildSizesSection(context, product, availableSizes, margin);
+          }
+          return const SizedBox.shrink();
+        }),
       ],
     );
   }
@@ -274,9 +290,6 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
 
   Widget _buildProductImage(
       BuildContext context, ProductModel product, double margin) {
-    final String? firstVariantId =
-        product.variants.isNotEmpty ? product.variants.first.id : null;
-
     return Obx(() {
       // Fix: Ensure Obx always has a listener even if variants are empty
       selectedVariantId.value;
@@ -305,14 +318,13 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
       // 2. Product-level images (e.g. enriched from full product API)
       for (final img in product.images) _addIfNew(img);
 
-      // 3. Main thumbnail URL
-      if (product.imageUrl.isNotEmpty) _addIfNew(product.imageUrl);
-
-      // 4. Images from ALL other variants as supplemental gallery images
-      for (final v in product.variants) {
-        if (v == variant) continue; // already added above
-        for (final img in v.images) _addIfNew(img);
+      // 3. Main thumbnail URL (explicit product thumbnail only)
+      if (product.thumbnail != null && product.thumbnail!.isNotEmpty) {
+        _addIfNew(product.thumbnail!);
       }
+
+      // Removed: Other variant images are no longer combined in the gallery.
+      // The user should only see the images for the selected variant and general product images.
 
       // Fallback placeholder only when no real image is available
       if (carouselImages.isEmpty) {
@@ -323,10 +335,10 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
       return ProductImagesCarousel(
         images: carouselImages,
         containerHeight: 300,
-        isWishlisted: wishlistController.isWishlisted(product.id),
+        isWishlisted: wishlistController.isWishlisted(product.id, variantId: variant?.id ?? (product.variants.isNotEmpty ? product.variants.first.id : null)),
         onHeartTap: () => wishlistController.toggleWishlist(
           product.id,
-          variantId: firstVariantId,
+          variantId: variant?.id ?? (product.variants.isNotEmpty ? product.variants.first.id : null),
         ),
       );
     });
@@ -500,20 +512,25 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
 
   Widget _buildBrandAndPriceSection(
       BuildContext context, ProductModel product, double margin) {
-    double basePrice = product.originalPrice;
-    double currentPrice = product.currentPrice;
-    double discountPercent = 0.0;
-    
-    // Add safety check for zero or negative prices
-    if (basePrice <= 0) basePrice = currentPrice;
-    if (currentPrice <= 0) currentPrice = basePrice;
-    
-    if (basePrice > 0 && currentPrice > 0 && basePrice > currentPrice) {
-      discountPercent =
-          (((basePrice - currentPrice) / basePrice) * 100).toDouble();
-    } else {
-      basePrice = currentPrice;
-    }
+    return Obx(() {
+      final variant = _getSelectedVariant(product);
+      double basePrice = variant?.price ?? product.originalPrice;
+      double currentPrice = (variant?.discountPrice != null && variant!.discountPrice! > 0)
+          ? variant.discountPrice!
+          : (variant?.price ?? product.currentPrice);
+
+      double discountPercent = 0.0;
+
+      // Add safety check for zero or negative prices
+      if (basePrice <= 0) basePrice = currentPrice;
+      if (currentPrice <= 0) currentPrice = basePrice;
+
+      if (basePrice > 0 && currentPrice > 0 && basePrice > currentPrice) {
+        discountPercent =
+            (((basePrice - currentPrice) / basePrice) * 100).toDouble();
+      } else {
+        basePrice = currentPrice;
+      }
 
     return Container(
       margin: EdgeInsets.symmetric(horizontal: margin, vertical: 12.h),
@@ -568,7 +585,7 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
                     fontWeight: FontWeight.w500,
                     decoration: TextDecoration.lineThrough,
                     decorationColor: const Color(0xFF4B5563),
-                    decorationThickness: 1.2,
+                    decorationThickness: 2.0,
                     txtHeight: 1.4),
               ],
             ],
@@ -577,9 +594,27 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
           getCustomFont(
               "₹${currentPrice.toStringAsFixed(0)}", 20, accentColor, 1,
               fontWeight: FontWeight.w800),
+          Obx(() {
+            final variant = _getSelectedVariant(product);
+            if (variant != null) {
+              if (variant.status == 'out-of-stock' || variant.availableStock <= 0) {
+                return Padding(
+                  padding: EdgeInsets.only(top: 8.h),
+                  child: getCustomFont("Out of Stock", 13, Colors.redAccent, 1, fontWeight: FontWeight.w600),
+                );
+              } else if (variant.availableStock > 0 && variant.availableStock < 10) {
+                return Padding(
+                  padding: EdgeInsets.only(top: 8.h),
+                  child: getCustomFont("Limited stocks available", 13, Colors.orange, 1, fontWeight: FontWeight.w600),
+                );
+              }
+            }
+            return const SizedBox.shrink();
+          }),
         ],
       ),
     );
+    });
   }
 
   // ═══════════════════════════════════════════════════════
@@ -762,16 +797,16 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
     return product.variants.first;
   }
 
-  int _getCartQuantity(ProductModel product) {
+  int _getCartQuantity(String productId, String? variantId) {
+    if (variantId == null || variantId.isEmpty) return 0;
     final cartController = Get.find<CartController>();
     final cartItems = cartController.cartModel.value?.items ?? [];
-    int qty = 0;
     for (var item in cartItems) {
-      if (item.productId == product.id) {
-        qty += item.quantity;
+      if (item.productId == productId && item.variantId == variantId) {
+        return item.quantity;
       }
     }
-    return qty;
+    return 0;
   }
 
   // ═══════════════════════════════════════════════════════
@@ -817,7 +852,7 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
               formattedDate = "${review.createdAt!.day}/${review.createdAt!.month}/${review.createdAt!.year}";
             }
             return ProductReviewCard(
-              reviewerName: "Customer", // Since we don't fetch user info with reviews in backend currently
+              reviewerName: review.userName,
               rating: review.rating.toDouble(),
               reviewText: review.comment,
               reviewHeadline: review.headline,
@@ -837,10 +872,9 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
         top: false,
         child: Obx(() {
           final cartController = Get.find<CartController>();
-          int cartQty = _getCartQuantity(product);
-          bool isInCart = cartQty > 0;
-          
           VariantModel? variant = _getSelectedVariant(product);
+          int cartQty = _getCartQuantity(product.id, variant?.id);
+          bool isInCart = cartQty > 0;
           bool hasReachedMaxStock = variant != null && cartQty >= variant.availableStock;
 
           return Row(
@@ -977,7 +1011,7 @@ class _ProductDetailScreen extends State<ProductDetailScreen>
                     ),
                     child: Center(
                       child: getCustomFont(
-                          "Buy at \u20B9${product.currentPrice.toStringAsFixed(0)}", 14,
+                          "Buy at \u20B9${(variant?.discountPrice != null && variant!.discountPrice! > 0 ? variant.discountPrice! : (variant?.price ?? product.currentPrice)).toStringAsFixed(0)}", 14,
                           Colors.white, 1,
                           fontWeight: FontWeight.w700),
                     ),

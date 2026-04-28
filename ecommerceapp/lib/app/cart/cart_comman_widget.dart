@@ -159,18 +159,39 @@ class _CartCommonWidgetState extends State<CartCommonWidget> {
                     ],
                   ),
                   SizedBox(height: 6.h),
-                  if (variantName.isNotEmpty)
-                    Wrap(
-                      spacing: 6.w,
-                      children: variantName.split(",").map((v) => Container(
-                        padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
-                        decoration: BoxDecoration(
-                          color: getGreyCardColor(context),
-                          borderRadius: BorderRadius.circular(20.w),
+                  // Display Color and Size explicitly
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (item.variant?.color != null && item.variant!.color!.trim().isNotEmpty)
+                        Padding(
+                          padding: EdgeInsets.only(bottom: 2.h),
+                          child: Row(
+                            children: [
+                              getCustomFont("Color: ", 12, getFontColor(context), 1, fontWeight: FontWeight.w700),
+                              getCustomFont(item.variant!.color!, 12, getFontGreyColor(context), 1, fontWeight: FontWeight.w500),
+                            ],
+                          ),
                         ),
-                        child: getCustomFont(v.trim(), 10, getFontGreyColor(context), 1, fontWeight: FontWeight.w600),
-                      )).toList(),
-                    ),
+                      if (item.variant?.size != null && item.variant!.size!.trim().isNotEmpty)
+                        Padding(
+                          padding: EdgeInsets.only(bottom: 2.h),
+                          child: Row(
+                            children: [
+                              getCustomFont("Size: ", 12, getFontColor(context), 1, fontWeight: FontWeight.w700),
+                              getCustomFont(item.variant!.size!, 12, getFontGreyColor(context), 1, fontWeight: FontWeight.w500),
+                            ],
+                          ),
+                        ),
+                      if ((item.variant?.color == null || item.variant!.color!.trim().isEmpty) && 
+                          (item.variant?.size == null || item.variant!.size!.trim().isEmpty) && 
+                          variantName.isNotEmpty && !variantName.trim().toLowerCase().contains("default"))
+                        Padding(
+                          padding: EdgeInsets.only(bottom: 2.h),
+                          child: getCustomFont(variantName, 12, getFontGreyColor(context), 1, fontWeight: FontWeight.w600),
+                        ),
+                    ],
+                  ),
                   SizedBox(height: 12.h),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -301,53 +322,42 @@ class _CartCommonWidgetState extends State<CartCommonWidget> {
                           BoxShadow(color: const Color(0xFF0D9488).withOpacity(0.06), blurRadius: 8, offset: const Offset(0, 2)),
                         ],
                       ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Container(
-                              padding: EdgeInsets.symmetric(horizontal: 12.w),
-                              decoration: getButtonDecoration(Colors.transparent, withCorners: true, corner: 10.h, withBorder: true, borderColor: black20),
-                              height: 46.h,
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Expanded(
-                                    child: TextField(
-                                      onChanged: (value) {},
-                                      controller: couponController,
-                                      cursorColor: getFontColor(context),
-                                      style: buildTextStyle(context, getFontColor(context), FontWeight.w400, 14),
-                                      decoration: InputDecoration(
-                                        contentPadding: EdgeInsets.zero,
-                                        isDense: true,
-                                        isCollapsed: true,
-                                        floatingLabelBehavior: FloatingLabelBehavior.never,
-                                        border: InputBorder.none,
-                                        hintText: "Coupon Code",
-                                        hintMaxLines: 1,
-                                        hintStyle: buildTextStyle(context, black40, FontWeight.w400, 14),
-                                      ),
-                                    ),
-                                  ),
-                                  GetBuilder<CartController>(
-                                    init: CartController(),
-                                    builder: (controller) {
-                                      return GestureDetector(
-                                        onTap: () async {},
-                                        child: getCustomFont("Apply", 14, getAccentColor(context), 1, fontWeight: FontWeight.w600),
-                                      );
-                                    },
-                                  ),
-                                ],
+                      child: Container(
+                        padding: EdgeInsets.symmetric(horizontal: 12.w),
+                        decoration: getButtonDecoration(Colors.transparent, withCorners: true, corner: 10.h, withBorder: true, borderColor: black20),
+                        height: 46.h,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                onChanged: (value) {},
+                                controller: couponController,
+                                cursorColor: getFontColor(context),
+                                style: buildTextStyle(context, getFontColor(context), FontWeight.w400, 14),
+                                decoration: InputDecoration(
+                                  contentPadding: EdgeInsets.zero,
+                                  isDense: true,
+                                  isCollapsed: true,
+                                  floatingLabelBehavior: FloatingLabelBehavior.never,
+                                  border: InputBorder.none,
+                                  hintText: "Coupon Code",
+                                  hintMaxLines: 1,
+                                  hintStyle: buildTextStyle(context, black40, FontWeight.w400, 14),
+                                ),
                               ),
                             ),
-                          ),
-                          getHorSpace(12.w),
-                          InkWell(
-                            onTap: () => Constant.sendToNext(context, couponsScreenRoute),
-                            child: getCustomFont("View all", 13, black40, 1, fontWeight: FontWeight.w400),
-                          ),
-                        ],
+                            GetBuilder<CartController>(
+                              init: CartController(),
+                              builder: (controller) {
+                                return GestureDetector(
+                                  onTap: () async {},
+                                  child: getCustomFont("Apply", 14, getAccentColor(context), 1, fontWeight: FontWeight.w600),
+                                );
+                              },
+                            ),
+                          ],
+                        ),
                       ),
                     ),
 
@@ -450,6 +460,17 @@ class _CartCommonWidgetState extends State<CartCommonWidget> {
           return emptyCard(context);
         }
       }),
+    );
+  }
+
+  Widget _buildVariantPill(BuildContext context, String text) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
+      decoration: BoxDecoration(
+        color: getGreyCardColor(context),
+        borderRadius: BorderRadius.circular(20.w),
+      ),
+      child: getCustomFont(text, 10, getFontGreyColor(context), 1, fontWeight: FontWeight.w600),
     );
   }
 
