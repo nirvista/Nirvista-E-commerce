@@ -83,17 +83,74 @@ class _CheckOutComplete extends State<CheckOutComplete> {
   }
 
   void _handlePaymentError(PaymentFailureResponse response) {
+    // Map error codes to user-friendly messages
+    String errorMessage = "Payment Failed: ${response.message}";
+    
+    switch(response.code) {
+      case Razorpay.NETWORK_ERROR:
+        errorMessage = "Network error. Please check your connection and try again.";
+        break;
+      case Razorpay.INVALID_OPTIONS:
+        errorMessage = "Invalid payment details. Please try again.";
+        break;
+      case Razorpay.PAYMENT_CANCELLED:
+        errorMessage = "You cancelled the payment. Your order is still reserved.";
+        break;
+      case Razorpay.TLS_ERROR:
+        errorMessage = "Your device doesn't support secure payments. Please update your device.";
+        break;
+      case Razorpay.UNKNOWN_ERROR:
+        errorMessage = "An unexpected error occurred. Please try again.";
+        break;
+    }
+    
+    debugPrint('Payment Error - Code: ${response.code}, Message: ${response.message}');
+    
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("Payment Failed: ${response.message}"), backgroundColor: Colors.red),
+      SnackBar(
+        content: Text(errorMessage),
+        backgroundColor: Colors.red,
+        duration: const Duration(seconds: 4),
+      ),
     );
   }
 
   void _handleExternalWallet(ExternalWalletResponse response) {
-    // Handle external wallet
+    // User selected external wallet (e.g., UPI, Google Pay, Apple Pay)
+    debugPrint('External Wallet Selected: ${response.walletName}');
+    
+    // Treat external wallet selection as payment success since order is already confirmed
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text("Payment via ${response.walletName} initiated. Please complete payment."),
+        backgroundColor: Colors.blue,
+        duration: const Duration(seconds: 3),
+      ),
+    );
+    
+    // Navigate to order confirmation (order already placed, stock deducted)
+    Future.delayed(const Duration(seconds: 2), () {
+      cartController.clearCartAction();
+      Constant.sendToNext(context, orderConfirmScreenRoute);
+    });
   }
 
   void openCheckout(Map<String, dynamic> razorpayOrderData, String userEmail, String userPhone) async {
     final razorpayKey = dotenv.env['RAZORPAY_KEY_ID'];
+    
+    // Debug log to verify key is loaded
+    if (razorpayKey == null || razorpayKey.isEmpty) {
+      debugPrint('ERROR: RAZORPAY_KEY_ID is not loaded from .env file');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Payment configuration error. Please contact support.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    
+    debugPrint('Opening Razorpay Checkout - Key: $razorpayKey, Order ID: ${razorpayOrderData['id']}');
     
     var options = {
       'key': razorpayKey,
@@ -112,6 +169,12 @@ class _CheckOutComplete extends State<CheckOutComplete> {
       _razorpay.open(options);
     } catch (e) {
       debugPrint('Error opening Razorpay: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to open payment: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
