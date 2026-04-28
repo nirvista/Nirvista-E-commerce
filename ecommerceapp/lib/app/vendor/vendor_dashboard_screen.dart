@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
-import 'package:image_picker/image_picker.dart';
 import 'package:pet_shop/base/get/login_data_controller.dart';
 import '../../services/vendor_api.dart';
 import '../../services/vendor_order_api.dart';
@@ -51,6 +50,18 @@ String _getVendorStatus(List<dynamic> items) {
   if (items.any((i) => i['fulfillmentStatus'] == 'shipped')) return 'shipped';
   if (items.any((i) => i['fulfillmentStatus'] == 'processing')) return 'processing';
   return 'pending';
+}
+
+/// Safely extract a string ID from a value that might be a String, int, or Map.
+String _extractId(dynamic value) {
+  if (value == null) return '';
+  if (value is String) return value.trim();
+  if (value is int) return value.toString();
+  if (value is Map) {
+    final id = value['id'] ?? value['_id'] ?? value['categoryId'];
+    return _extractId(id);
+  }
+  return value.toString().trim();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -237,13 +248,46 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
       final r = await CategoryApiService.getAllCategories();
       if (r['success'] == true) {
         final d = r['data'];
-        if (mounted) setState(() => _categories = d is List ? d : []);
+        if (mounted) {
+          final raw = d is List ? d : [];
+          for (final c in raw) {
+            debugPrint('[Category] id=${_extractId(c['id'] ?? c['_id'])} '
+                'name=${c['name']} parentId=${c['parentId']} '
+                'parentIdType=${c['parentId']?.runtimeType}');
+          }
+          setState(() => _categories = raw);
+        }
       } else {
         debugPrint('Categories fetch failed: ${r['message']}');
       }
     } catch (e) {
       debugPrint('_fetchCategories error: $e');
     }
+  }
+
+  List<dynamic> get _rootCategories {
+    return _categories.where((c) {
+      final rawParentId = c['parentId'];
+      final parentId = _extractId(rawParentId);
+      return rawParentId == null ||
+          parentId.isEmpty ||
+          parentId == 'null' ||
+          parentId == '0';
+    }).toList();
+  }
+
+  List<dynamic> _getSubCategories(String parentId) {
+    if (parentId.isEmpty) return [];
+    return _flatCategories.where((c) {
+      final rawParentId = c['parentId'];
+      if (rawParentId == null) return false;
+      final pid = _extractId(rawParentId);
+      return pid == parentId;
+    }).toList();
+  }
+
+  String _categoryId(dynamic c) {
+    return _extractId(c['id'] ?? c['_id'] ?? c['categoryId']);
   }
 
   List<dynamic> get _flatCategories {
@@ -628,14 +672,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
                     children: [
                       Icon(Icons.logout_rounded, color: _kRed, size: 18),
                       SizedBox(width: 12),
-                      Text(
-                        'Logout',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
-                        ),
-                      ),
+                      Text('Logout', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14)),
                     ],
                   ),
                 ),
@@ -653,9 +690,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
   // ─────────────────────────────────────────────────────────────────────────
   Widget _buildDashboardTab() {
     final totalProducts = _products.length;
-    final activeProducts = _products.where((p) => p['listingStatus'] == 'active' || p['listingStatus'] == 'ACTIVE').length;
     final totalOrders = _orders.length;
-    final totalSKUs = _inventorySummary['totalSKUs'] ?? _inventory.length;
     final lowStock  = _inventorySummary['lowStockCount'] ?? 0;
     final revenue   = _salesAnalytics['summary']?['totalRevenue'] ?? '0.00';
 
@@ -885,7 +920,6 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
   // ─────────────────────────────────────────────────────────────────────────
   Widget _buildOrdersTab() {
     final filtered  = _filteredOrders;
-    
     int pending = 0, processing = 0, shipped = 0, delivered = 0;
     for (final o in _orders) {
       final s = _getVendorStatus(o['items'] as List? ?? []);
@@ -910,13 +944,13 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
           ]),
           const SizedBox(height: 14),
           Row(children: [
-            Expanded(child: _MiniStatCard(label: 'Pending',   value: '$pending',   color: _kAmber)),
+            Expanded(child: _MiniStatCard(label: 'Pending',    value: '$pending',    color: _kAmber)),
             const SizedBox(width: 10),
-            Expanded(child: _MiniStatCard(label: 'Processing',value: '$processing',color: _kTeal)),
+            Expanded(child: _MiniStatCard(label: 'Processing', value: '$processing', color: _kTeal)),
             const SizedBox(width: 10),
-            Expanded(child: _MiniStatCard(label: 'Shipped',   value: '$shipped',   color: const Color(0xFF6366F1))),
+            Expanded(child: _MiniStatCard(label: 'Shipped',    value: '$shipped',    color: const Color(0xFF6366F1))),
             const SizedBox(width: 10),
-            Expanded(child: _MiniStatCard(label: 'Delivered', value: '$delivered', color: _kGreen)),
+            Expanded(child: _MiniStatCard(label: 'Delivered',  value: '$delivered',  color: _kGreen)),
           ]),
           const SizedBox(height: 12),
           _SearchBar(
@@ -1038,24 +1072,19 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
   // ─────────────────────────────────────────────────────────────────────────
   //  DIALOGS
   // ─────────────────────────────────────────────────────────────────────────
-
-  // ─────────────────────────────────────────────────────────────────────────
-  //  _showAddProductDialog
-  //  CHANGES:
-  //   • SKU field REMOVED from main product form (SKU lives only in variants)
-  //   • Image picker uses _ImagePickerAdder which now supports file + URL
-  // ─────────────────────────────────────────────────────────────────────────
   void _showAddProductDialog() {
     final nameC     = TextEditingController();
     final descC     = TextEditingController();
     final priceC    = TextEditingController();
     final discountC = TextEditingController();
-    // SKU field REMOVED — intentionally not declared here
     final stockC    = TextEditingController();
     final urlC      = TextEditingController();
     final materialC = TextEditingController();
+
     String? selectedBrandId;
     String? selectedCategoryId;
+    String? selectedSubCategoryId;
+
     final List<Map<String, dynamic>> variants  = [];
     final List<String>               imageUrls = [];
 
@@ -1063,140 +1092,207 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
       context: context,
       barrierDismissible: false,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setD) => _NirvistaDialog(
-          title: 'Add New Product',
-          onConfirm: () async {
-            final title     = nameC.text.trim();
-            final priceText = priceC.text.trim();
-            final discText  = discountC.text.trim();
-            final stockText = stockC.text.trim();
+        builder: (ctx, setD) {
+          final List<dynamic> subCategories = selectedCategoryId != null
+              ? _getSubCategories(selectedCategoryId!)
+              : [];
 
-            // Flush any typed URL that was not yet added
-            final autoUrl = urlC.text.trim();
-            if (autoUrl.isNotEmpty && !imageUrls.contains(autoUrl)) imageUrls.add(autoUrl);
+          if (selectedSubCategoryId != null &&
+              !subCategories.any((s) => _categoryId(s) == selectedSubCategoryId)) {
+            selectedSubCategoryId = null;
+          }
 
-            // ── Validation ────────────────────────────────────────────────
-            if (title.isEmpty) {
-              _snack('Product title is required', true);
-              return;
-            }
-            if (selectedBrandId == null || selectedBrandId!.isEmpty) {
-              _snack('Please select a brand', true);
-              return;
-            }
-            if (selectedCategoryId == null || selectedCategoryId!.isEmpty) {
-              _snack('Please select a category', true);
-              return;
-            }
+          return _NirvistaDialog(
+            title: 'Add New Product',
+            onConfirm: () async {
+              final title     = nameC.text.trim();
+              final priceText = priceC.text.trim();
+              final discText  = discountC.text.trim();
+              final stockText = stockC.text.trim();
 
-            final price = priceText.isEmpty ? 0.0 : double.tryParse(priceText);
-            if (price == null) {
-              _snack('Enter a valid price (e.g. 299.99)', true);
-              return;
-            }
+              final autoUrl = urlC.text.trim();
+              if (autoUrl.isNotEmpty && !imageUrls.contains(autoUrl)) imageUrls.add(autoUrl);
 
-            final discountPrice = discText.isEmpty ? null : double.tryParse(discText);
+              if (title.isEmpty) { _snack('Product title is required', true); return; }
+              if (selectedBrandId == null || selectedBrandId!.isEmpty) { _snack('Please select a brand', true); return; }
+              if (selectedCategoryId == null || selectedCategoryId!.isEmpty) { _snack('Please select a category', true); return; }
 
-            // ── Build default variant (SKU auto-generated, no user input) ─
-            final autoSku = '${title.replaceAll(RegExp(r"\s+"), "-").toLowerCase()}-${DateTime.now().millisecondsSinceEpoch}';
-            final defaultVariant = <String, dynamic>{
-              'sku'           : autoSku,
-              'variantName'   : 'Default',
-              'price'         : price,
-              'discountPrice' : discountPrice,
-              'stock'         : int.tryParse(stockText) ?? 0,
-              'images'        : List<String>.from(imageUrls),
-              'color'         : '',
-              'size'          : '',
-              'approvalStatus': 'pending',
-            };
+              final price = priceText.isEmpty ? 0.0 : double.tryParse(priceText);
+              if (price == null) { _snack('Enter a valid price (e.g. 299.99)', true); return; }
 
-            final body = <String, dynamic>{
-              'title'      : title,
-              'description': descC.text.trim(),
-              'categoryId' : selectedCategoryId,
-              'brandId'    : selectedBrandId,
-              'material'   : materialC.text.trim(),
-              'variants'   : [defaultVariant, ...variants],
-            };
+              final discountPrice = discText.isEmpty ? null : double.tryParse(discText);
+              final autoSku = '${title.replaceAll(RegExp(r"\s+"), "-").toLowerCase()}-${DateTime.now().millisecondsSinceEpoch}';
+              final defaultVariant = <String, dynamic>{
+                'sku'           : autoSku,
+                'variantName'   : 'Default',
+                'price'         : price,
+                'discountPrice' : discountPrice,
+                'stock'         : int.tryParse(stockText) ?? 0,
+                'images'        : List<String>.from(imageUrls),
+                'color'         : '',
+                'size'          : '',
+                'approvalStatus': 'pending',
+              };
 
-            Navigator.pop(ctx);
-            await _createProduct(body);
-          },
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            _dInput(nameC, 'Product Title *', Icons.label_rounded),
-            _dInput(descC, 'Description', Icons.description_rounded, maxLines: 3),
+              final effectiveCategoryId =
+                  (selectedSubCategoryId != null && selectedSubCategoryId!.isNotEmpty)
+                      ? selectedSubCategoryId
+                      : selectedCategoryId;
 
-            // Brand Dropdown
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: DropdownButtonFormField<String>(
-                value: selectedBrandId,
-                decoration: _dDeco('Select Brand *', Icons.business_rounded),
-                hint: const Text('Choose a brand'),
-                items: _brands.map((b) => DropdownMenuItem(
-                  value: b['id']?.toString() ?? '',
-                  child: Text(b['name']?.toString() ?? 'Unknown'),
-                )).toList(),
-                onChanged: (v) => setD(() => selectedBrandId = v),
+              final body = <String, dynamic>{
+                'title'         : title,
+                'description'   : descC.text.trim(),
+                'categoryId'    : effectiveCategoryId,
+                'brandId'       : selectedBrandId,
+                'material'      : materialC.text.trim(),
+                'listingStatus' : 'pending',
+                'approvalStatus': 'pending',
+                'variants'      : [defaultVariant, ...variants],
+              };
+
+              Navigator.pop(ctx);
+              await _createProduct(body);
+            },
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              _dInput(nameC, 'Product Title *', Icons.label_rounded),
+              _dInput(descC, 'Description', Icons.description_rounded, maxLines: 3),
+              // ── Brand Dropdown ──────────────────────────────────────────
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: DropdownButtonFormField<String>(
+                  value: selectedBrandId,
+                  decoration: _dDeco('Select Brand *', Icons.business_rounded),
+                  hint: const Text('Choose a brand'),
+                  items: _brands.map((b) => DropdownMenuItem(
+                    value: _extractId(b['id'] ?? b['_id']),
+                    child: Text(b['name']?.toString() ?? 'Unknown'),
+                  )).toList(),
+                  onChanged: (v) => setD(() => selectedBrandId = v),
+                ),
               ),
-            ),
-
-            // Category Dropdown
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: DropdownButtonFormField<String>(
-                value: selectedCategoryId,
-                decoration: _dDeco('Select Category *', Icons.category_rounded),
-                hint: const Text('Choose a category'),
-                items: _categories.map((c) {
-                  final level = c['level'] as int? ?? 0;
-                  final prefix = level > 0 ? '${List.filled(level, '—').join('')} ' : '';
-                  return DropdownMenuItem(
-                    value: c['id']?.toString() ?? '',
-                    child: Text('$prefix${c['name']?.toString() ?? 'Unknown'}'),
-                  );
-                }).toList(),
-                onChanged: (v) => setD(() => selectedCategoryId = v),
+              // ── Parent / Root Category Dropdown ────────────────────────
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: DropdownButtonFormField<String>(
+                  value: selectedCategoryId,
+                  decoration: _dDeco('Select Category *', Icons.category_rounded),
+                  hint: const Text('Choose a category'),
+                  items: _rootCategories.map((c) {
+                    final id = _categoryId(c);
+                    return DropdownMenuItem(
+                      value: id,
+                      child: Text(c['name']?.toString() ?? 'Unknown'),
+                    );
+                  }).toList(),
+                  onChanged: (v) => setD(() {
+                    selectedCategoryId    = v;
+                    selectedSubCategoryId = null;
+                  }),
+                ),
               ),
-            ),
-
-            _dInput(priceC,    'Base Price (₹) *',                    Icons.currency_rupee_rounded, numeric: true),
-            _dInput(discountC, 'Discount Price (₹)',                   Icons.tag_rounded,            numeric: true),
-            _dInput(materialC, 'Material (e.g. cotton, leather)',      Icons.texture_rounded),
-            _dInput(stockC,    'Initial Stock',                        Icons.inventory_2_rounded,    numeric: true),
-
-            // ── Product Images (URL + file picker) ────────────────────────
-            _sectionLabel('Product Images'),
-            _ImagePickerAdder(
-              urlController: urlC,
-              imageUrls: imageUrls,
-              onChanged: () => setD(() {}),
-            ),
-
-            const SizedBox(height: 16),
-
-            // ── Additional Variants ───────────────────────────────────────
-            _sectionLabel('Additional Variants'),
-            ...variants.asMap().entries.map((e) => _VariantFormCard(
-              index: e.key,
-              data: e.value,
-              onRemove: () => setD(() => variants.removeAt(e.key)),
-              onChanged: () => setD(() {}),
-            )),
-            const SizedBox(height: 8),
-            OutlinedButton.icon(
-              onPressed: () => setD(() => variants.add({})),
-              icon: const Icon(Icons.add, size: 16),
-              label: const Text('Add Variant'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: _kTeal,
-                side: const BorderSide(color: _kTeal),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
+              // ── Sub-Category section ────────────────────────────────────
+              if (selectedCategoryId != null) ...[
+                if (subCategories.isNotEmpty) ...[
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 6),
+                          child: Row(children: [
+                            const Icon(Icons.subdirectory_arrow_right_rounded, size: 14, color: _kTeal),
+                            const SizedBox(width: 6),
+                            const Text('Sub-Category', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: _kTealDark)),
+                            const Spacer(),
+                            if (selectedSubCategoryId != null)
+                              GestureDetector(
+                                onTap: () => setD(() => selectedSubCategoryId = null),
+                                child: const Text('Clear', style: TextStyle(fontSize: 11, color: _kTextMuted, decoration: TextDecoration.underline)),
+                              ),
+                          ]),
+                        ),
+                        SizedBox(
+                          height: 38,
+                          child: ListView.separated(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: subCategories.length,
+                            separatorBuilder: (_, __) => const SizedBox(width: 8),
+                            itemBuilder: (ctx, i) {
+                              final sub    = subCategories[i];
+                              final subId  = _categoryId(sub);
+                              final subName= sub['name']?.toString() ?? 'Unknown';
+                              final active = selectedSubCategoryId == subId;
+                              return GestureDetector(
+                                onTap: () => setD(() => selectedSubCategoryId = subId),
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 160),
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color  : active ? _kTeal : _kBg,
+                                    borderRadius: BorderRadius.circular(20),
+                                    border : Border.all(color: active ? _kTeal : _kBorder),
+                                  ),
+                                  child: Text(subName, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: active ? Colors.white : _kTextMuted)),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          selectedSubCategoryId != null
+                              ? 'Sub-category selected. Product will be listed under the selected sub-category.'
+                              : 'Optional — select a sub-category to narrow the listing.',
+                          style: TextStyle(fontSize: 10, color: selectedSubCategoryId != null ? _kTealDark : _kTextMuted),
+                        ),
+                      ],
+                    ),
+                  ),
+                ] else ...[
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Row(children: [
+                      const Icon(Icons.info_outline_rounded, size: 13, color: _kTextMuted),
+                      const SizedBox(width: 6),
+                      const Text('This category has no sub-categories.', style: TextStyle(fontSize: 11, color: _kTextMuted)),
+                    ]),
+                  ),
+                ],
+              ],
+              _dInput(priceC,    'Base Price (₹) *',               Icons.currency_rupee_rounded, numeric: true),
+              _dInput(discountC, 'Discount Price (₹)',              Icons.tag_rounded,            numeric: true),
+              _dInput(materialC, 'Material (e.g. cotton, leather)', Icons.texture_rounded),
+              _dInput(stockC,    'Initial Stock',                   Icons.inventory_2_rounded,    numeric: true),
+              _sectionLabel('Product Images'),
+              // ── URL-only image adder (no device picker) ─────────────────
+              _UrlOnlyImageAdder(
+                urlController: urlC,
+                imageUrls: imageUrls,
+                onChanged: () => setD(() {}),
               ),
-            ),
-          ]),
-        ),
+              const SizedBox(height: 16),
+              _sectionLabel('Additional Variants'),
+              ...variants.asMap().entries.map((e) => _VariantFormCard(
+                index: e.key,
+                data: e.value,
+                onRemove: () => setD(() => variants.removeAt(e.key)),
+                onChanged: () => setD(() {}),
+              )),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: () => setD(() => variants.add({})),
+                icon: const Icon(Icons.add, size: 16),
+                label: const Text('Add Variant'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: _kTeal,
+                  side: const BorderSide(color: _kTeal),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
+                ),
+              ),
+            ]),
+          );
+        },
       ),
     );
   }
@@ -1222,9 +1318,9 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
                   itemCount: variants.length,
                   itemBuilder: (ctx, i) {
                     final v = variants[i] as Map<String, dynamic>;
-                    final variantId    = v['id']?.toString() ?? '';
+                    final variantId      = v['id']?.toString() ?? '';
                     final approvalStatus = v['approvalStatus']?.toString() ?? 'pending';
-                    Color approvalColor = approvalStatus == 'approved' ? _kGreen : approvalStatus == 'rejected' ? _kRed : _kAmber;
+                    Color approvalColor  = approvalStatus == 'approved' ? _kGreen : approvalStatus == 'rejected' ? _kRed : _kAmber;
                     return Container(
                       margin: const EdgeInsets.only(bottom: 12),
                       decoration: BoxDecoration(color: _kBg, borderRadius: BorderRadius.circular(14), border: Border.all(color: _kBorder)),
@@ -1232,15 +1328,12 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
                         padding: const EdgeInsets.all(14),
                         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                           Row(children: [
-                            Expanded(
-                              child: Text(v['variantName']?.toString() ?? v['sku']?.toString() ?? 'Variant ${i+1}',
-                                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: _kText)),
-                            ),
+                            Expanded(child: Text(v['variantName']?.toString() ?? v['sku']?.toString() ?? 'Variant ${i+1}',
+                                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: _kText))),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                               decoration: BoxDecoration(color: approvalColor.withOpacity(0.12), borderRadius: BorderRadius.circular(20)),
-                              child: Text(approvalStatus.toUpperCase(),
-                                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: approvalColor)),
+                              child: Text(approvalStatus.toUpperCase(), style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: approvalColor)),
                             ),
                           ]),
                           const SizedBox(height: 8),
@@ -1313,15 +1406,15 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
             });
           },
           child: Column(mainAxisSize: MainAxisSize.min, children: [
-            _dInput(skuC,         'SKU (optional)',      Icons.qr_code_2_rounded),
-            _dInput(variantNameC, 'Variant Name',        Icons.label_rounded),
-            _dInput(priceC,       'Price (₹)',           Icons.currency_rupee_rounded, numeric: true),
-            _dInput(discountC,    'Discount Price (₹)',  Icons.tag_rounded,            numeric: true),
-            _dInput(sizeC,        'Size',                Icons.straighten_rounded),
-            _dInput(colorC,       'Color',               Icons.palette_rounded),
-            _dInput(stockC,       'Stock',               Icons.inventory_2_rounded,    numeric: true),
+            _dInput(skuC,         'SKU (optional)',     Icons.qr_code_2_rounded),
+            _dInput(variantNameC, 'Variant Name',       Icons.label_rounded),
+            _dInput(priceC,       'Price (₹)',          Icons.currency_rupee_rounded, numeric: true),
+            _dInput(discountC,    'Discount Price (₹)', Icons.tag_rounded,            numeric: true),
+            _dInput(sizeC,        'Size',               Icons.straighten_rounded),
+            _dInput(colorC,       'Color',              Icons.palette_rounded),
+            _dInput(stockC,       'Stock',              Icons.inventory_2_rounded,    numeric: true),
             _sectionLabel('Images'),
-            _ImagePickerAdder(urlController: urlC, imageUrls: imageUrls, onChanged: () => setD(() {})),
+            _UrlOnlyImageAdder(urlController: urlC, imageUrls: imageUrls, onChanged: () => setD(() {})),
           ]),
         ),
       ),
@@ -1360,15 +1453,15 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
             });
           },
           child: Column(mainAxisSize: MainAxisSize.min, children: [
-            _dInput(skuC,         'SKU',                 Icons.qr_code_2_rounded),
-            _dInput(variantNameC, 'Variant Name',        Icons.label_rounded),
-            _dInput(priceC,       'Price (₹)',           Icons.currency_rupee_rounded, numeric: true),
-            _dInput(discountC,    'Discount Price (₹)',  Icons.tag_rounded,            numeric: true),
-            _dInput(sizeC,        'Size',                Icons.straighten_rounded),
-            _dInput(colorC,       'Color',               Icons.palette_rounded),
-            _dInput(stockC,       'Stock',               Icons.inventory_2_rounded,    numeric: true),
+            _dInput(skuC,         'SKU',                Icons.qr_code_2_rounded),
+            _dInput(variantNameC, 'Variant Name',       Icons.label_rounded),
+            _dInput(priceC,       'Price (₹)',          Icons.currency_rupee_rounded, numeric: true),
+            _dInput(discountC,    'Discount Price (₹)', Icons.tag_rounded,            numeric: true),
+            _dInput(sizeC,        'Size',               Icons.straighten_rounded),
+            _dInput(colorC,       'Color',              Icons.palette_rounded),
+            _dInput(stockC,       'Stock',              Icons.inventory_2_rounded,    numeric: true),
             _sectionLabel('Images'),
-            _ImagePickerAdder(urlController: urlC, imageUrls: imageUrls, onChanged: () => setD2(() {})),
+            _UrlOnlyImageAdder(urlController: urlC, imageUrls: imageUrls, onChanged: () => setD2(() {})),
           ]),
         ),
       ),
@@ -1449,7 +1542,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
           onConfirm: () {
             Navigator.pop(ctx);
             _updateFulfillment(orderId, {
-              'fulfillmentStatus': status, 
+              'fulfillmentStatus': status,
               'trackingNumber': trackingC.text.trim(),
               'carrierName': carrierC.text.trim(),
             });
@@ -1475,8 +1568,8 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
               onChanged: (v) => setD(() => status = v ?? 'processing'),
             ),
             const SizedBox(height: 12),
-            _dInput(carrierC, 'Carrier (e.g. BlueDart, Delivery)', Icons.business_rounded),
-            _dInput(trackingC, 'Tracking Number (optional)', Icons.pin_drop_rounded),
+            _dInput(carrierC,  'Carrier (e.g. BlueDart, Delivery)', Icons.business_rounded),
+            _dInput(trackingC, 'Tracking Number (optional)',        Icons.pin_drop_rounded),
           ]),
         ),
       ),
@@ -1484,8 +1577,8 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
   }
 
   void _showOrderDetailDialog(Map<String, dynamic> order) {
-    final addr  = order['shippingAddress'] as Map<String, dynamic>? ?? {};
-    final items = order['items'] as List? ?? [];
+    final addr    = order['shippingAddress'] as Map<String, dynamic>? ?? {};
+    final items   = order['items'] as List? ?? [];
     final orderId = order['id']?.toString() ?? '';
 
     showDialog(
@@ -1519,11 +1612,10 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
                   const Text('ORDER ITEMS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: _kTextMuted, letterSpacing: 1)),
                   const SizedBox(height: 8),
                   ...items.map((item) {
-                    final variant = item['variant'] as Map<String, dynamic>? ?? {};
-                    final product = item['product'] as Map<String, dynamic>? ?? {};
-                    final status  = item['fulfillmentStatus']?.toString() ?? 'pending';
+                    final variant  = item['variant'] as Map<String, dynamic>? ?? {};
+                    final product  = item['product'] as Map<String, dynamic>? ?? {};
+                    final status   = item['fulfillmentStatus']?.toString() ?? 'pending';
                     final canRefund = status == 'delivered' && (item['returnStatus'] == null);
-
                     return Container(
                       margin: const EdgeInsets.only(bottom: 10),
                       padding: const EdgeInsets.all(12),
@@ -1544,8 +1636,11 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
                               _showRefundDialog(orderId, item);
                             }),
                             const SizedBox(width: 4),
-                            Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: _kBg, borderRadius: BorderRadius.circular(4)), 
-                              child: Text(status.toUpperCase(), style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: _kTextMuted))),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(color: _kBg, borderRadius: BorderRadius.circular(4)),
+                              child: Text(status.toUpperCase(), style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: _kTextMuted)),
+                            ),
                           ]),
                         ]),
                       ]),
@@ -1584,16 +1679,17 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
           _initiateRefund(orderId, item['id'].toString(), qty, reasonC.text.trim());
         },
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          const Text('Initiate a refund for this item. This will reverse the payment for the selected quantity.', style: TextStyle(fontSize: 12, color: _kTextMuted)),
+          const Text('Initiate a refund for this item. This will reverse the payment for the selected quantity.',
+              style: TextStyle(fontSize: 12, color: _kTextMuted)),
           const SizedBox(height: 16),
-          _dInput(qtyC, 'Refund Quantity (Max $maxQty)', Icons.numbers_rounded, numeric: true),
-          _dInput(reasonC, 'Reason for Refund', Icons.message_rounded, maxLines: 2),
+          _dInput(qtyC,    'Refund Quantity (Max $maxQty)', Icons.numbers_rounded, numeric: true),
+          _dInput(reasonC, 'Reason for Refund',             Icons.message_rounded, maxLines: 2),
         ]),
       ),
     );
   }
 
-  // ── Dialog Helpers ─────────────────────────────────────────────────────────
+  // ── Dialog Helpers ──────────────────────────────────────────────────────
   Widget _dialogHeader(String title, BuildContext ctx) => Container(
         padding: const EdgeInsets.fromLTRB(20, 18, 16, 18),
         decoration: const BoxDecoration(
@@ -1647,7 +1743,6 @@ class _AnalyticsTile {
 // ─────────────────────────────────────────────────────────────────────────────
 //  REUSABLE WIDGETS
 // ─────────────────────────────────────────────────────────────────────────────
-
 class _SectionHeader extends StatelessWidget {
   const _SectionHeader({required this.title, this.action});
   final String title;
@@ -1816,28 +1911,19 @@ class _ProductCard extends StatelessWidget {
     final variants     = product['variants'] as List? ?? [];
     final firstVariant = variants.isNotEmpty ? variants.first as Map<String, dynamic> : null;
     final images       = <String>[];
-    if (product['imageUrls'] is List) {
-      images.addAll((product['imageUrls'] as List).map((e) => e.toString()));
-    }
-    if (images.isEmpty && product['images'] is List) {
-      images.addAll((product['images'] as List).map((e) => e.toString()));
-    }
+    if (product['imageUrls'] is List) images.addAll((product['imageUrls'] as List).map((e) => e.toString()));
+    if (images.isEmpty && product['images'] is List) images.addAll((product['images'] as List).map((e) => e.toString()));
     if (images.isEmpty) {
       for (final v in variants) {
         if (v is Map<String, dynamic> && v['images'] is List) {
-          final vImgs = (v['images'] as List)
-              .map((e) => e.toString())
-              .where((s) => s.isNotEmpty);
-          if (vImgs.isNotEmpty) {
-            images.addAll(vImgs);
-            break;
-          }
+          final vImgs = (v['images'] as List).map((e) => e.toString()).where((s) => s.isNotEmpty);
+          if (vImgs.isNotEmpty) { images.addAll(vImgs); break; }
         }
       }
     }
-    final status = product['listingStatus']?.toString();
-    final sku    = firstVariant?['sku'] ?? firstVariant?['variantName'] ?? '—';
-    final stock  = firstVariant?['stock'] ?? 0;
+    final status        = product['listingStatus']?.toString();
+    final sku           = firstVariant?['sku'] ?? firstVariant?['variantName'] ?? '—';
+    final stock         = firstVariant?['stock'] ?? 0;
     final originalPrice = firstVariant?['price'] ?? product['basePrice'] ?? product['price'] ?? 0;
     final discountPrice = firstVariant?['discountPrice'];
     final displayPrice  = (discountPrice != null && (double.tryParse(discountPrice.toString()) ?? 0) > 0) ? discountPrice : originalPrice;
@@ -1956,12 +2042,11 @@ class _OrderRowCard extends StatelessWidget {
   Color _statusBg(String s) { switch (s.toLowerCase()) { case 'delivered': return _kGreenLight; case 'shipped': return const Color(0xFFEEF2FF); case 'processing': return _kTealLight; case 'packed': return _kAmberLight; case 'cancelled': return _kRedLight; default: return _kBg; } }
   @override
   Widget build(BuildContext context) {
-    final orderId    = order['id']?.toString() ?? '—';
-    final items      = order['items'] as List? ?? [];
-    double total     = 0;
+    final orderId   = order['id']?.toString() ?? '—';
+    final items     = order['items'] as List? ?? [];
+    double total    = 0;
     for (final i in items) { total += (double.tryParse(i['priceAtPurchase']?.toString() ?? '0') ?? 0) * (i['quantity'] ?? 1); }
-    final createdAt  = order['createdAt']?.toString() ?? '';
-    
+    final createdAt = order['createdAt']?.toString() ?? '';
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(color: _kCard, borderRadius: BorderRadius.circular(14), border: Border.all(color: _kBorder),
@@ -2145,16 +2230,10 @@ class _NirvistaDialog extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  IMAGE PICKER ADDER
-//  CHANGES vs original:
-//   • "+" gallery/camera button added next to URL field (opens ImagePicker)
-//   • URL field uses onChanged so paste works immediately (no submit needed)
-//   • "Add URL" link-button also flushes the field
-//   • Image previews use full-size containers with no clipping that hides them
-//   • errorBuilder shows a clean broken-image tile instead of blank space
+//  URL-ONLY IMAGE ADDER  (no device/gallery picker)
 // ─────────────────────────────────────────────────────────────────────────────
-class _ImagePickerAdder extends StatefulWidget {
-  const _ImagePickerAdder({
+class _UrlOnlyImageAdder extends StatefulWidget {
+  const _UrlOnlyImageAdder({
     required this.urlController,
     required this.imageUrls,
     required this.onChanged,
@@ -2164,83 +2243,10 @@ class _ImagePickerAdder extends StatefulWidget {
   final VoidCallback onChanged;
 
   @override
-  State<_ImagePickerAdder> createState() => _ImagePickerAdderState();
+  State<_UrlOnlyImageAdder> createState() => _UrlOnlyImageAdderState();
 }
 
-class _ImagePickerAdderState extends State<_ImagePickerAdder> {
-  final ImagePicker _picker = ImagePicker();
-
-  // Tracks whether an upload is currently in progress
-  bool _isUploading = false;
-
-  // ─────────────────────────────────────────────────────────────────────────
-  //  IMPORTANT: Replace the base URL below with your actual backend URL.
-  //  This must point to your image upload endpoint that:
-  //    • Accepts  POST  multipart/form-data  with field name "image"
-  //    • Returns  { "success": true, "data": { "url": "https://..." } }
-  //
-  //  Example: 'https://api.yourbackend.com/api/v1/upload/image'
-  // ─────────────────────────────────────────────────────────────────────────
-  static const String _uploadEndpoint =
-      'https://YOUR_BACKEND_URL/api/v1/upload/image'; // ← CHANGE THIS
-
-  // ── Upload a picked file to the server and return the public URL ─────────
-  Future<String?> _uploadImageToServer(XFile file) async {
-    try {
-      final uri = Uri.parse(_uploadEndpoint);
-      final request = http.MultipartRequest('POST', uri);
-
-      // Attach auth token from the login controller
-      final loginController = Get.find<LoginDataController>();
-      final token = loginController.accessToken ?? '';
-      if (token.isNotEmpty) {
-        request.headers['Authorization'] = 'Bearer $token';
-      }
-
-      if (kIsWeb) {
-        // On web, read bytes directly
-        final bytes = await file.readAsBytes();
-        request.files.add(http.MultipartFile.fromBytes(
-          'image', // ← field name your backend expects
-          bytes,
-          filename: file.name,
-        ));
-      } else {
-        // On mobile/desktop, use the local file path
-        request.files.add(await http.MultipartFile.fromPath(
-          'image', // ← field name your backend expects
-          file.path,
-        ));
-      }
-
-      final streamed = await request.send();
-      final body = await streamed.stream.bytesToString();
-
-      debugPrint('[ImageUpload] Status: ${streamed.statusCode}  Body: $body');
-
-      if (streamed.statusCode == 200 || streamed.statusCode == 201) {
-        final json = jsonDecode(body) as Map<String, dynamic>;
-        // Handle common response shapes:
-        //   { "success": true, "data": { "url": "https://..." } }
-        //   { "success": true, "url": "https://..." }
-        //   { "imageUrl": "https://..." }
-        final url = json['data']?['url'] as String? ??
-            json['data']?['imageUrl'] as String? ??
-            json['url'] as String? ??
-            json['imageUrl'] as String?;
-        if (url != null && url.isNotEmpty) return url;
-        debugPrint('[ImageUpload] Could not parse URL from response: $body');
-      } else {
-        debugPrint('[ImageUpload] Upload failed (${streamed.statusCode}): $body');
-      }
-      return null;
-    } catch (e) {
-      debugPrint('[ImageUpload] Error: $e');
-      return null;
-    }
-  }
-
-  // ── Add URL typed/pasted in text field ─────────────────────────────────
+class _UrlOnlyImageAdderState extends State<_UrlOnlyImageAdder> {
   void _addTypedUrl() {
     final url = widget.urlController.text.trim();
     if (url.isEmpty) return;
@@ -2252,40 +2258,6 @@ class _ImagePickerAdderState extends State<_ImagePickerAdder> {
     setState(() {});
   }
 
-  // ── Pick image from device gallery, upload it, store the public URL ──────
-  Future<void> _pickFromDevice() async {
-    if (_isUploading) return; // Prevent double-tap during upload
-    try {
-      final XFile? picked = await _picker.pickImage(
-        source: ImageSource.gallery,
-        imageQuality: 85,
-      );
-      if (picked == null) return;
-
-      setState(() => _isUploading = true);
-
-      final publicUrl = await _uploadImageToServer(picked);
-
-      if (publicUrl != null && !widget.imageUrls.contains(publicUrl)) {
-        widget.imageUrls.add(publicUrl);
-        widget.onChanged();
-      } else if (publicUrl == null) {
-        // Upload failed — show a snack so the vendor knows
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('Image upload failed. Check your connection and try again.'),
-            backgroundColor: Color(0xFFEF4444),
-            behavior: SnackBarBehavior.floating,
-          ));
-        }
-      }
-    } catch (e) {
-      debugPrint('Image pick/upload error: $e');
-    } finally {
-      if (mounted) setState(() => _isUploading = false);
-    }
-  }
-
   void _remove(int index) {
     widget.imageUrls.removeAt(index);
     widget.onChanged();
@@ -2295,7 +2267,6 @@ class _ImagePickerAdderState extends State<_ImagePickerAdder> {
   @override
   Widget build(BuildContext context) {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      // ── URL input row ───────────────────────────────────────────────────
       Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
@@ -2305,50 +2276,34 @@ class _ImagePickerAdderState extends State<_ImagePickerAdder> {
         ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
-            // Text field — onChanged fires on every keystroke/paste
             Expanded(
               child: TextField(
                 controller: widget.urlController,
                 style: const TextStyle(fontSize: 13),
-                onChanged: (_) => setState(() {}),   // repaint clear button
+                onChanged: (_) => setState(() {}),
                 onSubmitted: (_) => _addTypedUrl(),
                 decoration: InputDecoration(
                   hintText: 'Paste image URL…',
                   hintStyle: const TextStyle(color: _kTextMuted, fontSize: 12),
                   isDense: true,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: _kBorder),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: _kBorder),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: _kTeal, width: 1.5),
-                  ),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: _kBorder)),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: _kBorder)),
+                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: _kTeal, width: 1.5)),
                   filled: true,
                   fillColor: Colors.white,
                   contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                  // Clear button when there's text
                   suffixIcon: widget.urlController.text.isNotEmpty
                       ? IconButton(
                           icon: const Icon(Icons.clear_rounded, size: 16, color: _kTextMuted),
                           visualDensity: VisualDensity.compact,
-                          onPressed: () {
-                            widget.urlController.clear();
-                            setState(() {});
-                          },
+                          onPressed: () { widget.urlController.clear(); setState(() {}); },
                         )
                       : null,
                 ),
               ),
             ),
-
             const SizedBox(width: 6),
-
-            // "Add URL" button — link icon
+            // ── Link / Add URL button only ──────────────────────────────
             Tooltip(
               message: 'Add URL',
               child: InkWell(
@@ -2356,85 +2311,40 @@ class _ImagePickerAdderState extends State<_ImagePickerAdder> {
                 borderRadius: BorderRadius.circular(8),
                 child: Container(
                   width: 38, height: 38,
-                  decoration: BoxDecoration(
-                    color: _kTealLight,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
+                  decoration: BoxDecoration(color: _kTealLight, borderRadius: BorderRadius.circular(8)),
                   child: const Icon(Icons.link_rounded, color: _kTeal, size: 20),
                 ),
               ),
             ),
-
-            const SizedBox(width: 6),
-
-            // "+" pick from device gallery button (shows spinner while uploading)
-            Tooltip(
-              message: _isUploading ? 'Uploading…' : 'Pick from device',
-              child: InkWell(
-                onTap: _isUploading ? null : _pickFromDevice,
-                borderRadius: BorderRadius.circular(8),
-                child: Container(
-                  width: 38, height: 38,
-                  decoration: BoxDecoration(
-                    color: _isUploading ? _kTeal.withOpacity(0.6) : _kTeal,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Center(
-                    child: _isUploading
-                        ? const SizedBox(
-                            width: 18, height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const Icon(Icons.add_photo_alternate_rounded,
-                            color: Colors.white, size: 20),
-                  ),
-                ),
-              ),
-            ),
           ]),
-
           if (widget.imageUrls.isEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 8),
               child: Text(
-                _isUploading
-                    ? 'Uploading image to server…'
-                    : 'Paste a URL and tap the link icon, or tap + to pick & upload from your device.',
+                'Paste an image URL and tap the link icon to add it.',
                 style: TextStyle(color: _kTeal.withOpacity(0.7), fontSize: 11),
               ),
             ),
         ]),
       ),
-
-      // ── Image thumbnails ─────────────────────────────────────────────────
       if (widget.imageUrls.isNotEmpty) ...[
         const SizedBox(height: 10),
         Wrap(
-          spacing: 8,
-          runSpacing: 8,
+          spacing: 8, runSpacing: 8,
           children: widget.imageUrls.asMap().entries.map((entry) {
             final index = entry.key;
             final url   = entry.value;
             return Stack(
               clipBehavior: Clip.none,
               children: [
-                // Thumbnail box — no ClipRRect so the remove button is always visible
                 Container(
                   width: 80, height: 80,
-                  decoration: BoxDecoration(
-                    color: _kTealLight,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: _kTeal.withOpacity(0.25)),
-                  ),
+                  decoration: BoxDecoration(color: _kTealLight, borderRadius: BorderRadius.circular(10), border: Border.all(color: _kTeal.withOpacity(0.25))),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(10),
                     child: _buildTileImage(url),
                   ),
                 ),
-                // Remove badge — positioned outside the box so it's never clipped
                 Positioned(
                   top: -6, right: -6,
                   child: GestureDetector(
@@ -2451,22 +2361,16 @@ class _ImagePickerAdderState extends State<_ImagePickerAdder> {
           }).toList(),
         ),
         const SizedBox(height: 4),
-        Text(
-          '${widget.imageUrls.length} image(s) added',
-          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _kTealDark),
-        ),
+        Text('${widget.imageUrls.length} image(s) added',
+            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _kTealDark)),
       ],
     ]);
   }
 
-  /// Renders a thumbnail for both http URLs and local file paths.
   Widget _buildTileImage(String url) {
-    if (url.startsWith('http') || url.startsWith('https') || url.startsWith('blob:')) {
+    if (url.startsWith('http') || url.startsWith('https')) {
       return Image.network(
-        url,
-        width: 80, height: 80,
-        fit: BoxFit.cover,
-        // Show a loading spinner while the image loads
+        url, width: 80, height: 80, fit: BoxFit.cover,
         loadingBuilder: (_, child, progress) {
           if (progress == null) return child;
           return Center(
@@ -2485,31 +2389,16 @@ class _ImagePickerAdderState extends State<_ImagePickerAdder> {
         errorBuilder: (_, __, ___) => _errorPlaceholder(),
       );
     }
-
-    // Local file path (mobile / desktop)
-    if (!kIsWeb) {
-      final file = File(url);
-      return Image.file(
-        file,
-        width: 80, height: 80,
-        fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => _errorPlaceholder(),
-      );
-    }
-
     return _errorPlaceholder();
   }
 
   Widget _errorPlaceholder() => Container(
     color: _kRedLight.withOpacity(0.5),
-    child: const Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Icon(Icons.broken_image_rounded, color: _kRed, size: 24),
-        SizedBox(height: 4),
-        Text('Load Error', style: TextStyle(fontSize: 9, color: _kRed, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
-      ],
-    ),
+    child: const Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+      Icon(Icons.broken_image_rounded, color: _kRed, size: 24),
+      SizedBox(height: 4),
+      Text('Load Error', style: TextStyle(fontSize: 9, color: _kRed, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+    ]),
   );
 }
 
@@ -2547,16 +2436,13 @@ class _VariantFormCardState extends State<_VariantFormCard> {
 
   void _sync() {
     String sku = _skuC.text.trim();
-    if (sku.isEmpty) {
-      sku = 'variant-${widget.index}-${DateTime.now().millisecondsSinceEpoch}';
-    }
-    widget.data['sku']          = sku;
-    widget.data['stock']        = int.tryParse(_stockC.text.trim()) ?? 0;
-    widget.data['price']        = double.tryParse(_priceC.text.trim()) ?? 0;
-    widget.data['discountPrice']= double.tryParse(_discC.text.trim());
-    widget.data['color']        = _colorC.text.trim();
-    widget.data['size']         = _sizeC.text.trim();
-
+    if (sku.isEmpty) sku = 'variant-${widget.index}-${DateTime.now().millisecondsSinceEpoch}';
+    widget.data['sku']           = sku;
+    widget.data['stock']         = int.tryParse(_stockC.text.trim()) ?? 0;
+    widget.data['price']         = double.tryParse(_priceC.text.trim()) ?? 0;
+    widget.data['discountPrice'] = double.tryParse(_discC.text.trim());
+    widget.data['color']         = _colorC.text.trim();
+    widget.data['size']          = _sizeC.text.trim();
     final autoUrl = _urlC.text.trim();
     final combinedImages = List<String>.from(_imageUrls);
     if (autoUrl.isNotEmpty && !combinedImages.contains(autoUrl)) combinedImages.add(autoUrl);
@@ -2613,7 +2499,8 @@ class _VariantFormCardState extends State<_VariantFormCard> {
           ]),
           const Align(alignment: Alignment.centerLeft, child: Text('Variant Images', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: _kTealDark))),
           const SizedBox(height: 6),
-          _ImagePickerAdder(urlController: _urlC, imageUrls: _imageUrls, onChanged: _sync),
+          // ── URL-only adder in variant form as well ──────────────────
+          _UrlOnlyImageAdder(urlController: _urlC, imageUrls: _imageUrls, onChanged: _sync),
         ]),
       ),
     ]),

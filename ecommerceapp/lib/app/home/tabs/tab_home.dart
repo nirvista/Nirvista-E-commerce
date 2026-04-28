@@ -76,6 +76,17 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
     });
   }
 
+  // ── HELPER FUNCTION TO FILTER PENDING/DRAFT PRODUCTS ────────────────
+  bool _isProductApprovedAndActive(dynamic p) {
+    // Default to 'approved'/'active' if null so older products in your DB 
+    // without these fields don't suddenly disappear from the customer app.
+    final approvalStatus = (p['approvalStatus'] ?? 'approved').toString().toLowerCase();
+    final listingStatus = (p['listingStatus'] ?? 'active').toString().toLowerCase();
+    
+    return approvalStatus == 'approved' && listingStatus == 'active';
+  }
+  // ─────────────────────────────────────────────────────────────────────
+
   Future<void> _refreshAllSections() async {
     isSectionLoading.value = true;
     try {
@@ -148,11 +159,19 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
     ]);
 
     // Relaxed cleanup: Only hide if the product is BOTH missing variants/price AND missing images.
+    // After cleanup, call refresh() so Obx widgets repaint with the newly enriched image URLs.
     void cleanup(RxList<ProductModel> list) {
-      list.removeWhere((p) => (p.variants.isEmpty && p.originalPrice <= 0) && p.imageUrl.isEmpty);
+      list.removeWhere((p) {
+        // Check all possible image sources before hiding
+        final hasImage = p.imageUrl.isNotEmpty ||
+            p.images.isNotEmpty ||
+            p.variants.any((v) => v.images.isNotEmpty);
+        return (p.variants.isEmpty && p.originalPrice <= 0) && !hasImage;
+      });
+      // Force Obx to rebuild so newly enriched imageUrls are painted immediately
       list.refresh();
     }
-    
+
     cleanup(bestSellingList);
     cleanup(topDealsList);
     cleanup(popularPicksList);
@@ -169,7 +188,12 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
       final res = await CategoryApiService.getProductsByCategory(catId);
       if (res['success']) {
         List<dynamic> data = res['data'];
-        final products = data.map((e) => ProductModel.fromJson(e)).toList();
+        
+        // APPLY THE STATUS FILTER HERE
+        final products = data
+            .where(_isProductApprovedAndActive)
+            .map((e) => ProductModel.fromJson(e))
+            .toList();
         
         // Populate all sections with category products
         // In a real app, you might have category-specific best sellers, 
@@ -185,8 +209,6 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
     }
   }
 
-  // Removed _fetchUserLocation as it is now handled by ShippingAddressController
-
   Future<List<ProductModel>> _fetchProducts(Future<Map<String, dynamic>> apiCall) async {
     final res = await apiCall;
     if (res['success']) {
@@ -197,7 +219,12 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
       } else if (data is Map && data['products'] is List) {
         productsList = data['products'];
       }
-      return productsList.map((e) => ProductModel.fromJson(e)).toList();
+      
+      // APPLY THE STATUS FILTER HERE
+      return productsList
+          .where(_isProductApprovedAndActive)
+          .map((e) => ProductModel.fromJson(e))
+          .toList();
     }
     return [];
   }
@@ -266,11 +293,6 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
     );
   }
 
-  // ─────────────────────────────────────────────
-  // ONLY THIS METHOD WAS CHANGED
-  // Wrapped the search bar in a GestureDetector + AbsorbPointer
-  // so that tapping anywhere on it navigates to SearchPage.
-  // ─────────────────────────────────────────────
   Widget _buildHeader(BuildContext context, double margin) {
     return Container(
       decoration: const BoxDecoration(
@@ -764,7 +786,11 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
                    if (resData is List) productsList = resData;
                    else if (resData is Map && resData['products'] is List) productsList = resData['products'];
                    
-                   var products = productsList.map((e) => ProductModel.fromJson(e)).toList();
+                   // APPLY THE STATUS FILTER HERE
+                   var products = productsList
+                       .where(_isProductApprovedAndActive)
+                       .map((e) => ProductModel.fromJson(e))
+                       .toList();
                    
                    // Relaxed cleanup: Only hide if the product is BOTH missing variants/price AND missing images.
                    products.removeWhere((p) => (p.variants.isEmpty && p.originalPrice <= 0) && p.imageUrl.isEmpty);
@@ -841,6 +867,26 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
       basePrice = currentPrice;
     }
 
+    // ── Resolve the best available image URL ─────────────────────────────
+    // Priority: product.imageUrl → product.images[0] → first variant image
+    String resolvedImageUrl = product.imageUrl;
+    if (resolvedImageUrl.isEmpty || resolvedImageUrl.contains('example.com')) {
+      if (product.images.isNotEmpty) {
+        resolvedImageUrl = product.images.first;
+      }
+    }
+    if (resolvedImageUrl.isEmpty || resolvedImageUrl.contains('example.com')) {
+      for (final v in product.variants) {
+        if (v.images.isNotEmpty) {
+          resolvedImageUrl = v.images.first;
+          break;
+        }
+      }
+    }
+    final bool hasValidImage = resolvedImageUrl.isNotEmpty &&
+        !resolvedImageUrl.contains('example.com');
+    // ─────────────────────────────────────────────────────────────────────
+
     return GestureDetector(
       onTap: () {
         storeController.setSelectedProductModel(product);
@@ -873,17 +919,21 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
                     height: 110.w,
                     width: double.infinity,
                     color: getGreyCardColor(context),
-                    child: (product.imageUrl.isNotEmpty && !product.imageUrl.contains("example.com"))
+                    child: hasValidImage
                         ? CachedNetworkImage(
-                            imageUrl: product.imageUrl,
+                            imageUrl: resolvedImageUrl,
                             fit: BoxFit.contain,
                             placeholder: (_, __) => Center(
-                              child: CircularProgressIndicator(color: accentColor, strokeWidth: 2),
+                              child: CircularProgressIndicator(
+                                  color: accentColor, strokeWidth: 2),
                             ),
-                            errorWidget: (_, __, ___) =>
-                                Icon(Icons.shopping_bag_outlined, color: getFontGreyColor(context), size: 32.w),
+                            errorWidget: (_, __, ___) => Icon(
+                                Icons.shopping_bag_outlined,
+                                color: getFontGreyColor(context),
+                                size: 32.w),
                           )
-                        : Icon(Icons.shopping_bag_outlined, color: getFontGreyColor(context), size: 32.w),
+                        : Icon(Icons.shopping_bag_outlined,
+                            color: getFontGreyColor(context), size: 32.w),
                   ),
                 ),
                 // Heart icon — top right
@@ -893,27 +943,34 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
                   child: GestureDetector(
                     onTap: () {
                       if (product.variants.isNotEmpty) {
-                        wishlistController.toggleWishlist(product.id, variantId: product.variants[0].id);
+                        wishlistController.toggleWishlist(product.id,
+                            variantId: product.variants[0].id);
                       } else {
-                        Get.snackbar("Error", "No variants available for this product", 
-                          backgroundColor: Colors.redAccent, colorText: Colors.white);
+                        Get.snackbar("Error",
+                            "No variants available for this product",
+                            backgroundColor: Colors.redAccent,
+                            colorText: Colors.white);
                       }
                     },
                     child: Obx(() {
-                      bool isWished = wishlistController.isWishlisted(product.id);
+                      bool isWished =
+                          wishlistController.isWishlisted(product.id);
                       return Container(
                         width: 28.w,
                         height: 28.w,
                         decoration: BoxDecoration(
                           color: Colors.white,
                           shape: BoxShape.circle,
-                          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 6)],
+                          boxShadow: [
+                            BoxShadow(
+                                color: Colors.black.withOpacity(0.08),
+                                blurRadius: 6)
+                          ],
                         ),
                         child: Icon(
-                          isWished ? Icons.favorite : Icons.favorite_border, 
-                          color: accentColor, 
-                          size: 15.w
-                        ),
+                            isWished ? Icons.favorite : Icons.favorite_border,
+                            color: accentColor,
+                            size: 15.w),
                       );
                     }),
                   ),
@@ -928,19 +985,30 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(product.brandName,
-                      style: TextStyle(fontSize: 10.sp, color: getFontGreyColor(context), fontWeight: FontWeight.w500)),
+                      style: TextStyle(
+                          fontSize: 10.sp,
+                          color: getFontGreyColor(context),
+                          fontWeight: FontWeight.w500)),
                   SizedBox(height: 3.h),
                   Text(product.title,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 12.sp, color: getFontColor(context), fontWeight: FontWeight.w600, height: 1.3)),
+                      style: TextStyle(
+                          fontSize: 12.sp,
+                          color: getFontColor(context),
+                          fontWeight: FontWeight.w600,
+                          height: 1.3)),
                   SizedBox(height: 5.h),
                   Row(
                     children: [
-                      Icon(Icons.star_rounded, color: ratedColor, size: 12.w),
+                      Icon(Icons.star_rounded,
+                          color: ratedColor, size: 12.w),
                       SizedBox(width: 3.w),
                       Text(product.rating.toStringAsFixed(1),
-                          style: TextStyle(fontSize: 10.sp, color: getFontColor(context), fontWeight: FontWeight.w500)),
+                          style: TextStyle(
+                              fontSize: 10.sp,
+                              color: getFontColor(context),
+                              fontWeight: FontWeight.w500)),
                     ],
                   ),
                   SizedBox(height: 6.h),
@@ -951,7 +1019,10 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
                     runSpacing: 3.h,
                     children: [
                       Text("₹${currentPrice.toStringAsFixed(0)}",
-                          style: TextStyle(fontSize: 14.sp, color: accentColor, fontWeight: FontWeight.w800)),
+                          style: TextStyle(
+                              fontSize: 14.sp,
+                              color: accentColor,
+                              fontWeight: FontWeight.w800)),
                       if (discountPercent > 0) ...[
                         Text("\u20b9${basePrice.toStringAsFixed(0)}",
                             style: TextStyle(
@@ -964,14 +1035,18 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
                               height: 1.0,
                             )),
                         Container(
-                          padding: EdgeInsets.symmetric(horizontal: 5.w, vertical: 2.h),
+                          padding: EdgeInsets.symmetric(
+                              horizontal: 5.w, vertical: 2.h),
                           decoration: BoxDecoration(
                             color: accentColor.withOpacity(0.12),
                             borderRadius: BorderRadius.circular(4.w),
                           ),
                           child: Text(
                             "${discountPercent.toStringAsFixed(0)}% off",
-                            style: TextStyle(fontSize: 9.sp, color: accentColor, fontWeight: FontWeight.w700),
+                            style: TextStyle(
+                                fontSize: 9.sp,
+                                color: accentColor,
+                                fontWeight: FontWeight.w700),
                           ),
                         ),
                       ],
