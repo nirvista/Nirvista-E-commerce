@@ -185,23 +185,55 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
 
     isSectionLoading.value = true;
     try {
-      final res = await CategoryApiService.getProductsByCategory(catId);
-      if (res['success']) {
-        List<dynamic> data = res['data'];
-        
-        // APPLY THE STATUS FILTER HERE
-        final products = data
-            .where(_isProductApprovedAndActive)
-            .map((e) => ProductModel.fromJson(e))
-            .toList();
-        
-        // Populate all sections with category products
-        // In a real app, you might have category-specific best sellers, 
-        // but here we'll show the category products in these sections.
-        bestSellingList.value = products.where((p) => p.variants.isNotEmpty || p.originalPrice > 0 || p.imageUrl.isNotEmpty).toList();
-        topDealsList.value = List.from(bestSellingList.value)..shuffle();
-        popularPicksList.value = bestSellingList.value;
+      final futures = <Future<Map<String, dynamic>>>[
+        CategoryApiService.getProductsByCategory(catId)
+      ];
+
+      // Try to find if this category has subcategories, and fetch them too
+      if (categoriesFuture != null) {
+        final categories = await categoriesFuture;
+        final parentCat = categories?.firstWhere(
+          (c) => c.id == catId, 
+          orElse: () => CategoryModel(id: '', name: '')
+        );
+        if (parentCat != null && parentCat.id.isNotEmpty && parentCat.children.isNotEmpty) {
+          for (var child in parentCat.children) {
+            futures.add(CategoryApiService.getProductsByCategory(child.id));
+          }
+        }
       }
+
+      final results = await Future.wait(futures);
+      final uniqueMap = <String, dynamic>{};
+
+      for (var res in results) {
+        if (res['success']) {
+          List<dynamic> data = [];
+          if (res['data'] is List) {
+            data = res['data'];
+          } else if (res['data'] is Map && res['data']['products'] is List) {
+            data = res['data']['products'];
+          }
+          for (var item in data) {
+            if (item['id'] != null) {
+              uniqueMap[item['id'].toString()] = item;
+            }
+          }
+        }
+      }
+
+      // APPLY THE STATUS FILTER HERE
+      final products = uniqueMap.values
+          .where(_isProductApprovedAndActive)
+          .map((e) => ProductModel.fromJson(e))
+          .toList();
+        
+      // Populate all sections with category products
+      // In a real app, you might have category-specific best sellers, 
+      // but here we'll show the category products in these sections.
+      bestSellingList.value = products.where((p) => p.variants.isNotEmpty || p.originalPrice > 0 || p.imageUrl.isNotEmpty).toList();
+      topDealsList.value = List.from(bestSellingList.value)..shuffle();
+      popularPicksList.value = bestSellingList.value;
     } catch (e) {
       print("Error updating category products: $e");
     } finally {
@@ -395,7 +427,6 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
                         textAlignVertical: TextAlignVertical.center,
                       ),
                     ),
-                    Icon(Icons.tune, color: accentColor, size: 20.w),
                   ],
                 ),
               ),
@@ -1051,6 +1082,26 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
                         ),
                       ],
                     ],
+                  ),
+                  Builder(
+                    builder: (context) {
+                      int totalStock = product.variants.fold(0, (sum, v) => sum + v.availableStock);
+                      bool isOutOfStock = product.variants.isNotEmpty && 
+                          product.variants.every((v) => v.status == 'out-of-stock' || v.availableStock <= 0);
+                      
+                      if (isOutOfStock || (product.variants.isNotEmpty && totalStock <= 0)) {
+                        return Padding(
+                          padding: EdgeInsets.only(top: 6.h),
+                          child: getCustomFont("Out of Stock", 10, Colors.redAccent, 1, fontWeight: FontWeight.w600),
+                        );
+                      } else if (totalStock > 0 && totalStock < 10) {
+                        return Padding(
+                          padding: EdgeInsets.only(top: 6.h),
+                          child: getCustomFont("Limited stocks available", 10, Colors.orange, 1, fontWeight: FontWeight.w600),
+                        );
+                      }
+                      return const SizedBox.shrink();
+                    },
                   ),
                 ],
               ),

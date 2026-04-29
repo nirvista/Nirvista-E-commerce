@@ -598,6 +598,7 @@ class ReviewModel {
   final String id;
   final String productId;
   final String userId;
+  final String userName;
   final String headline;
   final String comment;
   final int rating;
@@ -609,6 +610,7 @@ class ReviewModel {
     required this.id,
     required this.productId,
     required this.userId,
+    this.userName = 'Customer',
     required this.headline,
     required this.comment,
     required this.rating,
@@ -618,10 +620,16 @@ class ReviewModel {
   });
 
   factory ReviewModel.fromJson(Map<String, dynamic> json) {
+    String parsedUserName = 'Customer';
+    if (json['user'] != null && json['user']['name'] != null) {
+      parsedUserName = json['user']['name'].toString();
+    }
+
     return ReviewModel(
       id: json['id']?.toString() ?? '',
       productId: json['productId']?.toString() ?? '',
       userId: json['userId']?.toString() ?? '',
+      userName: parsedUserName,
       headline: json['headline']?.toString() ?? '',
       comment: json['comment']?.toString() ?? '',
       rating: json['rating'] is int ? json['rating'] : int.tryParse(json['rating']?.toString() ?? '0') ?? 0,

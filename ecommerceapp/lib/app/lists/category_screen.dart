@@ -74,20 +74,6 @@ class _CategoryScreenState extends State<CategoryScreen>
             padding: EdgeInsets.fromLTRB(margin, 48.h, margin, 16.h),
             child: Row(
               children: [
-                GestureDetector(
-                  onTap: () => Constant.backToPrev(context),
-                  child: Container(
-                    width: 36.w,
-                    height: 36.w,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.18),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(Icons.arrow_back_ios_new_rounded,
-                        color: Colors.white, size: 16.w),
-                  ),
-                ),
-                SizedBox(width: 14.w),
                 Text(
                   'Categories',
                   style: TextStyle(
@@ -301,7 +287,7 @@ class _CategoryScreenState extends State<CategoryScreen>
         crossAxisCount: 2,
         crossAxisSpacing: 10.w,
         mainAxisSpacing: 10.h,
-        childAspectRatio: 1.05,
+        childAspectRatio: 2.2,
       ),
       itemCount: subs.length,
       itemBuilder: (context, index) {
@@ -329,10 +315,10 @@ class _CategoryScreenState extends State<CategoryScreen>
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Padding(
-                  padding: EdgeInsets.fromLTRB(10.w, 12.h, 10.w, 6.h),
+                  padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
                   child: Text(
                     sub.name,
-                    maxLines: 3,
+                    maxLines: 2,
                     textAlign: TextAlign.center,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
@@ -340,24 +326,6 @@ class _CategoryScreenState extends State<CategoryScreen>
                       fontWeight: FontWeight.w700,
                       fontSize: 12.sp,
                       height: 1.35,
-                    ),
-                  ),
-                ),
-                SizedBox(height: 6.h),
-                // "Browse" pill — same as home tab category chips
-                Container(
-                  padding:
-                      EdgeInsets.symmetric(horizontal: 10.w, vertical: 3.h),
-                  decoration: BoxDecoration(
-                    color: accentColor.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(20.w),
-                  ),
-                  child: Text(
-                    'Browse →',
-                    style: TextStyle(
-                      color: accentColor,
-                      fontSize: 9.sp,
-                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ),
@@ -398,12 +366,10 @@ class _CategoryScreenState extends State<CategoryScreen>
         } else if (res['data'] is Map && res['data']['products'] is List) {
           productsList = res['data']['products'];
         }
+        
         final products =
             productsList.map((e) => ProductModel.fromJson(e)).toList()
-                ..removeWhere((p) =>
-                    p.variants.isEmpty &&
-                    p.originalPrice <= 0 &&
-                    p.imageUrl.isEmpty);
+                ..removeWhere((p) => p.variants.isEmpty);
 
         if (products.isEmpty) {
           return Center(
@@ -488,7 +454,7 @@ class _CategoryScreenState extends State<CategoryScreen>
                                 !product.imageUrl.contains('example.com'))
                             ? CachedNetworkImage(
                                 imageUrl: product.imageUrl,
-                                fit: BoxFit.cover,
+                                fit: BoxFit.contain,
                                 placeholder: (_, __) => Center(
                                   child: CircularProgressIndicator(
                                       color: accentColor, strokeWidth: 2),
