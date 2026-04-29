@@ -133,7 +133,9 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
       }).toList();
     }
     if (_productFilterStatus != 'All') {
-      list = list.where((p) => p['listingStatus'] == _productFilterStatus).toList();
+      list = list.where((p) =>
+        (p['listingStatus'] ?? '').toString().toUpperCase() == _productFilterStatus.toUpperCase()
+      ).toList();
     }
     return list;
   }
@@ -363,7 +365,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
         setState(() => _inventory = d is List ? d : []);
       }
     } else {
-      _snack(r['message'] ?? 'Cannot fetch inventory', true);
+      debugPrint('Inventory fetch failed: ${r['message']}');
     }
   }, loader: loader);
 
@@ -1139,13 +1141,14 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
                       ? selectedSubCategoryId
                       : selectedCategoryId;
 
+              // FIX APPLIED HERE: Changed 'listingStatus' from 'pending' to 'active'
               final body = <String, dynamic>{
                 'title'         : title,
                 'description'   : descC.text.trim(),
                 'categoryId'    : effectiveCategoryId,
                 'brandId'       : selectedBrandId,
                 'material'      : materialC.text.trim(),
-                'listingStatus' : 'pending',
+                'listingStatus' : 'active', 
                 'approvalStatus': 'pending',
                 'variants'      : [defaultVariant, ...variants],
               };
@@ -1264,14 +1267,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
               _dInput(discountC, 'Discount Price (₹)',              Icons.tag_rounded,            numeric: true),
               _dInput(materialC, 'Material (e.g. cotton, leather)', Icons.texture_rounded),
               _dInput(stockC,    'Initial Stock',                   Icons.inventory_2_rounded,    numeric: true),
-              _sectionLabel('Product Images'),
-              // ── URL-only image adder (no device picker) ─────────────────
-              _UrlOnlyImageAdder(
-                urlController: urlC,
-                imageUrls: imageUrls,
-                onChanged: () => setD(() {}),
-              ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 8),
               _sectionLabel('Additional Variants'),
               ...variants.asMap().entries.map((e) => _VariantFormCard(
                 index: e.key,
@@ -2482,27 +2478,30 @@ class _VariantFormCardState extends State<_VariantFormCard> {
       ),
       Padding(
         padding: const EdgeInsets.all(14),
-        child: Column(children: [
-          Row(children: [
-            Expanded(child: Padding(padding: const EdgeInsets.only(bottom: 10), child: TextField(controller: _skuC, decoration: _dec('SKU *', Icons.qr_code_2_rounded)))),
-            const SizedBox(width: 10),
-            Expanded(child: Padding(padding: const EdgeInsets.only(bottom: 10), child: TextField(controller: _priceC, keyboardType: TextInputType.number, decoration: _dec('Price (₹)', Icons.currency_rupee_rounded)))),
-            const SizedBox(width: 10),
-            Expanded(child: Padding(padding: const EdgeInsets.only(bottom: 10), child: TextField(controller: _discC, keyboardType: TextInputType.number, decoration: _dec('Discount (₹)', Icons.tag_rounded)))),
-            const SizedBox(width: 10),
-            Expanded(child: Padding(padding: const EdgeInsets.only(bottom: 10), child: TextField(controller: _stockC, keyboardType: TextInputType.number, decoration: _dec('Stock', Icons.inventory_2_rounded)))),
-          ]),
-          Row(children: [
-            Expanded(child: Padding(padding: const EdgeInsets.only(bottom: 10), child: TextField(controller: _colorC, decoration: _dec('Color', Icons.palette_rounded)))),
-            const SizedBox(width: 10),
-            Expanded(child: Padding(padding: const EdgeInsets.only(bottom: 10), child: TextField(controller: _sizeC, decoration: _dec('Size', Icons.straighten_rounded)))),
-          ]),
-          const Align(alignment: Alignment.centerLeft, child: Text('Variant Images', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: _kTealDark))),
-          const SizedBox(height: 6),
-          // ── URL-only adder in variant form as well ──────────────────
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          _varInput(_skuC,   'SKU (optional)',      Icons.qr_code_2_rounded),
+          _varInput(_priceC, 'Price (₹)',           Icons.currency_rupee_rounded, numeric: true),
+          _varInput(_discC,  'Discount Price (₹)',  Icons.tag_rounded,            numeric: true),
+          _varInput(_colorC, 'Color',               Icons.palette_rounded),
+          _varInput(_sizeC,  'Size',                Icons.straighten_rounded),
+          _varInput(_stockC, 'Stock',               Icons.inventory_2_rounded,    numeric: true),
+          const Align(alignment: Alignment.centerLeft, child: Padding(
+            padding: EdgeInsets.only(bottom: 8, top: 4),
+            child: Text('Variant Images', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _kTealDark)),
+          )),
           _UrlOnlyImageAdder(urlController: _urlC, imageUrls: _imageUrls, onChanged: _sync),
         ]),
       ),
     ]),
   );
+
+  Widget _varInput(TextEditingController c, String label, IconData icon, {bool numeric = false}) =>
+      Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: TextField(
+          controller: c,
+          keyboardType: numeric ? TextInputType.number : TextInputType.text,
+          decoration: _dec(label, icon),
+        ),
+      );
 }

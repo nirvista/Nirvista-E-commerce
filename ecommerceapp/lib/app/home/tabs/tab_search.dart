@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
@@ -72,9 +73,6 @@ class SearchFilters {
     final params = <String, dynamic>{};
     if (keyword.isNotEmpty) {
       params['keyword'] = keyword;
-      params['search'] = keyword;
-      params['q'] = keyword;
-      params['name'] = keyword;
     }
     if (categoryIds.isNotEmpty) params['categoryId'] = categoryIds;
     if (brandIds.isNotEmpty) params['brandId'] = brandIds;
@@ -196,21 +194,56 @@ class _TabSearchState extends State<TabSearch> {
       if (res['success'] == true) {
         dynamic rawData = res['data'];
         List<dynamic> productList = [];
-        
+
         if (rawData is List) {
           productList = rawData;
         } else if (rawData is Map) {
-          final nested = rawData['data'] ?? rawData['products'] ?? rawData['results'] ?? rawData['items'];
+          final nested = rawData['data'] ??
+              rawData['products'] ??
+              rawData['results'] ??
+              rawData['items'];
           if (nested is List) {
             productList = nested;
           }
         }
 
-        List<ProductModel> parsedResults = productList.map((e) => ProductModel.fromJson(e)).toList();
+        debugPrint('[TabSearch] Raw product count from API: ${productList.length}');
 
-        // ── NEW: Await enrichment and filter placeholders ──
+        // Only exclude products explicitly marked inactive or rejected.
+        // Missing/null fields are treated as approved — the search API already
+        // returns only visible listings on most backends.
+        productList.removeWhere((e) {
+          final status   = (e['listingStatus']  ?? '').toString().toLowerCase();
+          final approval = (e['approvalStatus'] ?? '').toString().toLowerCase();
+          final statusBad   = status.isNotEmpty   && status   != 'active';
+          final approvalBad = approval.isNotEmpty && approval != 'approved';
+          return statusBad || approvalBad;
+        });
+
+        debugPrint('[TabSearch] After status filter: ${productList.length}');
+
+        final List<ProductModel> parsedResults =
+            productList.map((e) => ProductModel.fromJson(e as Map<String, dynamic>)).toList();
+
         await EnrichmentService.enrichProducts(parsedResults);
-        parsedResults.removeWhere((p) => p.variants.isEmpty && p.originalPrice <= 0 && p.imageUrl.isEmpty);
+
+        // Only strip completely empty placeholder entries.
+        parsedResults.removeWhere(
+          (p) => p.title.isEmpty && p.originalPrice <= 0 && p.imageUrl.isEmpty,
+        );
+
+        // Client-side keyword filter — ensures only matching products are shown
+        // even if the API returns a broader result set.
+        if (_currentKeyword.isNotEmpty) {
+          final kw = _currentKeyword.toLowerCase();
+          parsedResults.removeWhere((p) {
+            final title = p.title.toLowerCase();
+            final brand = p.brandName.toLowerCase();
+            return !title.contains(kw) && !brand.contains(kw);
+          });
+        }
+
+        debugPrint('[TabSearch] Final results after enrichment: ${parsedResults.length}');
 
         if (mounted) {
           setState(() {
@@ -218,7 +251,6 @@ class _TabSearchState extends State<TabSearch> {
             _isLoading = false;
           });
         }
-        // ───────────────────────────────
       } else {
         setState(() {
           _results = [];
