@@ -89,8 +89,8 @@ class _CategoryProductsPageState extends State<CategoryProductsPage> {
       merged = merged.where((p) => p.variants.any((v) => v.discountPrice != null && v.discountPrice! > 0)).toList();
     }
     
-    // Relaxed cleanup: Only hide if the product is BOTH missing variants/price AND missing images.
-    merged.removeWhere((p) => (p.variants.isEmpty && p.originalPrice <= 0) && p.imageUrl.isEmpty);
+    // Strict cleanup: Hide the product if there are no approved variants
+    merged.removeWhere((p) => p.variants.isEmpty);
     
     loadedProducts = merged;
     return loadedProducts;
@@ -111,8 +111,8 @@ class _CategoryProductsPageState extends State<CategoryProductsPage> {
       // Enrich with missing variants using the background enrichment service
       await EnrichmentService.enrichProducts(prods);
 
-      // Cleanup broken products
-      prods.removeWhere((p) => p.variants.isEmpty && p.originalPrice <= 0 && p.imageUrl.isEmpty);
+      // Strict cleanup: Remove products that have no approved variants available
+      prods.removeWhere((p) => p.variants.isEmpty);
       
       loadedProducts = prods;
       return prods;

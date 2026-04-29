@@ -366,12 +366,10 @@ class _CategoryScreenState extends State<CategoryScreen>
         } else if (res['data'] is Map && res['data']['products'] is List) {
           productsList = res['data']['products'];
         }
+        
         final products =
             productsList.map((e) => ProductModel.fromJson(e)).toList()
-                ..removeWhere((p) =>
-                    p.variants.isEmpty &&
-                    p.originalPrice <= 0 &&
-                    p.imageUrl.isEmpty);
+                ..removeWhere((p) => p.variants.isEmpty);
 
         if (products.isEmpty) {
           return Center(
