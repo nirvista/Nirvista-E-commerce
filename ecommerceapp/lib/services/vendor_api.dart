@@ -31,23 +31,30 @@ class VendorApiService {
       };
 
   static Map<String, dynamic> _success(http.Response response) {
-    final decoded = jsonDecode(response.body);
-    return {
-      'success': true,
-      'data': decoded['data'],
-      'message': decoded['message'],
-    };
+    try {
+      final decoded = jsonDecode(response.body);
+      // Backend may wrap data under 'data' key, or return it directly
+      final data = decoded['data'] ?? decoded;
+      return {
+        'success': true,
+        'data': data,
+        'message': decoded['message'],
+      };
+    } catch (e) {
+      print('[VendorApiService] Failed to parse success response: $e\nBody: ${response.body}');
+      return {'success': false, 'message': 'Unexpected server response format'};
+    }
   }
 
   static Map<String, dynamic> _failure(http.Response response, String fallback) {
+    print('[VendorApiService Error] Status: ${response.statusCode}, URL body snippet: ${response.body.length > 300 ? response.body.substring(0, 300) : response.body}');
     try {
       final decoded = jsonDecode(response.body);
-      final message = decoded['message'] ?? decoded['error'] ?? fallback;
-      print('[VendorApiService Error] Status: ${response.statusCode}, Message: $message, Body: ${response.body}');
-      return {'success': false, 'message': message};
+      final message = decoded['message'] ?? decoded['error'] ?? decoded['msg'] ?? fallback;
+      return {'success': false, 'message': message, 'statusCode': response.statusCode};
     } catch (e) {
-      print('[VendorApiService Error] Status: ${response.statusCode}, Fallback: $fallback, Body: ${response.body}, Parse Error: $e');
-      return {'success': false, 'message': '$fallback - Status ${response.statusCode}'};
+      // Response body is not JSON (e.g. HTML 404 page from misconfigured server)
+      return {'success': false, 'message': '$fallback (HTTP ${response.statusCode})', 'statusCode': response.statusCode};
     }
   }
 
@@ -58,9 +65,6 @@ class VendorApiService {
   //  VENDOR PROFILE  &  CURRENT USER
   // ─────────────────────────────────────────────────────────────────────────────
 
-  /// POST /api/vendor/profile
-  /// Creates the vendor profile for the currently authenticated vendor.
-  /// Backend returns 400 "Vendor profile already exists" if one is present.
   static Future<Map<String, dynamic>> createVendorProfile(
     String accessToken,
     Map<String, dynamic> payload,
@@ -78,9 +82,6 @@ class VendorApiService {
     }
   }
 
-  /// GET /api/auth/me — returns the current user including userStatus.
-  /// Used after login to decide where to route a vendor
-  /// (pending → profile screen, active → dashboard, suspended → blocked).
   static Future<Map<String, dynamic>> getCurrentUser(String accessToken) async {
     try {
       final response = await http.get(
@@ -98,8 +99,6 @@ class VendorApiService {
   //  PRODUCTS
   // ─────────────────────────────────────────────────────────────────────────────
 
-  /// GET /api/vendor/products
-  /// Supports: listingStatus, categoryId, search, page, limit, sortBy, sortOrder
   static Future<Map<String, dynamic>> getVendorProducts(
     String accessToken, {
     String? listingStatus,
@@ -129,31 +128,23 @@ class VendorApiService {
     }
   }
 
-  /// POST /api/vendor/products
   static Future<Map<String, dynamic>> createVendorProduct(
     String accessToken,
     Map<String, dynamic> payload,
   ) async {
     try {
-      print('[VendorApiService] Creating product with payload: $payload');
-      print('[VendorApiService] URL: $baseUrl/products');
-      print('[VendorApiService] Token: $accessToken');
       final response = await http.post(
         Uri.parse('$baseUrl/products'),
         headers: _headers(accessToken),
         body: jsonEncode(payload),
       );
-      print('[VendorApiService] Response status: ${response.statusCode}');
-      print('[VendorApiService] Response body: ${response.body}');
       if (_isOk(response)) return _success(response);
       return _failure(response, 'Failed to create product');
     } catch (e) {
-      print('[VendorApiService] Exception: $e');
       return {'success': false, 'message': 'Error: $e'};
     }
   }
 
-  /// PUT /api/vendor/products/:productId
   static Future<Map<String, dynamic>> updateVendorProduct(
     String accessToken,
     String productId,
@@ -172,7 +163,6 @@ class VendorApiService {
     }
   }
 
-  /// PATCH /api/vendor/products/:productId/status
   static Future<Map<String, dynamic>> updateVendorProductStatus(
     String accessToken,
     String productId,
@@ -191,7 +181,6 @@ class VendorApiService {
     }
   }
 
-  /// POST /api/vendor/products/:productId/images
   static Future<Map<String, dynamic>> addVariantImageUrls(
     String accessToken,
     String productId, {
@@ -211,7 +200,6 @@ class VendorApiService {
     }
   }
 
-  /// DELETE /api/vendor/products/:id
   static Future<Map<String, dynamic>> deleteVendorProduct(
     String accessToken,
     String id,
@@ -232,7 +220,6 @@ class VendorApiService {
   //  VARIANTS  (via /api/products — public product routes)
   // ─────────────────────────────────────────────────────────────────────────────
 
-  /// POST /api/products/:id/variants
   static Future<Map<String, dynamic>> addVariant(
     String accessToken,
     String productId,
@@ -251,7 +238,6 @@ class VendorApiService {
     }
   }
 
-  /// PUT /api/products/:id/variants/:variantId
   static Future<Map<String, dynamic>> updateVariant(
     String accessToken,
     String productId,
@@ -271,7 +257,6 @@ class VendorApiService {
     }
   }
 
-  /// GET /api/products/:id/variants
   static Future<Map<String, dynamic>> getProductVariants(
     String accessToken,
     String productId,
@@ -288,7 +273,6 @@ class VendorApiService {
     }
   }
 
-  /// DELETE /api/products/:id/variants/:variantId
   static Future<Map<String, dynamic>> deleteVariant(
     String accessToken,
     String productId,
@@ -310,8 +294,6 @@ class VendorApiService {
   //  INVENTORY
   // ─────────────────────────────────────────────────────────────────────────────
 
-  /// GET /api/vendor/inventory
-  /// Supports: lowStockOnly, status, search, page, limit
   static Future<Map<String, dynamic>> getVendorInventory(
     String accessToken, {
     bool lowStockOnly = false,
@@ -325,7 +307,7 @@ class VendorApiService {
         'page': '$page',
         'limit': '$limit',
         if (lowStockOnly) 'lowStockOnly': '1',
-        if (status != null) 'status': status,
+        if (status != null && status.isNotEmpty) 'status': status,
         if (search != null && search.isNotEmpty) 'search': search,
       };
       final uri = Uri.parse('$baseUrl/inventory').replace(queryParameters: params);
@@ -337,14 +319,21 @@ class VendorApiService {
     }
   }
 
-  /// PATCH /api/vendor/inventory/:sku
-  /// Body: { quantity: int, operation: 'set'|'increment'|'decrement', lowStockThreshold?: int }
   static Future<Map<String, dynamic>> adjustVendorInventory(
     String accessToken,
-    String sku,
-    Map<String, dynamic> payload,
-  ) async {
+    String sku, {
+    required int quantity,
+    required String operation, // 'set', 'increment', or 'decrement'
+    int? lowStockThreshold,
+  }) async {
     try {
+      // Constructed payload directly mapping to requirements in vendorInventoryController.js
+      final payload = {
+        'quantity': quantity,
+        'operation': operation,
+        if (lowStockThreshold != null) 'lowStockThreshold': lowStockThreshold,
+      };
+
       final response = await http.patch(
         Uri.parse('$baseUrl/inventory/$sku'),
         headers: _headers(accessToken),
@@ -361,10 +350,6 @@ class VendorApiService {
   //  ANALYTICS
   // ─────────────────────────────────────────────────────────────────────────────
 
-  /// GET /api/vendor/analytics/sales
-  /// timeframe: today | last_7_days | last_30_days | last_90_days |
-  ///            last_12_months | this_month | this_year
-  /// granularity: day | week | month
   static Future<Map<String, dynamic>> getVendorSalesAnalytics(
     String accessToken, {
     String timeframe = 'last_30_days',
@@ -382,7 +367,6 @@ class VendorApiService {
     }
   }
 
-  /// GET /api/vendor/analytics/performance
   static Future<Map<String, dynamic>> getVendorPerformanceAnalytics(
     String accessToken, {
     String timeframe = 'last_30_days',
@@ -399,8 +383,6 @@ class VendorApiService {
     }
   }
 
-  /// GET /api/vendor/analytics/top-products
-  /// metric: revenue | volume
   static Future<Map<String, dynamic>> getVendorTopProducts(
     String accessToken, {
     String timeframe = 'last_30_days',

@@ -10,7 +10,9 @@ const variantInclude = {
     attributes: [
         "id", "variantName", "price", "size", "color", 
         "discountPrice", "images", "status", "stock"
-    ]
+    ],
+    where: { approvalStatus: 'approved' },
+
 };
 
 // List all categories (Tree Structure)

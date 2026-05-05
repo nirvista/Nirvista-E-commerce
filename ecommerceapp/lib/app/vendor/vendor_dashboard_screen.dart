@@ -52,7 +52,6 @@ String _getVendorStatus(List<dynamic> items) {
   return 'pending';
 }
 
-/// Safely extract a string ID from a value that might be a String, int, or Map.
 String _extractId(dynamic value) {
   if (value == null) return '';
   if (value is String) return value.trim();
@@ -107,11 +106,13 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
   final TextEditingController _productSearchC = TextEditingController();
   String _productFilterStatus = 'All';
 
+  // Inventory search & filter
+  final TextEditingController _inventorySearchC = TextEditingController();
+  String _inventoryStatusFilter = 'All'; // 'All', 'In Stock', 'Out of Stock', 'Discontinued'
+  bool _inventoryLowStockOnly = false;
+
   // Analytics timeframe
   String _analyticsTimeframe = 'last_30_days';
-
-  // Inventory filter
-  bool _inventoryLowStockOnly = false;
 
   // Orders search
   final TextEditingController _orderSearchC = TextEditingController();
@@ -157,6 +158,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
     super.initState();
     _productSearchC.addListener(() => setState(() {}));
     _orderSearchC.addListener(() => setState(() {}));
+    _inventorySearchC.addListener(() => setState(() {}));
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadInitial());
   }
 
@@ -164,6 +166,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
   void dispose() {
     _productSearchC.dispose();
     _orderSearchC.dispose();
+    _inventorySearchC.dispose();
     super.dispose();
   }
 
@@ -237,8 +240,6 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
       if (r['success'] == true) {
         final d = r['data'];
         if (mounted) setState(() => _brands = d is List ? d : []);
-      } else {
-        debugPrint('Brands fetch failed: ${r['message']}');
       }
     } catch (e) {
       debugPrint('_fetchBrands error: $e');
@@ -252,15 +253,8 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
         final d = r['data'];
         if (mounted) {
           final raw = d is List ? d : [];
-          for (final c in raw) {
-            debugPrint('[Category] id=${_extractId(c['id'] ?? c['_id'])} '
-                'name=${c['name']} parentId=${c['parentId']} '
-                'parentIdType=${c['parentId']?.runtimeType}');
-          }
           setState(() => _categories = raw);
         }
-      } else {
-        debugPrint('Categories fetch failed: ${r['message']}');
       }
     } catch (e) {
       debugPrint('_fetchCategories error: $e');
@@ -305,9 +299,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
   }
 
   Future<void> _createProduct(Map<String, dynamic> body) => _run(() async {
-    debugPrint('[VendorDashboard] Creating product: $body');
     final r = await VendorApiService.createVendorProduct(_token, body);
-    debugPrint('[VendorDashboard] Create product response: $r');
     if (r['success'] == true) {
       if (r['data'] != null && r['data'] is Map<String, dynamic>) {
         final newProduct = r['data'] as Map<String, dynamic>;
@@ -350,30 +342,98 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
     }, loader: true);
   }
 
+  // Inventory logic using controller parameters
   Future<void> _fetchInventory({bool loader = false}) => _run(() async {
+    String? apiStatus;
+    if (_inventoryStatusFilter == 'In Stock') apiStatus = 'in-stock';
+    else if (_inventoryStatusFilter == 'Out of Stock') apiStatus = 'out-of-stock';
+    else if (_inventoryStatusFilter == 'Discontinued') apiStatus = 'discontinued';
+
     final r = await VendorApiService.getVendorInventory(
-      _token, lowStockOnly: _inventoryLowStockOnly,
+      _token,
+      lowStockOnly: _inventoryLowStockOnly,
+      search: _inventorySearchC.text.trim().isEmpty ? null : _inventorySearchC.text.trim(),
+      status: apiStatus,
+      limit: 200,
     );
+
+    debugPrint('[Inventory] Raw response: $r');
+
     if (r['success'] == true) {
       final d = r['data'];
+      debugPrint('[Inventory] data type=${d.runtimeType}  keys=${d is Map ? (d as Map).keys.toList() : "n/a"}');
+
       if (d is Map) {
+        // Expected shape from backend: { inventory: [...], summary: {...}, pagination: {...} }
+        final rawInventory = d['inventory'];
+        final rawSummary   = d['summary'];
+
+        final List<dynamic> inventoryList = rawInventory is List
+            ? List<dynamic>.from(rawInventory)
+            : [];
+
+        final Map<String, dynamic> summaryMap = rawSummary is Map
+            ? Map<String, dynamic>.from(rawSummary as Map)
+            : {
+                'totalSKUs':      inventoryList.length,
+                'lowStockCount':   inventoryList.where((i) => (i as Map?)?['alerts']?['lowStock']   == true).length,
+                'outOfStockCount': inventoryList.where((i) => (i as Map?)?['alerts']?['outOfStock'] == true).length,
+              };
+
+        debugPrint('[Inventory] Loaded ${inventoryList.length} items, summary=$summaryMap');
         setState(() {
-          _inventory = d['inventory'] as List? ?? [];
-          _inventorySummary = d['summary'] as Map<String, dynamic>? ?? {};
+          _inventory        = inventoryList;
+          _inventorySummary = summaryMap;
+        });
+      } else if (d is List) {
+        final inventoryList = List<dynamic>.from(d);
+        setState(() {
+          _inventory = inventoryList;
+          _inventorySummary = {
+            'totalSKUs':      inventoryList.length,
+            'lowStockCount':   inventoryList.where((i) => (i as Map?)?['alerts']?['lowStock']   == true).length,
+            'outOfStockCount': inventoryList.where((i) => (i as Map?)?['alerts']?['outOfStock'] == true).length,
+          };
         });
       } else {
-        setState(() => _inventory = d is List ? d : []);
+        debugPrint('[Inventory] Unexpected data shape: $d');
+        setState(() { _inventory = []; _inventorySummary = {}; });
       }
     } else {
-      debugPrint('Inventory fetch failed: ${r['message']}');
+      final statusCode = r['statusCode'];
+      final msg        = r['message'] ?? 'Failed to load inventory';
+      debugPrint('[Inventory] FAILED — HTTP $statusCode — $msg');
+
+      String userMsg = msg;
+      if (statusCode == 401) userMsg = 'Session expired. Please log in again.';
+      else if (statusCode == 403) userMsg = 'Access denied to inventory.';
+      else if (statusCode == 404) userMsg = 'Inventory route not found (HTTP 404). Check server route registration.';
+      else if (statusCode == 500) userMsg = 'Server error fetching inventory. Check backend logs.';
+
+      _snack(userMsg, true);
+      if (mounted) setState(() { _inventory = []; _inventorySummary = {}; });
     }
   }, loader: loader);
 
-  Future<void> _adjustInventory(String sku, Map<String, dynamic> payload) => _run(() async {
-    final r = await VendorApiService.adjustVendorInventory(_token, sku, payload);
-    _snack(r['message'] ?? 'Adjusted', r['success'] != true);
-    if (r['success'] == true) await _fetchInventory();
-  });
+ // ── Inventory API Wrapper ────────────────────────────────────────────────
+  
+  Future<void> _adjustInventory(
+    String sku, {
+    required int quantity,
+    required String operation,
+    int? lowStockThreshold,
+  }) =>
+      _run(() async {
+        final r = await VendorApiService.adjustVendorInventory(
+          _token,
+          sku,
+          quantity: quantity,
+          operation: operation,
+          lowStockThreshold: lowStockThreshold,
+        );
+        _snack(r['message'] ?? 'Adjusted', r['success'] != true);
+        if (r['success'] == true) await _fetchInventory();
+      });
 
   Future<void> _fetchOrders({bool loader = false}) => _run(() async {
     final r = await VendorOrderApiService.getVendorOrders(_token);
@@ -848,6 +908,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
     final totalSKUs     = _inventorySummary['totalSKUs'] ?? _inventory.length;
     final lowStockCount = _inventorySummary['lowStockCount'] ?? 0;
     final outOfStock    = _inventorySummary['outOfStockCount'] ?? 0;
+    final inStockCount  = (totalSKUs as int) - (lowStockCount as int) - (outOfStock as int);
 
     return Column(children: [
       Container(
@@ -864,13 +925,44 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
             _OutlineBtn(label: 'Sync', icon: Icons.sync_rounded, onPressed: () => _fetchInventory(loader: true)),
           ]),
           const SizedBox(height: 14),
-          Row(children: [
-            Expanded(child: _MiniStatCard(label: 'Total SKUs', value: '$totalSKUs', color: _kTeal)),
-            const SizedBox(width: 10),
-            Expanded(child: _MiniStatCard(label: 'Low Stock', value: '$lowStockCount', color: _kAmber)),
-            const SizedBox(width: 10),
-            Expanded(child: _MiniStatCard(label: 'Out of Stock', value: '$outOfStock', color: _kRed)),
-          ]),
+          // Summary cards row
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(children: [
+              _MiniStatCard(label: 'Total SKUs',    value: '$totalSKUs',     color: _kTeal),
+              const SizedBox(width: 10),
+              _MiniStatCard(label: 'In Stock',      value: '${inStockCount < 0 ? 0 : inStockCount}', color: _kGreen),
+              const SizedBox(width: 10),
+              _MiniStatCard(label: 'Low Stock',     value: '$lowStockCount', color: _kAmber),
+              const SizedBox(width: 10),
+              _MiniStatCard(label: 'Out of Stock',  value: '$outOfStock',    color: _kRed),
+            ]),
+          ),
+          const SizedBox(height: 16),
+          _SearchBar(
+            controller: _inventorySearchC,
+            hint: 'Search by SKU or Variant Name…',
+            onSubmit: (_) => _fetchInventory(loader: true),
+            onClear: () { _inventorySearchC.clear(); _fetchInventory(loader: true); },
+          ),
+          const SizedBox(height: 12),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(children: [
+              for (final entry in ['All', 'In Stock', 'Out of Stock', 'Discontinued'])
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: _FilterPill(
+                    label: entry,
+                    active: _inventoryStatusFilter == entry,
+                    onTap: () {
+                      setState(() => _inventoryStatusFilter = entry);
+                      _fetchInventory(loader: true);
+                    },
+                  ),
+                ),
+            ]),
+          ),
           const SizedBox(height: 12),
           GestureDetector(
             onTap: () {
@@ -904,15 +996,43 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
       Container(height: 1, color: _kBorder),
       Expanded(
         child: _inventory.isEmpty
-            ? const _EmptyState(icon: Icons.warehouse_outlined, label: 'No inventory data')
+            ? _EmptyState(
+                icon: Icons.warehouse_outlined,
+                label: _inventorySearchC.text.isNotEmpty
+                    ? 'No items match your search.'
+                    : _inventoryLowStockOnly
+                        ? 'No low-stock or out-of-stock items found.'
+                        : 'No inventory data found.\nAdd products with variants to track stock.',
+                action: _inventorySearchC.text.isNotEmpty
+                    ? null
+                    : _OutlineBtn(
+                        label: 'Retry',
+                        icon: Icons.refresh_rounded,
+                        onPressed: () => _fetchInventory(loader: true),
+                      ),
+              )
             : ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: _inventory.length,
-                itemBuilder: (ctx, i) {
-                  final item = _inventory[i] as Map<String, dynamic>? ?? {};
-                  return _InventoryCard(item: item, onAdjust: () => _showAdjustInventoryDialog(item));
-                },
-              ),
+  padding: const EdgeInsets.all(16),
+  itemCount: _inventory.length,
+  itemBuilder: (ctx, i) {
+    final item = _inventory[i] as Map<String, dynamic>? ?? {};
+    
+    // Extract the SKU string from the map (safely falling back to empty string if missing)
+    final String sku = item['sku']?.toString() ?? '';
+
+    return _InventoryCard(
+      item: item,
+      onAdjust: () {
+        if (sku.isNotEmpty) {
+          _showAdjustStockDialog(sku);
+        } else {
+          // Fallback error if the backend returned an item without an SKU
+          Get.snackbar('Error', 'Invalid product SKU. Cannot adjust stock.');
+        }
+      },
+    );
+  },
+),
       ),
     ]);
   }
@@ -1141,7 +1261,6 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
                       ? selectedSubCategoryId
                       : selectedCategoryId;
 
-              // FIX APPLIED HERE: Changed 'listingStatus' from 'pending' to 'active'
               final body = <String, dynamic>{
                 'title'         : title,
                 'description'   : descC.text.trim(),
@@ -1159,7 +1278,6 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
             child: Column(mainAxisSize: MainAxisSize.min, children: [
               _dInput(nameC, 'Product Title *', Icons.label_rounded),
               _dInput(descC, 'Description', Icons.description_rounded, maxLines: 3),
-              // ── Brand Dropdown ──────────────────────────────────────────
               Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: DropdownButtonFormField<String>(
@@ -1173,7 +1291,6 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
                   onChanged: (v) => setD(() => selectedBrandId = v),
                 ),
               ),
-              // ── Parent / Root Category Dropdown ────────────────────────
               Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: DropdownButtonFormField<String>(
@@ -1193,7 +1310,6 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
                   }),
                 ),
               ),
-              // ── Sub-Category section ────────────────────────────────────
               if (selectedCategoryId != null) ...[
                 if (subCategories.isNotEmpty) ...[
                   Padding(
@@ -1464,61 +1580,475 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
     );
   }
 
-  void _showAdjustInventoryDialog(dynamic item) {
+ // ── Stock Adjustment Dialog ──────────────────────────────────────────────
+
+  void _showAdjustStockDialog(String sku) {
     final quantityC = TextEditingController();
-    final sku       = item['sku']?.toString() ?? '';
+    final thresholdC = TextEditingController();
     String operation = 'increment';
 
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setD) => _NirvistaDialog(
-          title: 'Adjust Stock',
-          onConfirm: () {
-            final qty = int.tryParse(quantityC.text.trim());
-            if (qty == null || qty < 0) { _snack('Enter a valid non-negative quantity', true); return; }
-            Navigator.pop(ctx);
-            _adjustInventory(sku, {'quantity': qty, 'operation': operation});
-          },
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              decoration: BoxDecoration(color: _kTealLight, borderRadius: BorderRadius.circular(12), border: Border.all(color: _kTeal.withOpacity(0.3))),
-              child: Row(children: [
-                const Icon(Icons.qr_code_2_rounded, color: _kTeal, size: 18),
-                const SizedBox(width: 8),
-                Text('SKU: $sku', style: const TextStyle(fontWeight: FontWeight.w700, color: _kTealDark)),
-                const SizedBox(width: 12),
-                Text('Current: ${item['stock'] ?? item['availableStock'] ?? '—'} units', style: const TextStyle(color: _kTextMuted, fontSize: 12)),
-              ]),
-            ),
-            const SizedBox(height: 14),
-            Row(children: [
-              for (final op in ['set', 'increment', 'decrement'])
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 3),
-                    child: GestureDetector(
-                      onTap: () => setD(() => operation = op),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 150),
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        decoration: BoxDecoration(
-                          color: operation == op ? _kTeal : _kBg,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: operation == op ? _kTeal : _kBorder),
+        builder: (ctx, setD) => Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 500),
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.all(28),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // ── Header ───────────────────────────────────────────────────
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: _kTealLight,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(Icons.edit_note_rounded, color: _kTeal, size: 24),
                         ),
-                        child: Text(op[0].toUpperCase() + op.substring(1),
-                            textAlign: TextAlign.center,
-                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: operation == op ? Colors.white : _kTextMuted)),
-                      ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Adjust Stock Level',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w800,
+                                  color: _kText,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Update inventory for SKU: $sku',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: _kTextMuted,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
+                    const SizedBox(height: 24),
+
+                    // ── Section 1: Operation Selection ────────────────────────────
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.settings_rounded, size: 18, color: _kTeal),
+                            const SizedBox(width: 8),
+                            const Text(
+                              'Operation',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: _kText,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Container(
+                          decoration: BoxDecoration(
+                            border: Border.all(color: _kBorder, width: 1.5),
+                            borderRadius: BorderRadius.circular(14),
+                            color: Colors.white,
+                          ),
+                          child: DropdownButton<String>(
+                            isExpanded: true,
+                            underline: const SizedBox(),
+                            value: operation,
+                            borderRadius: BorderRadius.circular(14),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                            onChanged: (newVal) {
+                              if (newVal != null) setD(() => operation = newVal);
+                            },
+                            items: [
+                              DropdownMenuItem(
+                                value: 'set',
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(6),
+                                      decoration: BoxDecoration(
+                                        color: _kGreenLight,
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: const Icon(Icons.check_circle_outline_rounded,
+                                          size: 14, color: _kGreen),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    const Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text('Set',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.w600,
+                                                fontSize: 13,
+                                                color: _kText,
+                                              )),
+                                          Text('Replace total stock',
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                color: _kTextMuted,
+                                              )),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              DropdownMenuItem(
+                                value: 'increment',
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(6),
+                                      decoration: BoxDecoration(
+                                        color: _kTealLight,
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: const Icon(Icons.add_circle_outline_rounded,
+                                          size: 14, color: _kTeal),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    const Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text('Increment',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.w600,
+                                                fontSize: 13,
+                                                color: _kText,
+                                              )),
+                                          Text('Add to stock',
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                color: _kTextMuted,
+                                              )),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              DropdownMenuItem(
+                                value: 'decrement',
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(6),
+                                      decoration: BoxDecoration(
+                                        color: _kRedLight,
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: const Icon(Icons.remove_circle_outline_rounded,
+                                          size: 14, color: _kRed),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    const Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text('Decrement',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.w600,
+                                                fontSize: 13,
+                                                color: _kText,
+                                              )),
+                                          Text('Remove from stock',
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                color: _kTextMuted,
+                                              )),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ].toList(),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 22),
+
+                    // ── Section 2: Quantity Input ─────────────────────────────────
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.numbers_rounded, size: 18, color: _kTeal),
+                            const SizedBox(width: 8),
+                            const Text(
+                              'Quantity',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: _kText,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: quantityC,
+                          keyboardType: TextInputType.number,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: _kText,
+                          ),
+                          decoration: InputDecoration(
+                            hintText: 'Enter quantity',
+                            hintStyle: const TextStyle(
+                              fontSize: 14,
+                              color: Color(0xFFB0B9B6),
+                            ),
+                            filled: true,
+                            fillColor: _kBg,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 14,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: const BorderSide(color: _kBorder),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: const BorderSide(color: _kBorder, width: 1.5),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: const BorderSide(color: _kTeal, width: 2),
+                            ),
+                            suffixIcon: Padding(
+                              padding: const EdgeInsets.only(right: 12),
+                              child: Center(
+                                widthFactor: 1,
+                                child: quantityC.text.isNotEmpty
+                                    ? GestureDetector(
+                                        onTap: quantityC.clear,
+                                        child: const Icon(Icons.clear_rounded,
+                                            size: 18, color: _kTextMuted),
+                                      )
+                                    : null,
+                              ),
+                            ),
+                          ),
+                          onChanged: (_) => setD(() {}),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Must be a non-negative whole number',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: _kTextMuted.withOpacity(0.7),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 22),
+
+                    // ── Section 3: Low Stock Threshold ────────────────────────────
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.warning_amber_rounded, size: 18, color: _kAmber),
+                            const SizedBox(width: 8),
+                            const Text(
+                              'Low Stock Threshold',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: _kText,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: _kAmberLight,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: const Text(
+                                'Optional',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: _kAmber,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: thresholdC,
+                          keyboardType: TextInputType.number,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: _kText,
+                          ),
+                          decoration: InputDecoration(
+                            hintText: 'e.g., 5 units',
+                            hintStyle: const TextStyle(
+                              fontSize: 14,
+                              color: Color(0xFFB0B9B6),
+                            ),
+                            filled: true,
+                            fillColor: _kBg,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 14,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: const BorderSide(color: _kBorder),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: const BorderSide(color: _kBorder, width: 1.5),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: const BorderSide(color: _kTeal, width: 2),
+                            ),
+                            suffixIcon: thresholdC.text.isNotEmpty
+                                ? Padding(
+                                    padding: const EdgeInsets.only(right: 12),
+                                    child: GestureDetector(
+                                      onTap: thresholdC.clear,
+                                      child: const Icon(Icons.clear_rounded,
+                                          size: 18, color: _kTextMuted),
+                                    ),
+                                  )
+                                : null,
+                          ),
+                          onChanged: (_) => setD(() {}),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Icon(Icons.info_outline_rounded,
+                                size: 14, color: _kTextMuted.withOpacity(0.8)),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                'Alert when available stock falls to this level or below',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: _kTextMuted.withOpacity(0.7),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 28),
+
+                    // ── Action Buttons ────────────────────────────────────────────
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => Navigator.pop(ctx),
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(color: _kBorder, width: 1.5),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: const Text(
+                              'Cancel',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: _kText,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () {
+                              final qty = int.tryParse(quantityC.text.trim());
+                              if (qty == null || qty < 0) {
+                                _snack('Enter a valid non-negative quantity', true);
+                                return;
+                              }
+
+                              final threshold = thresholdC.text.trim().isEmpty
+                                  ? null
+                                  : int.tryParse(thresholdC.text.trim());
+
+                              Navigator.pop(ctx);
+                              _adjustInventory(sku,
+                                  quantity: qty,
+                                  operation: operation,
+                                  lowStockThreshold: threshold);
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: _kTeal,
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.done_rounded, size: 18),
+                                SizedBox(width: 8),
+                                Text(
+                                  'Update Stock',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-            ]),
-            const SizedBox(height: 14),
-            _dInput(quantityC, 'Quantity', Icons.numbers_rounded, numeric: true),
-          ]),
+              ),
+            ),
+          ),
         ),
       ),
     );
@@ -1817,9 +2347,9 @@ class _AnalyticsGrid extends StatelessWidget {
 }
 
 class _FilterPill extends StatelessWidget {
-  const _FilterPill({required this.label, required this.count, required this.active, required this.onTap});
+  const _FilterPill({required this.label, this.count, required this.active, required this.onTap});
   final String label;
-  final int count;
+  final int? count;
   final bool active;
   final VoidCallback onTap;
   @override
@@ -1829,7 +2359,7 @@ class _FilterPill extends StatelessWidget {
       duration: const Duration(milliseconds: 180),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(color: active ? _kTeal : _kCard, borderRadius: BorderRadius.circular(20), border: Border.all(color: active ? _kTeal : _kBorder)),
-      child: Text('$label ($count)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: active ? Colors.white : _kTextMuted)),
+      child: Text(count != null ? '$label ($count)' : label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: active ? Colors.white : _kTextMuted)),
     ),
   );
 }
@@ -1983,46 +2513,212 @@ class _InventoryCard extends StatelessWidget {
   const _InventoryCard({required this.item, required this.onAdjust});
   final Map<String, dynamic> item;
   final VoidCallback onAdjust;
+
   @override
   Widget build(BuildContext context) {
-    final alerts   = item['alerts'] as Map<String, dynamic>? ?? {};
-    final isLow    = alerts['lowStock'] == true;
-    final isOut    = alerts['outOfStock'] == true;
-    final stock    = item['availableStock'] ?? item['stock'] ?? 0;
-    final reserved = item['reservedStock'] ?? 0;
-    Color statusColor = isOut ? _kRed : isLow ? _kAmber : _kGreen;
-    Color statusBg    = isOut ? _kRedLight : isLow ? _kAmberLight : _kGreenLight;
-    String statusText = isOut ? 'Out of Stock' : isLow ? 'Low Stock' : 'In Stock';
+    final alerts      = item['alerts'] as Map<String, dynamic>? ?? {};
+    final isLow       = alerts['lowStock'] == true;
+    final isOut       = alerts['outOfStock'] == true;
+    final isDisc      = item['status'] == 'discontinued';
+
+    final totalStock  = (item['stock'] as num?)?.toInt() ?? 0;
+    final reserved    = (item['reservedStock'] as num?)?.toInt() ?? 0;
+    final available   = (item['availableStock'] as num?)?.toInt() ?? (totalStock - reserved);
+    final threshold   = (item['lowStockThreshold'] as num?)?.toInt() ?? 5;
+    final price       = item['price'];
+    final discPrice   = item['discountPrice'];
+    final color       = item['color']?.toString();
+    final size        = item['size']?.toString();
+    final approvalStatus = item['approvalStatus']?.toString();
+    final listingStatus  = item['listingStatus']?.toString();
+
+    Color statusColor = isDisc ? Colors.grey.shade600 : isOut ? _kRed : isLow ? _kAmber : _kGreen;
+    Color statusBg    = isDisc ? Colors.grey.shade100 : isOut ? _kRedLight : isLow ? _kAmberLight : _kGreenLight;
+    String statusText = isDisc ? 'Discontinued' : isOut ? 'Out of Stock' : isLow ? 'Low Stock' : 'In Stock';
+    IconData statusIcon = isDisc ? Icons.block_rounded : isOut ? Icons.remove_circle_outline_rounded : isLow ? Icons.warning_amber_rounded : Icons.check_circle_outline_rounded;
+
+    // Stock bar ratio: available / totalStock clamped to [0,1]
+    final double stockRatio = totalStock > 0 ? (available / totalStock).clamp(0.0, 1.0) : 0.0;
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(color: _kCard, borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: isOut ? _kRed.withOpacity(0.3) : isLow ? _kAmber.withOpacity(0.3) : _kBorder),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 6, offset: const Offset(0, 2))]),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        child: Row(children: [
-          Container(width: 44, height: 44, decoration: BoxDecoration(color: statusColor.withOpacity(0.1), borderRadius: BorderRadius.circular(12)), child: Icon(Icons.warehouse_rounded, color: statusColor, size: 20)),
-          const SizedBox(width: 14),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(item['sku']?.toString() ?? '—', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: _kText)),
-            if (item['productTitle'] != null || item['variantName'] != null)
-              Text('${item['productTitle'] ?? ''} ${item['variantName'] != null ? '· ${item['variantName']}' : ''}', style: const TextStyle(color: _kTextMuted, fontSize: 12)),
-            const SizedBox(height: 4),
-            Row(children: [
-              _InfoChip(Icons.inventory_2_rounded, '$stock available'),
-              if (reserved > 0) ...[const SizedBox(width: 10), _InfoChip(Icons.lock_outline_rounded, '$reserved reserved')],
-            ]),
-          ])),
-          Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-            Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: statusBg, borderRadius: BorderRadius.circular(8)),
-                child: Text(statusText, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: statusColor))),
-            const SizedBox(height: 8),
-            _OutlineBtn(label: 'Adjust', icon: Icons.edit_rounded, onPressed: onAdjust, compact: true),
-          ]),
-        ]),
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: _kCard,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isOut ? _kRed.withOpacity(0.35)
+              : isLow ? _kAmber.withOpacity(0.35)
+              : _kBorder,
+          width: (isOut || isLow) ? 1.5 : 1,
+        ),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2))],
       ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // ── Header row ──────────────────────────────────────────────────────
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 14, 10),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            // Icon avatar
+            Container(
+              width: 46, height: 46,
+              decoration: BoxDecoration(
+                color: statusColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(13),
+              ),
+              child: Icon(statusIcon, color: statusColor, size: 22),
+            ),
+            const SizedBox(width: 12),
+            // SKU + product/variant name
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Expanded(
+                  child: Text(
+                    item['sku']?.toString() ?? '—',
+                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: _kText, letterSpacing: 0.2),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                  decoration: BoxDecoration(color: statusBg, borderRadius: BorderRadius.circular(8)),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(statusIcon, size: 10, color: statusColor),
+                    const SizedBox(width: 4),
+                    Text(statusText, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: statusColor)),
+                  ]),
+                ),
+              ]),
+              const SizedBox(height: 3),
+              if (item['productTitle'] != null || item['variantName'] != null)
+                Text(
+                  [item['productTitle'], if (item['variantName'] != null) '· ${item['variantName']}']
+                      .where((e) => e != null && e.toString().isNotEmpty).join(' '),
+                  style: const TextStyle(color: _kTextMuted, fontSize: 12, fontWeight: FontWeight.w500),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+            ])),
+          ]),
+        ),
+
+        // ── Stock progress bar ───────────────────────────────────────────────
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Text('$available available', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: statusColor)),
+              const Spacer(),
+              Text('of $totalStock total', style: const TextStyle(fontSize: 11, color: _kTextMuted)),
+            ]),
+            const SizedBox(height: 6),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: stockRatio,
+                minHeight: 7,
+                backgroundColor: _kBorder,
+                valueColor: AlwaysStoppedAnimation<Color>(statusColor),
+              ),
+            ),
+          ]),
+        ),
+        const SizedBox(height: 12),
+
+        // ── Chips row ───────────────────────────────────────────────────────
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Wrap(spacing: 8, runSpacing: 6, children: [
+            if (reserved > 0)
+              _InventoryChip(Icons.lock_outline_rounded, '$reserved reserved', _kAmber),
+            _InventoryChip(Icons.warning_amber_rounded, 'Alert ≤ $threshold', Colors.grey.shade600),
+            if (color != null && color.isNotEmpty)
+              _InventoryChip(Icons.palette_outlined, color, _kTeal),
+            if (size != null && size.isNotEmpty)
+              _InventoryChip(Icons.straighten_rounded, size, _kTeal),
+            if (price != null)
+              _InventoryChip(
+                Icons.currency_rupee_rounded,
+                discPrice != null && (double.tryParse(discPrice.toString()) ?? 0) > 0
+                    ? '₹$discPrice  (was ₹$price)'
+                    : '₹$price',
+                _kTealDark,
+              ),
+            if (approvalStatus != null && approvalStatus.isNotEmpty)
+              _InventoryChip(
+                Icons.verified_outlined,
+                approvalStatus,
+                approvalStatus.toLowerCase() == 'approved' ? _kGreen
+                    : approvalStatus.toLowerCase() == 'pending' ? _kAmber
+                    : _kRed,
+              ),
+            if (listingStatus != null && listingStatus.isNotEmpty)
+              _InventoryChip(
+                Icons.storefront_outlined,
+                listingStatus.toUpperCase(),
+                listingStatus.toLowerCase() == 'active' ? _kGreen : _kTextMuted,
+              ),
+          ]),
+        ),
+        const SizedBox(height: 12),
+
+        // ── Footer action bar ────────────────────────────────────────────────
+        Container(
+          decoration: BoxDecoration(
+            color: _kBg,
+            borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
+            border: Border(top: BorderSide(color: _kBorder)),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: Row(children: [
+            // Stock counts summary
+            Expanded(
+              child: Row(children: [
+                _StockPill('Total', totalStock, _kTeal),
+                const SizedBox(width: 8),
+                _StockPill('Available', available, statusColor),
+                if (reserved > 0) ...[const SizedBox(width: 8), _StockPill('Reserved', reserved, _kAmber)],
+              ]),
+            ),
+            _TealButton(label: 'Adjust Stock', icon: Icons.edit_rounded, onPressed: onAdjust, compact: true),
+          ]),
+        ),
+      ]),
     );
   }
+}
+
+class _InventoryChip extends StatelessWidget {
+  const _InventoryChip(this.icon, this.label, this.color);
+  final IconData icon;
+  final String label;
+  final Color color;
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    decoration: BoxDecoration(
+      color: color.withOpacity(0.08),
+      borderRadius: BorderRadius.circular(8),
+      border: Border.all(color: color.withOpacity(0.2)),
+    ),
+    child: Row(mainAxisSize: MainAxisSize.min, children: [
+      Icon(icon, size: 11, color: color),
+      const SizedBox(width: 4),
+      Text(label, style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w600)),
+    ]),
+  );
+}
+
+class _StockPill extends StatelessWidget {
+  const _StockPill(this.label, this.value, this.color);
+  final String label;
+  final int value;
+  final Color color;
+  @override
+  Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    Text('$value', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: color)),
+    Text(label, style: const TextStyle(fontSize: 10, color: _kTextMuted, fontWeight: FontWeight.w500)),
+  ]);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

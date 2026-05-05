@@ -34,7 +34,7 @@ Product.belongsTo(User, { foreignKey: 'vendorId', as: 'vendor' });
 
 // --- Product Variants ---
 Product.hasMany(ProductVariant, { foreignKey: 'productId', as: 'variants', onDelete: 'CASCADE', hooks: true });
-ProductVariant.belongsTo(Product, { foreignKey: 'productId', onDelete: 'CASCADE' });
+ProductVariant.belongsTo(Product, { foreignKey: 'productId', as: 'product', onDelete: 'CASCADE' });
 
 // --- Category Self-Referencing (sub-categories) ---
 Category.hasMany(Category, { as: "children", foreignKey: "parentId" });
