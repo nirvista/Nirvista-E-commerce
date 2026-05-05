@@ -217,19 +217,37 @@ class WishlistItem {
 class WishlistProduct {
   final String id;
   final String title;
+  final String? tagName;
 
   WishlistProduct({
     required this.id,
     required this.title,
+    this.tagName,
   });
 
   factory WishlistProduct.fromJson(Map<String, dynamic> json) {
+    // Robust title parsing with fallbacks
+    String parsedTitle = json['title']?.toString() ?? json['name']?.toString() ?? '';
+    
+    // Try to get tag name if available
+    String? tName = json['tagName']?.toString();
+    if (tName == null && json['tags'] != null && json['tags'] is List && (json['tags'] as List).isNotEmpty) {
+      tName = json['tags'][0]['name']?.toString();
+    }
+
+    // If title is still empty or looks like an ID, and we have a tagName, use tagName
+    if ((parsedTitle.isEmpty || parsedTitle == json['id']?.toString()) && tName != null && tName.isNotEmpty) {
+      parsedTitle = tName;
+    }
+
     return WishlistProduct(
-      id: json['id'] ?? '',
-      title: json['title'] ?? '',
+      id: json['id']?.toString() ?? '',
+      title: parsedTitle,
+      tagName: tName,
     );
   }
 }
+
 
 class WishlistVariant {
   final String id;

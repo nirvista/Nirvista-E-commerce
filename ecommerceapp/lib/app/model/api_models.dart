@@ -47,10 +47,19 @@ class ProductModel {
       bName = json['brand']['name']?.toString() ?? '';
     }
 
+    // Try to get tag name if available
+    String? tName = json['tagName']?.toString();
+    if (tName == null && json['tags'] != null && json['tags'] is List && (json['tags'] as List).isNotEmpty) {
+      tName = json['tags'][0]['name']?.toString() ?? json['tags'][0]['title']?.toString();
+    }
+
+    String parsedTitle = json['title']?.toString() ?? json['name']?.toString() ?? tName ?? '';
+
     return ProductModel(
       id: json['id']?.toString() ?? '',
-      title: json['title']?.toString() ?? json['name']?.toString() ?? '',
+      title: parsedTitle,
       description: json['description']?.toString(),
+
       categoryId: json['categoryId']?.toString() ?? json['category']?.toString() ?? '',
       brandId: json['brandId']?.toString() ?? json['brand_id']?.toString() ?? '',
       brandName: bName,

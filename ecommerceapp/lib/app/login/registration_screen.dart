@@ -4,7 +4,6 @@ import 'package:get/get.dart';
 
 import '../../base/color_data.dart';
 import '../../base/constant.dart';
-// fetch_pixels not needed in card-centered layout
 import '../../base/get/login_data_controller.dart';
 import '../../base/get/route_key.dart';
 import '../../base/widget_utils.dart';
@@ -224,7 +223,7 @@ class _RegistrationScreen extends State<RegistrationScreen> {
             children: [
               // ── Header text ──────────────────────────────────────────────────
               Text(
-                "Create Account ✨",
+                "Create Account ",
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 20.sp,

@@ -105,7 +105,7 @@ class _TrackOrder extends State<TrackOrder> {
           const SnackBar(content: Text('Return request initiated successfully'), backgroundColor: Colors.green)
         );
         // Update local status if necessary
-        orderController.updateOrderStatusLocally(orderId, 'return_initiated');
+        orderController.updateOrderStatusLocally(orderId, 'return Initiated');
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(res['message'] ?? 'Failed to initiate return'), backgroundColor: Colors.red)
@@ -455,85 +455,95 @@ class _TrackOrder extends State<TrackOrder> {
               String img = item.displayImage;
               String title = (item.product?.title.isNotEmpty == true) ? item.product!.title : "Product ID: ${item.productId.length > 5 ? item.productId.substring(0, 5) : item.productId}";
               
-              return Row(
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    width: 60.h,
-                    height: 60.h,
-                    decoration: BoxDecoration(
-                      color: getGreyCardColor(context),
-                      borderRadius: BorderRadius.circular(8.w),
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(8.w),
-                      child: img.isNotEmpty 
-                        ? CachedNetworkImage(imageUrl: img, fit: BoxFit.contain, 
-                            placeholder: (context, url) => const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                            errorWidget: (context, url, error) => const Icon(Icons.image_not_supported))
-                        : const Icon(Icons.shopping_bag_outlined),
-                    ),
+                  Row(
+                    children: [
+                      Container(
+                        width: 60.h,
+                        height: 60.h,
+                        decoration: BoxDecoration(
+                          color: getGreyCardColor(context),
+                          borderRadius: BorderRadius.circular(8.w),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(8.w),
+                          child: img.isNotEmpty 
+                            ? CachedNetworkImage(imageUrl: img, fit: BoxFit.contain, 
+                                placeholder: (context, url) => const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                                errorWidget: (context, url, error) => const Icon(Icons.image_not_supported))
+                            : const Icon(Icons.shopping_bag_outlined),
+                        ),
+                      ),
+                      getHorSpace(12.h),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            getCustomFont(title, 14, getFontColor(context), 1, fontWeight: FontWeight.w500),
+                            getVerSpace(4.h),
+                            getCustomFont("Qty: ${item.quantity}", 12, getFontGreyColor(context), 1),
+                            if (item.variant?.variantName != null) 
+                              getCustomFont("Variant: ${item.variant!.variantName}", 12, getFontGreyColor(context), 1),
+                          ],
+                        ),
+                      ),
+                      getCustomFont("\u20B9${item.priceAtPurchase.toStringAsFixed(0)}", 14, getAccentColor(context), 1, fontWeight: FontWeight.w700),
+                    ],
                   ),
-                  getHorSpace(12.h),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        getCustomFont(title, 14, getFontColor(context), 1, fontWeight: FontWeight.w500),
-                        getVerSpace(4.h),
-                        getCustomFont("Qty: ${item.quantity}", 12, getFontGreyColor(context), 1),
-                        if (item.variant?.variantName != null) 
-                          getCustomFont("Variant: ${item.variant!.variantName}", 12, getFontGreyColor(context), 1),
-                        
-                        // Rating/Review Section
-                        if (order.orderStatus.toLowerCase() == 'delivered') ...[
-                          getVerSpace(8.h),
-                          Obx(() {
-                            final review = userReviews[item.productId];
-                            if (review != null) {
-                              return Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: List.generate(5, (index) => Icon(
-                                      index < review.rating ? Icons.star : Icons.star_outline,
-                                      color: ratedColor,
-                                      size: 14.w,
-                                    )),
-                                  ),
-                                  getVerSpace(2.h),
-                                  getCustomFont(review.headline, 11, getFontColor(context), 1, fontWeight: FontWeight.w600),
-                                ],
-                              );
-                            } else {
-                              return GestureDetector(
-                                onTap: () {
-                                  showDialog(
-                                    context: context,
-                                    builder: (ctx) => ProductRatingDialog(
-                                      productId: item.productId,
-                                      userId: loginController.currentUser.value?.id ?? '',
-                                      onReviewSubmitted: (newReview) {
-                                        userReviews[item.productId] = newReview;
-                                      },
-                                    ),
-                                  );
-                                },
-                                child: Container(
-                                  padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
-                                  decoration: BoxDecoration(
-                                    border: Border.all(color: accentColor),
-                                    borderRadius: BorderRadius.circular(4.w),
-                                  ),
-                                  child: getCustomFont("Rate Product", 10, accentColor, 1, fontWeight: FontWeight.w600),
+
+                  // Rating/Review Section
+                  if (order.orderStatus.toLowerCase() == 'delivered') ...[
+                    Obx(() {
+                      final review = userReviews[item.productId];
+                      if (review != null) {
+                        return Padding(
+                          padding: EdgeInsets.only(top: 12.h),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: List.generate(5, (index) => Icon(
+                                  index < review.rating ? Icons.star : Icons.star_outline,
+                                  color: ratedColor,
+                                  size: 14.w,
+                                )),
+                              ),
+                              getVerSpace(4.h),
+                              getCustomFont(review.headline, 12, getFontColor(context), 1, fontWeight: FontWeight.w600),
+                            ],
+                          ),
+                        );
+                      } else {
+                        return Padding(
+                          padding: EdgeInsets.only(top: 12.h),
+                          child: getButtonFigma(
+                            context, 
+                            Colors.transparent, 
+                            true, 
+                            "Rate this product", 
+                            accentColor, 
+                            () {
+                              showDialog(
+                                context: context,
+                                builder: (ctx) => ProductRatingDialog(
+                                  productId: item.productId,
+                                  userId: loginController.currentUser.value?.id ?? '',
+                                  onReviewSubmitted: (newReview) {
+                                    userReviews[item.productId] = newReview;
+                                  },
                                 ),
                               );
-                            }
-                          }),
-                        ],
-                      ],
-                    ),
-                  ),
-                  getCustomFont("\u20B9${item.priceAtPurchase.toStringAsFixed(0)}", 14, getAccentColor(context), 1, fontWeight: FontWeight.w700),
+                            }, 
+                            EdgeInsets.zero,
+                            isBorder: true,
+                            borderColor: accentColor,
+                          ),
+                        );
+                      }
+                    }),
+                  ],
                 ],
               );
             },

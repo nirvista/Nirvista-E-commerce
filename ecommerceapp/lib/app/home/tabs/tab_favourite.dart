@@ -261,19 +261,8 @@ class TabFavourite extends StatelessWidget {
                         getCustomFont(item.product.title, 14,
                             getFontColor(context), 2,
                             fontWeight: FontWeight.w700),
-                        SizedBox(height: 6.h),
-                        Container(
-                          padding: EdgeInsets.symmetric(
-                              horizontal: 8.w, vertical: 3.h),
-                          decoration: BoxDecoration(
-                            color: getGreyCardColor(context),
-                            borderRadius: BorderRadius.circular(6.w),
-                          ),
-                          child: getCustomFont(item.variant.variantName, 11,
-                              getFontGreyColor(context), 1,
-                              fontWeight: FontWeight.w500),
-                        ),
                         SizedBox(height: 8.h),
+
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.baseline,
                           textBaseline: TextBaseline.alphabetic,
