@@ -5,6 +5,36 @@ import ProductVariant from "../models/variantModel.js";
 import Tag from "../models/tagModel.js";
 import Review from "../models/reviewModel.js"; // Newly added Review Model
 import { created, notFound, serverError, success, badRequest } from "../utils/responseMessages.js"; // Added badRequest
+import { v2 as cloudinary } from 'cloudinary';
+
+cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET
+});
+
+const uploadMedia = async (mediaArray) => {
+    if (!mediaArray || !Array.isArray(mediaArray)) return [];
+    const uploadedUrls = [];
+    for (const file of mediaArray) {
+        // If it's already a web URL, keep it without re-uploading
+        if (file.startsWith("http://") || file.startsWith("https://")) {
+            uploadedUrls.push(file);
+        } else {
+            try {
+                const result = await cloudinary.uploader.upload(file, {
+                    resource_type: "auto", // Automatically detects image or video
+                    folder: "ecommerce_media"
+                });
+                uploadedUrls.push(result.secure_url);
+            } catch (err) {
+                console.error("Cloudinary upload error:", err);
+                throw new Error("Failed to upload media to Cloudinary");
+            }
+        }
+    }
+    return uploadedUrls;
+};
 
 // --- Include helpers ---
 const variantInclude = {
@@ -82,9 +112,14 @@ export const createProduct = async (req, res) => {
         }
         // All variants start as pending approval
         if (req.body.variants && Array.isArray(req.body.variants)) {
-            req.body.variants = req.body.variants.map(v => ({
-                ...v,
-                approvalStatus: 'pending'
+            req.body.variants = await Promise.all(req.body.variants.map(async v => {
+                if (v.images && Array.isArray(v.images)) {
+                    v.images = await uploadMedia(v.images);
+                }
+                return {
+                    ...v,
+                    approvalStatus: 'pending'
+                };
             }));
         }
         const product = await Product.create(req.body, {
@@ -106,6 +141,9 @@ export const addVariant = async (req, res) => {
         const product = await Product.findByPk(req.params.id);
         if (!product) return notFound(res, "Parent product not found");
 
+        if (req.body.images && Array.isArray(req.body.images)) {
+            req.body.images = await uploadMedia(req.body.images);
+        }
         const variant = await ProductVariant.create({
             ...req.body,
             productId: req.params.id,
@@ -120,6 +158,9 @@ export const addVariant = async (req, res) => {
 // --- Vendor: Update a variant (stock/price/availability) ---
 export const updateVariant = async (req, res) => {
     try {
+        if (req.body.images && Array.isArray(req.body.images)) {
+            req.body.images = await uploadMedia(req.body.images);
+        }
         // Any update by vendor sets status to pending
         const [updatedRows] = await ProductVariant.update(
             { ...req.body, approvalStatus: 'pending' },
@@ -229,6 +270,9 @@ export const updateProduct = async (req, res) => {
         const { id } = req.params;
         const { tagIds, ...updateData } = req.body;
 
+        if (updateData.images && Array.isArray(updateData.images)) {
+            updateData.images = await uploadMedia(updateData.images);
+        }
         // Returns [affectedCount]
         const [updatedRows] = await Product.update(updateData, {
             where: { id }
@@ -451,6 +495,9 @@ export const addReview = async (req, res) => {
             return badRequest(res, "Rating must be an integer between 1 and 5.");
         }
 
+        if (media && Array.isArray(media)) {
+            media = await uploadMedia(media);
+        }
         // Check if product exists
         const product = await Product.findByPk(productId);
         if (!product) return notFound(res, "Product not found");

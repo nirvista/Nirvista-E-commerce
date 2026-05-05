@@ -3,6 +3,10 @@ import { Plus, Edit, List, Eye, X, ChevronLeft, ChevronRight, Search, FilterX, C
 import { getToken } from "../utils/auth";
 import { apiFetch } from "../utils/api";
 
+// Extracted outside to prevent recreating object references on every render
+const defaultProductForm = { title: "", description: "", categoryId: "", brandId: "", vendorId: "", listingStatus: "draft" };
+const defaultVariantForm = { sku: "", variantName: "", price: "", discountPrice: "", stock: 0, status: "in-stock", images: [] };
+
 export default function Products() {
   const [view, setView] = useState("products"); // 'products', 'variants', or 'reviews'
   const [products, setProducts] = useState([]);
@@ -10,6 +14,7 @@ export default function Products() {
   const [reviews, setReviews] = useState([]);
   
   const [loading, setLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null); 
   
   const [selectedProduct, setSelectedProduct] = useState(null);
@@ -32,29 +37,36 @@ export default function Products() {
   const [allCategories, setAllCategories] = useState([]);
   const [allBrands, setAllBrands] = useState([]);
   const [allVendors, setAllVendors] = useState([]);
+  const [formData, setFormData] = useState({});
 
   const baseUrl = import.meta.env.VITE_BASE_URL || "";
-  const defaultProductForm = { title: "", description: "", categoryId: "", brandId: "", vendorId: "", listingStatus: "draft" };
-  const defaultVariantForm = { sku: "", variantName: "", price: "", discountPrice: "", stock: 0, status: "in-stock" };
-  const [formData, setFormData] = useState({});
+
+  // --- Safe Dependencies to prevent React Infinite Loops ---
+  const activeFiltersString = JSON.stringify(activeFilters);
+  const reviewFiltersString = JSON.stringify(reviewFilters);
+  const selectedProductId = selectedProduct?.id;
 
   useEffect(() => {
     fetchAuxiliaryData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     if (view === "products") {
       fetchProducts();
-    } else if (view === "variants" && selectedProduct) {
-      fetchVariants(selectedProduct.id);
-    } else if (view === "reviews" && selectedProduct) {
-      fetchReviews(selectedProduct.id);
+    } else if (view === "variants" && selectedProductId) {
+      fetchVariants(selectedProductId);
+    } else if (view === "reviews" && selectedProductId) {
+      fetchReviews(selectedProductId);
     }
-  }, [view, selectedProduct, activeFilters]);
+    // Using stringified primitives prevents object-reference infinite loops
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, selectedProductId, activeFiltersString]);
 
   useEffect(() => {
     setReviewPage(1);
-  },  [selectedProduct, reviewFilters]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedProductId, reviewFiltersString]);
 
   // --- API Calls ---
 
@@ -160,7 +172,6 @@ export default function Products() {
     setLoading(true);
     setErrorMsg(null);
     try {
-      // FIX: Use apiFetch to automatically append the JWT token and point to the Protected Admin route
       const res = await apiFetch(`${baseUrl}/api/products/admin/${productId}/reviews`);
       const contentType = res.headers.get("content-type");
       if (!contentType || !contentType.includes("application/json")) {
@@ -248,7 +259,7 @@ export default function Products() {
       });
       if (res.ok) {
         fetchReviews(selectedProduct.id);
-        fetchProducts(); // Refresh overall product rating
+        fetchProducts(); 
       } else alert(`Error: ${(await res.json()).message || "Failed to update review status"}`);
     } catch (err) { console.error(err); }
   };
@@ -281,7 +292,11 @@ export default function Products() {
   const applyFilters = () => setActiveFilters({ ...filterForm });
   const clearFilters = () => { setFilterForm({ search: "", sort: "", categoryId: "", brandId: "" }); setActiveFilters({}); };
   const handleInputChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
-  const closeModal = () => setModalType(null);
+  
+  const closeModal = () => {
+    setModalType(null);
+    setIsSubmitting(false);
+  };
 
   const openCreateProductModal = () => { setFormData(defaultProductForm); setModalType("createProduct"); };
   const openAddVariantModal = () => { setFormData(defaultVariantForm); setModalType("addVariant"); };
@@ -290,14 +305,16 @@ export default function Products() {
     setSelectedVariant(variant);
     setFormData({
       sku: variant.sku || "", variantName: variant.variantName || "", price: variant.price || "",
-      discountPrice: variant.discountPrice || "", stock: variant.stock || 0, status: variant.status || "in-stock"
+      discountPrice: variant.discountPrice || "", stock: variant.stock || 0, status: variant.status || "in-stock",
+      images: variant.images || [] 
     });
     setModalType("editVariant");
   };
 
   const openVariantDetails = (variant) => { setSelectedVariant(variant); setModalType("variantDetails"); };
 
-  // Carousel Handlers
+  // --- Media Handlers ---
+  
   const openCarousel = (mediaArray, index) => {
     setCarouselMedia(mediaArray);
     setCurrentMediaIndex(index);
@@ -309,23 +326,51 @@ export default function Products() {
 
   const isVideo = (url) => /\.(mp4|webm|ogg)$/i.test(url);
 
+  const handleImageUpload = async (e) => {
+    const files = Array.from(e.target.files);
+    const base64Media = await Promise.all(files.map(file => {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = error => reject(error);
+      });
+    }));
+    setFormData(prev => ({ ...prev, images: [...(prev.images || []), ...base64Media] }));
+  };
+
+  const removeMedia = (index) => {
+    setFormData(prev => ({
+      ...prev,
+      images: prev.images.filter((_, i) => i !== index)
+    }));
+  };
+
   const handleProductSubmit = async (e) => {
     e.preventDefault();
+    setIsSubmitting(true);
     try {
       const res = await apiFetch(`${baseUrl}/api/products`, {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(formData),
       });
       if (res.ok) { fetchProducts(); closeModal(); }
       else alert(`Error: ${(await res.json()).message || "Failed to create product"}`);
-    } catch (err) { console.error(err); }
+    } catch (err) { 
+      console.error(err); 
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleVariantSubmit = async (e) => {
     e.preventDefault();
+    setIsSubmitting(true);
+    
     const isEditing = modalType === "editVariant";
     const url = isEditing
       ? `${baseUrl}/api/products/${selectedProduct.id}/variants/${selectedVariant.id}`
       : `${baseUrl}/api/products/${selectedProduct.id}/variants`;
+      
     const payload = { ...formData };
     if (payload.discountPrice === "") payload.discountPrice = null;
 
@@ -333,9 +378,17 @@ export default function Products() {
       const res = await apiFetch(url, {
         method: isEditing ? "PUT" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
       });
-      if (res.ok) { fetchVariants(selectedProduct.id); closeModal(); }
-      else alert(`Error: ${(await res.json()).message || "Failed to save variant"}`);
-    } catch (err) { console.error(err); }
+      if (res.ok) { 
+        fetchVariants(selectedProduct.id); 
+        closeModal(); 
+      } else {
+        alert(`Error: ${(await res.json()).message || "Failed to save variant"}`);
+      }
+    } catch (err) { 
+      console.error(err); 
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // --- Dynamic Review Filters ---
@@ -810,7 +863,13 @@ export default function Products() {
 
                 <div className="pt-4 flex gap-3 justify-end">
                   <button type="button" onClick={closeModal} className="px-4 py-2 text-slate-600 dark:text-gray-300 hover:bg-slate-100 dark:hover:bg-gray-800 rounded-lg transition">Cancel</button>
-                  <button type="submit" className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg transition font-medium">Create Product</button>
+                  <button 
+                    type="submit" 
+                    disabled={isSubmitting}
+                    className={`px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg transition font-medium ${isSubmitting ? 'opacity-70 cursor-not-allowed' : ''}`}
+                  >
+                    {isSubmitting ? 'Processing...' : 'Create Product'}
+                  </button>
                 </div>
               </form>
             )}
@@ -852,10 +911,49 @@ export default function Products() {
                     </select>
                   </div>
                 </div>
+
+                {/* Image/Media uploader for the variant form */}
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">Variant Media (Images/Videos)</label>
+                  <input 
+                    type="file" 
+                    multiple 
+                    accept="image/*,video/*"
+                    onChange={handleImageUpload} 
+                    className="w-full text-sm text-slate-500 dark:text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-teal-50 file:text-teal-700 hover:file:bg-teal-100 dark:file:bg-teal-900/30 dark:file:text-teal-400 border border-slate-300 dark:border-gray-700 rounded-lg p-2"
+                  />
+                  
+                  {/* Media Preview Grid */}
+                  {formData.images && formData.images.length > 0 && (
+                    <div className="mt-3 flex gap-3 overflow-x-auto pb-2">
+                      {formData.images.map((mediaUrl, idx) => (
+                        <div key={idx} className="relative group shrink-0">
+                          {(mediaUrl.startsWith('data:video') || isVideo(mediaUrl)) ? (
+                            <video src={mediaUrl} className="w-16 h-16 object-cover rounded border border-slate-200 dark:border-gray-700" />
+                          ) : (
+                            <img src={mediaUrl} alt={`media-${idx}`} className="w-16 h-16 object-cover rounded border border-slate-200 dark:border-gray-700" />
+                          )}
+                          <button 
+                            type="button" 
+                            onClick={() => removeMedia(idx)} 
+                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition shadow"
+                          >
+                            <X size={12} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 <div className="pt-4 flex gap-3 justify-end">
                   <button type="button" onClick={closeModal} className="px-4 py-2 text-slate-600 dark:text-gray-300 hover:bg-slate-100 dark:hover:bg-gray-800 rounded-lg transition">Cancel</button>
-                  <button type="submit" className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg transition font-medium">
-                    {modalType === "addVariant" ? "Add Variant" : "Save Changes"}
+                  <button 
+                    type="submit" 
+                    disabled={isSubmitting} // Disable while submitting
+                    className={`px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg transition font-medium ${isSubmitting ? 'opacity-70 cursor-not-allowed' : ''}`}
+                  >
+                    {isSubmitting ? 'Processing...' : (modalType === "addVariant" ? "Add Variant" : "Save Changes")}
                   </button>
                 </div>
               </form>
