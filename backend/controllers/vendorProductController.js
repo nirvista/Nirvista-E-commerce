@@ -6,11 +6,11 @@
  * their own products.
  *
  * Routes (mounted under /api/vendor):
- *   GET    /products
- *   POST   /products
- *   PUT    /products/:productId
- *   PATCH  /products/:productId/status
- *   POST   /products/:productId/images
+ * GET    /products
+ * POST   /products
+ * PUT    /products/:productId
+ * PATCH  /products/:productId/status
+ * POST   /products/:productId/images
  */
 
 import { Op } from "sequelize";
@@ -18,6 +18,37 @@ import Product from "../models/productModel.js";
 import ProductVariant from "../models/variantModel.js";
 import Tag from "../models/tagModel.js";
 import { success, created, notFound, badRequest, serverError } from "../utils/responseMessages.js";
+import { v2 as cloudinary } from 'cloudinary';
+
+// ── Cloudinary Configuration & Helper ─────────────────────────────────────────
+cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET
+});
+
+const uploadMedia = async (mediaArray) => {
+    if (!mediaArray || !Array.isArray(mediaArray)) return [];
+    const uploadedUrls = [];
+    for (const file of mediaArray) {
+        // If it's already a web URL, keep it without re-uploading
+        if (file.startsWith("http://") || file.startsWith("https://")) {
+            uploadedUrls.push(file);
+        } else {
+            try {
+                const result = await cloudinary.uploader.upload(file, {
+                    resource_type: "auto", // Automatically detects image or video
+                    folder: "ecommerce_media"
+                });
+                uploadedUrls.push(result.secure_url);
+            } catch (err) {
+                console.error("Cloudinary upload error:", err);
+                throw new Error("Failed to upload media to Cloudinary");
+            }
+        }
+    }
+    return uploadedUrls;
+};
 
 // ── Shared include helpers ────────────────────────────────────────────────────
 const variantInclude = {
@@ -252,8 +283,10 @@ export const updateVendorProductStatus = async (req, res) => {
     }
 };
 
+// ─────────────────────────────────────────────────────────────────────────────
 // POST /api/vendor/products/:productId/images
-// Attach external image URLs to a specific variant.
+// Attach external image URLs or upload base64 media to a specific variant.
+// ─────────────────────────────────────────────────────────────────────────────
 export const addVariantImageUrls = async (req, res) => {
     try {
         const vendorId = req.user.id;
@@ -265,21 +298,7 @@ export const addVariantImageUrls = async (req, res) => {
         }
 
         if (!Array.isArray(imageUrls) || imageUrls.length === 0) {
-            return badRequest(res, "imageUrls must be a non-empty array of strings");
-        }
-
-        // Validate URLs to prevent bad data
-        const isValidUrl = (url) => {
-            try {
-                new URL(url);
-                return true;
-            } catch (err) {
-                return false;
-            }
-        };
-
-        if (!imageUrls.every(isValidUrl)) {
-            return badRequest(res, "One or more image URLs are invalid");
+            return badRequest(res, "imageUrls must be a non-empty array of strings or base64 data");
         }
 
         // Ownership check
@@ -297,13 +316,16 @@ export const addVariantImageUrls = async (req, res) => {
             return notFound(res, "Variant not found for this product");
         }
 
+        // Upload media to Cloudinary (handles both raw URLs and base64 strings)
+        const uploadedUrls = await uploadMedia(imageUrls);
+
         // Append new URLs to the existing images array
         const existingImages = variant.images || [];
-        await variant.update({ images: [...existingImages, ...imageUrls] });
+        await variant.update({ images: [...existingImages, ...uploadedUrls] });
 
-        success(res, { variantId, images: variant.images }, "Image URLs successfully added to variant");
+        success(res, { variantId, images: variant.images }, "Media successfully added to variant");
     } catch (error) {
         console.error("[addVariantImageUrls]", error);
-        serverError(res, "Failed to add image URLs");
+        serverError(res, "Failed to add media");
     }
 };
