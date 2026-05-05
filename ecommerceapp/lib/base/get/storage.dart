@@ -10,6 +10,18 @@ String keyIsFirst = "keyIsFirst";
 String keyCurrentUser = "keyCurrentUser";
 String keySearchHistory = "keyUserSearchHistory";
 String keyWishlistProducts = "keyWishlistProducts";
+String keyAccessToken = "keyAccessToken";
+String keyRefreshToken = "keyRefreshToken";
+String keyCurrentUserNew = "keyCurrentUserNew";
+
+void setAccessToken(String val) => setData(keyAccessToken, val);
+String? getAccessToken() => getString(keyAccessToken);
+
+void setRefreshToken(String val) => setData(keyRefreshToken, val);
+String? getRefreshToken() => getString(keyRefreshToken);
+
+void setCurrentUserNew(Map<String, dynamic>? val) =>
+    setData(keyCurrentUserNew, val);
 
 void setData(String key, dynamic value) => GetStorage().write(key, value);
 
@@ -53,4 +65,17 @@ WooCustomer? get getCurrentCustomer {
     return WooCustomer.fromJson(json.decode(getVal));
   }
   return getVal;
+}
+Map<String, dynamic>? getCurrentUserNew() {
+  dynamic getVal = getData(keyCurrentUserNew);
+  if (getVal != null) {
+    return Map<String, dynamic>.from(getVal);
+  }
+  return null;
+}
+void clearUserData() {
+  clearKey(keyAccessToken);
+  clearKey(keyRefreshToken);
+  clearKey(keyCurrentUserNew);
+  clearKey(keyLoggedIn);
 }

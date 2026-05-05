@@ -16,9 +16,9 @@ class DataFile {
     List<ModelBottomNav> bottomList = [];
 
     bottomList.add(ModelBottomNav("Home", "home.svg", "home_selected.svg"));
-    // bottomList.add(ModelBottomNav("Category", "home.svg", "home_selected.svg"));
-    bottomList
-        .add(ModelBottomNav("Search", "search.svg", "search_selected.svg"));
+    bottomList.add(ModelBottomNav("Categories", "category.svg", "category_selected.svg"));
+    // bottomList
+    //     .add(ModelBottomNav("Search", "search.svg", "search_selected.svg"));
     bottomList.add(
         ModelBottomNav("Cart", "bag.svg", "bag_filled.svg"));
     bottomList.add(ModelBottomNav("Heart", "bottom_nav_fav.svg", "heart_selected.svg"));
@@ -67,12 +67,12 @@ class DataFile {
 
   static List<ModelCategory> getAllCategory(){
     List<ModelCategory> list = [];
-    list.add(ModelCategory("cat1.png", "Cat"));
-    list.add(ModelCategory("cat2.png", "Dog"));
-    list.add(ModelCategory("cat3.png", "Perrot"));
-    list.add(ModelCategory("cat4.png", "Rabbit"));
-    list.add(ModelCategory("cat1.png", "Fish"));
-    list.add(ModelCategory("cat1.png", "Turtle"));
+    list.add(ModelCategory("cat1.png", "Mens"));
+    list.add(ModelCategory("cat2.png", "Womens"));
+    list.add(ModelCategory("cat3.png", "Kids"));
+    list.add(ModelCategory("cat4.png", "Electronics"));
+    list.add(ModelCategory("cat1.png", "Accessories"));
+    list.add(ModelCategory("cat1.png", "Home & Furniture"));
     return list;
   }
 
@@ -129,9 +129,8 @@ class DataFile {
 
   static List<ModelPaymentMtd> getAllPaymentMthList(){
     List<ModelPaymentMtd> list = [];
-    list.add(ModelPaymentMtd("paypal.svg", "Paypal",num: "XXXX XXXX XXXX 2563"));
+    list.add(ModelPaymentMtd("card.svg", "Razorpay (Online)"));
     list.add(ModelPaymentMtd("money.svg", "Cash On Delivery",));
-    list.add(ModelPaymentMtd("Stripe.svg", "Stripe",));
     return list;
   }
   
@@ -154,4 +153,5 @@ class DataFile {
     return list;
   }
 
+  // Dummy product methods have been removed. Use the new API service classes instead.
 }

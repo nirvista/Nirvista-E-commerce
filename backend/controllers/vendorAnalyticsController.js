@@ -73,16 +73,16 @@ export const getVendorSalesAnalytics = async (req, res) => {
         const [totals] = await sequelize.query(
             `
             SELECT
-                COUNT(DISTINCT oi."orderId")                          AS "orderCount",
-                SUM(oi."quantity")                                    AS "unitsSold",
-                SUM(oi."priceAtPurchase" * oi."quantity")             AS "totalRevenue",
+                COUNT(DISTINCT "OrderItem"."orderId")                          AS "orderCount",
+                SUM("OrderItem"."quantity")                                    AS "unitsSold",
+                SUM("OrderItem"."priceAtPurchase" * "OrderItem"."quantity")             AS "totalRevenue",
                 AVG(o."totalAmount")                                   AS "avgOrderValue",
-                SUM(CASE WHEN oi."returnStatus" = 'completed' THEN oi."refundAmount" ELSE 0 END)
+                SUM(CASE WHEN "OrderItem"."returnStatus" = 'completed' THEN "OrderItem"."refundAmount" ELSE 0 END)
                                                                       AS "totalRefunded"
-            FROM "OrderItems" oi
-            JOIN "Orders"   o  ON o."id" = oi."orderId"
-            WHERE oi."vendorId" = :vendorId
-              AND oi."createdAt" >= :startDate
+            FROM "OrderItems" "OrderItem"
+            JOIN "Orders"   o  ON o."id" = "OrderItem"."orderId"
+            WHERE "OrderItem"."vendorId" = :vendorId
+              AND "OrderItem"."createdAt" >= :startDate
               AND o."paymentStatus" IN ('paid', 'refund_initiated', 'refunded')
             `,
             {
@@ -96,13 +96,13 @@ export const getVendorSalesAnalytics = async (req, res) => {
             `
             SELECT
                 ${groupExpr}                                          AS "period",
-                COUNT(DISTINCT oi."orderId")                          AS "orderCount",
-                SUM(oi."quantity")                                    AS "unitsSold",
-                SUM(oi."priceAtPurchase" * oi."quantity")             AS "revenue"
-            FROM "OrderItems" oi
-            JOIN "Orders"   o  ON o."id" = oi."orderId"
-            WHERE oi."vendorId" = :vendorId
-              AND oi."createdAt" >= :startDate
+                COUNT(DISTINCT "OrderItem"."orderId")                          AS "orderCount",
+                SUM("OrderItem"."quantity")                                    AS "unitsSold",
+                SUM("OrderItem"."priceAtPurchase" * "OrderItem"."quantity")             AS "revenue"
+            FROM "OrderItems" "OrderItem"
+            JOIN "Orders"   o  ON o."id" = "OrderItem"."orderId"
+            WHERE "OrderItem"."vendorId" = :vendorId
+              AND "OrderItem"."createdAt" >= :startDate
               AND o."paymentStatus" IN ('paid', 'refund_initiated', 'refunded')
             GROUP BY ${groupExpr}
             ORDER BY ${groupExpr} ASC
@@ -150,18 +150,18 @@ export const getVendorPerformanceAnalytics = async (req, res) => {
             `
             SELECT
                 COUNT(*)                                                      AS "totalItems",
-                COUNT(CASE WHEN oi."fulfillmentStatus" = 'shipped'   THEN 1 END) AS "shippedCount",
-                COUNT(CASE WHEN oi."fulfillmentStatus" = 'delivered' THEN 1 END) AS "deliveredCount",
-                COUNT(CASE WHEN oi."fulfillmentStatus" = 'cancelled' THEN 1 END) AS "cancelledCount",
+                COUNT(CASE WHEN "OrderItem"."fulfillmentStatus" = 'shipped'   THEN 1 END) AS "shippedCount",
+                COUNT(CASE WHEN "OrderItem"."fulfillmentStatus" = 'delivered' THEN 1 END) AS "deliveredCount",
+                COUNT(CASE WHEN "OrderItem"."fulfillmentStatus" = 'cancelled' THEN 1 END) AS "cancelledCount",
                 AVG(
-                    CASE WHEN oi."shippedAt" IS NOT NULL
-                    THEN EXTRACT(EPOCH FROM (oi."shippedAt" - oi."createdAt")) / 3600.0
+                    CASE WHEN "OrderItem"."shippedAt" IS NOT NULL
+                    THEN EXTRACT(EPOCH FROM ("OrderItem"."shippedAt" - "OrderItem"."createdAt")) / 3600.0
                     END
                 )                                                              AS "avgHoursToShip"
-            FROM "OrderItems" oi
-            JOIN "Orders" o ON o."id" = oi."orderId"
-            WHERE oi."vendorId" = :vendorId
-              AND oi."createdAt" >= :startDate
+            FROM "OrderItems" "OrderItem"
+            JOIN "Orders" o ON o."id" = "OrderItem"."orderId"
+            WHERE "OrderItem"."vendorId" = :vendorId
+              AND "OrderItem"."createdAt" >= :startDate
             `,
             { replacements: { vendorId, startDate }, type: QueryTypes.SELECT }
         );
@@ -171,13 +171,13 @@ export const getVendorPerformanceAnalytics = async (req, res) => {
             `
             SELECT
                 COUNT(*)                                                    AS "totalItems",
-                COUNT(CASE WHEN oi."returnStatus" != 'none' THEN 1 END)    AS "returnRequests",
-                COUNT(CASE WHEN oi."returnStatus" = 'completed' THEN 1 END) AS "completedReturns",
-                SUM(CASE WHEN oi."returnStatus" = 'completed' THEN oi."refundAmount" ELSE 0 END)
+                COUNT(CASE WHEN "OrderItem"."returnStatus" != 'none' THEN 1 END)    AS "returnRequests",
+                COUNT(CASE WHEN "OrderItem"."returnStatus" = 'completed' THEN 1 END) AS "completedReturns",
+                SUM(CASE WHEN "OrderItem"."returnStatus" = 'completed' THEN "OrderItem"."refundAmount" ELSE 0 END)
                                                                             AS "totalRefunded"
-            FROM "OrderItems" oi
-            WHERE oi."vendorId" = :vendorId
-              AND oi."createdAt" >= :startDate
+            FROM "OrderItems" "OrderItem"
+            WHERE "OrderItem"."vendorId" = :vendorId
+              AND "OrderItem"."createdAt" >= :startDate
             `,
             { replacements: { vendorId, startDate }, type: QueryTypes.SELECT }
         );
@@ -244,8 +244,8 @@ export const getVendorTopProducts = async (req, res) => {
         const startDate = resolveTimeframe(timeframe);
 
         const orderExpr = metric === "revenue"
-            ? `SUM(oi."priceAtPurchase" * oi."quantity") DESC`
-            : `SUM(oi."quantity") DESC`;
+            ? `SUM("OrderItem"."priceAtPurchase" * "OrderItem"."quantity") DESC`
+            : `SUM("OrderItem"."quantity") DESC`;
 
         const topProducts = await sequelize.query(
             `
@@ -257,15 +257,15 @@ export const getVendorTopProducts = async (req, res) => {
                 pv."variantName"                                        AS "variantName",
                 pv."color"                                              AS "color",
                 pv."size"                                               AS "size",
-                SUM(oi."quantity")                                      AS "unitsSold",
-                SUM(oi."priceAtPurchase" * oi."quantity")              AS "revenue",
-                COUNT(DISTINCT oi."orderId")                            AS "orderCount"
-            FROM "OrderItems"      oi
-            JOIN "Orders"          o   ON o."id"  = oi."orderId"
-            JOIN "Products"        p   ON p."id"  = oi."productId"
-            JOIN "ProductVariants" pv  ON pv."id" = oi."variantId"
-            WHERE oi."vendorId" = :vendorId
-              AND oi."createdAt" >= :startDate
+                SUM("OrderItem"."quantity")                                      AS "unitsSold",
+                SUM("OrderItem"."priceAtPurchase" * "OrderItem"."quantity")              AS "revenue",
+                COUNT(DISTINCT "OrderItem"."orderId")                            AS "orderCount"
+            FROM "OrderItems"      "OrderItem"
+            JOIN "Orders"          o   ON o."id"  = "OrderItem"."orderId"
+            JOIN "Products"        p   ON p."id"  = "OrderItem"."productId"
+            JOIN "ProductVariants" pv  ON pv."id" = "OrderItem"."variantId"
+            WHERE "OrderItem"."vendorId" = :vendorId
+              AND "OrderItem"."createdAt" >= :startDate
               AND o."paymentStatus" IN ('paid', 'refund_initiated', 'refunded')
             GROUP BY p."id", p."title", pv."id", pv."sku", pv."variantName", pv."color", pv."size"
             ORDER BY ${orderExpr}

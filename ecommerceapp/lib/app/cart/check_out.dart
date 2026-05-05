@@ -9,6 +9,7 @@ import 'package:pet_shop/base/data_file.dart';
 import 'package:pet_shop/base/fetch_pixels.dart';
 import 'package:pet_shop/base/get/route_key.dart';
 import 'package:pet_shop/base/widget_utils.dart';
+import 'package:pet_shop/base/get/storage_controller.dart';
 
 class CheckOut extends StatefulWidget {
   const CheckOut({Key? key}) : super(key: key);
@@ -106,7 +107,7 @@ class _CheckOut extends State<CheckOut> {
                   },
                   padding: EdgeInsets.zero,
                   shrinkWrap: true,
-                  itemCount: 3,
+                  itemCount: paymentList.length,
                   separatorBuilder: (BuildContext context, int index) {
                     return Container(
                       color: getCardColor(context),
@@ -120,6 +121,8 @@ class _CheckOut extends State<CheckOut> {
               Builder(builder: (context) {
                 return getButtonFigma(context, getAccentColor(context), true,
                     "Next", Colors.white, () {
+                      final storageController = Get.find<StorageController>();
+                      storageController.selectedPaymentMethod.value = selectedIndex.value == 0 ? "online" : "cod";
                       Constant.sendToNext(context, checkoutCompleteScreenRoute);
                     }, EdgeInsets.symmetric(horizontal: margin, vertical: 15.h));
               },)

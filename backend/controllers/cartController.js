@@ -173,7 +173,7 @@ export const getCartByUserId = async (req, res) => {
                 {
                     model: ProductVariant,
                     as: 'variant',
-                    attributes: ["id", "variantName", "price", "discountPrice", "images"] // Add more fields as needed
+                    attributes: ["id", "variantName", "price", "discountPrice", "images", "color", "size"]
                 }
             ]
         });

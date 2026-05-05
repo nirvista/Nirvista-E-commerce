@@ -1,5 +1,6 @@
 import 'dart:async';
-import 'dart:io';
+import 'dart:io' show Platform, exit;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:currency_formatter/currency_formatter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
@@ -77,28 +78,28 @@ class Constant {
     return completer.future;
   }
 
-  static Color getOrderStatusColor(String status)
-  {
-    switch(status)
-    {
+  static Color getOrderStatusColor(String status) {
+    status = status.toLowerCase();
+    switch (status) {
       case "pending":
-        return "#FBBB00".toColor();
-       case "processing":
-        return "#FBBB00".toColor();
-       case "on-hold":
-        return "#FBBB00".toColor();
-       case "Delivered":
-        return "#04B155".toColor();
-       case "cancelled":
-        return "#FF6565".toColor();
-       case "refunded":
-        return "#FBBB00".toColor();
-       case "failed":
-        return "#FF6565".toColor();
-       case "trash":
-        return "#FBBB00".toColor();
+      case "reserved":
+      case "confirmed":
+      case "processing":
+        return const Color(0xFFF59E0B); // Amber/Orange
+      case "shipped":
+        return const Color(0xFF0D9488); // Teal/Blue-ish
+      case "delivered":
+        return const Color(0xFF22C55E); // Green
+      case "cancelled":
+      case "failed":
+        return const Color(0xFFEF4444); // Red
+      case "return_requested":
+      case "return_initiated":
+      case "returned":
+        return const Color(0xFF6366F1); // Indigo
+      default:
+        return const Color(0xFF6B8680); // Muted Grey
     }
-    return "#FBBB00".toColor();
   }
   static double parseWcPrice(String? price) =>
       (double.tryParse(price ?? "0") ?? 0);
@@ -219,17 +220,17 @@ class Constant {
   static formatTime(Duration d) =>
       d.toString().split('.').first.padLeft(8, "0");
 
-  static closeApp() {
-    // Get.close(times)close();
+  static void closeApp() {
     Future.delayed(const Duration(milliseconds: 1000), () {
-      // exit(0);
+      if (kIsWeb) {
+        // Cannot close browser tab easily, maybe navigate to home or show message
+        return;
+      }
       if (Platform.isAndroid) {
         SystemChannels.platform.invokeMethod('SystemNavigator.pop');
       } else {
         exit(0);
       }
-
-      // SystemChannels.platform.invokeMethod('SystemNavigator.pop');
     });
   }
 }

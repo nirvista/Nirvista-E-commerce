@@ -7,8 +7,9 @@ import 'package:pet_shop/base/data_file.dart';
 import 'package:pet_shop/base/fetch_pixels.dart';
 import 'package:pet_shop/base/get/route_key.dart';
 import 'package:pet_shop/base/widget_utils.dart';
-
+import 'package:pet_shop/base/base_scaffold.dart';
 import '../model_ui/model_best_selling_pro.dart';
+
 
 
 class BestSellingList extends StatefulWidget {
@@ -68,7 +69,7 @@ class _BestSellingListState extends State<BestSellingList> {
     double itemHeight = 220.h;
 
     return WillPopScope(
-        child: Scaffold(
+        child: BaseScaffold(
           backgroundColor: getScaffoldColor(context),
           body: Column(
             children: [
@@ -172,8 +173,8 @@ Column buildCommonProductView(BuildContext context, String image, String name, S
               children: [
                 getCustomFont(price, 16, getFontColor(context), 1,
                     fontWeight: FontWeight.w500, txtHeight: 1.28),
-                (isDiscount)?getCustomFont("\$34.00", 16, Colors.red, 1,
-                    fontWeight: FontWeight.w400, txtHeight: 1.28,decoration: TextDecoration.lineThrough):0.h.horizontalSpace,
+                (isDiscount)?getCustomFont("\$34.00", 11, const Color(0xFF4B5563), 1,
+                    fontWeight: FontWeight.w400, decoration: TextDecoration.lineThrough, decorationColor: const Color(0xFF4B5563), decorationThickness: 1.2, txtHeight: 1.4):0.h.horizontalSpace,
               ],
             ),
           ),

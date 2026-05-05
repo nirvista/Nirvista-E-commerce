@@ -6,11 +6,14 @@ import 'package:pet_shop/base/get/payment_controller.dart';
 import 'package:pet_shop/base/get/product_data.dart';
 import 'package:pet_shop/base/get/register_data_controller.dart';
 import 'package:pet_shop/base/get/search_controller.dart';
+import 'package:pet_shop/base/get/wishlist_controller.dart';
+
 
 import 'cart_contr/shipping_add_controller.dart';
 import 'image_controller.dart';
 import 'login_data_controller.dart';
 import 'storage_controller.dart';
+
 
 class StoreBinding implements Bindings {
   @override
@@ -24,6 +27,7 @@ class StoreBinding implements Bindings {
 
     Get.lazyPut(() => BottomItemSelectionController());
     Get.lazyPut(() => StorageController());
+    Get.lazyPut(() => WishlistController());
     Get.lazyPut(() => LoginDataController());
     Get.lazyPut(() => RegisterDataController());
     Get.lazyPut(() => ShippingAddressController());

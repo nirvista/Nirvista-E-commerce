@@ -58,7 +58,7 @@ class _CouponsScreen extends State<CouponsScreen> {
                 child: ListView.builder(
                   padding: EdgeInsets.zero,
                   shrinkWrap: true,
-                  itemCount: 3,
+                  itemCount: couponsList.length,
                   itemBuilder: (context, index) {
                     // RetrieveCoupon coupon =
                     // productDataController.couponsList[index];

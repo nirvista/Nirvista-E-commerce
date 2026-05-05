@@ -42,20 +42,20 @@ class ModelReviewProduct {
   Links? links;
 
   factory ModelReviewProduct.fromJson(Map<String, dynamic> json) => ModelReviewProduct(
-    id: json["id"],
-    dateCreated: json["date_created"],
-    dateCreatedGmt: json["date_created_gmt"],
-    productId: json["product_id"],
-    productName: json["product_name"],
-    productPermalink: json["product_permalink"],
-    status: json["status"],
-    reviewer: json["reviewer"],
-    reviewerEmail: json["reviewer_email"],
-    review: json["review"],
-    rating: json["rating"],
+    id: json["id"] != null ? (json["id"] is num ? (json["id"] as num).toInt() : int.tryParse(json["id"].toString())) : null,
+    dateCreated: json["date_created"]?.toString(),
+    dateCreatedGmt: json["date_created_gmt"]?.toString(),
+    productId: json["product_id"] != null ? (json["product_id"] is num ? (json["product_id"] as num).toInt() : int.tryParse(json["product_id"].toString())) : null,
+    productName: json["product_name"]?.toString(),
+    productPermalink: json["product_permalink"]?.toString(),
+    status: json["status"]?.toString(),
+    reviewer: json["reviewer"]?.toString(),
+    reviewerEmail: json["reviewer_email"]?.toString(),
+    review: json["review"]?.toString(),
+    rating: json["rating"] != null ? (json["rating"] is num ? (json["rating"] as num).toInt() : int.tryParse(json["rating"].toString())) : null,
     verified: json["verified"],
-    reviewerAvatarUrls: Map.from(json["reviewer_avatar_urls"]).map((k, v) => MapEntry<String, String>(k, v)),
-    links: Links.fromJson(json["_links"]),
+    reviewerAvatarUrls: json["reviewer_avatar_urls"] != null ? Map.from(json["reviewer_avatar_urls"]).map((k, v) => MapEntry<String, String>(k, v.toString())) : null,
+    links: json["_links"] != null ? Links.fromJson(json["_links"]) : null,
   );
 
   Map<String, dynamic> toJson() => {

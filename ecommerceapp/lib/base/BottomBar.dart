@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'package:pet_shop/base/fetch_pixels.dart';
 
 class BottomBar extends StatelessWidget {
+  
 
   const BottomBar({
     Key? key,

@@ -7,12 +7,12 @@ import 'package:pet_shop/base/constant.dart';
 import 'package:pet_shop/base/widget_utils.dart';
 
 class CheckOutSlider extends StatefulWidget {
-  double itemSize;
-  List<String> icons;
-  List<String> filledIcons;
-  int currentPos;
-  Color completeColor;
-  Color currentColor;
+  final double itemSize;
+  final List<String> icons;
+  final List<String> filledIcons;
+  final int currentPos;
+  final Color completeColor;
+  final Color currentColor;
 
   CheckOutSlider(
       {Key? key, this.itemSize = 20,

@@ -5,12 +5,21 @@ import '../../app/model/woo_payment_gateway.dart';
 import '../../woocommerce/model/cart_item.dart';
 import '../../woocommerce/model/product_variation.dart';
 import '../../woocommerce/model/products.dart';
+import '../../app/model_ui/model_dummy_product.dart';
+import '../../app/model/api_models.dart';
 
 class StorageController extends GetxController {
   WooProduct? selectedProduct;
+  DummyProduct? selectedDummyProduct;
+  ProductModel? selectedProductModel;
   RxInt currentQuantity=1.obs;
-  Rx<WooProductVariation?> variationModel = (null).obs;
-  Rx<WooCartItem?> wooCartItem=(null).obs;
+  final variationModel = Rxn<WooProductVariation>();
+  final wooCartItem = Rxn<WooCartItem>();
+  RxString selectedCategory = "for_you".obs;
+  RxString selectedCategoryName = "".obs;
+  RxString selectedColor = "".obs;
+  RxString selectedSize = "".obs;
+  RxString selectedPaymentMethod = "online".obs;
 
   // WooCartItem? wooCartItem;
 
@@ -73,5 +82,50 @@ class StorageController extends GetxController {
       });
       print("getsize===${attributeList.length}");
     }
+  }
+
+  setSelectedDummyProduct(DummyProduct product) {
+    selectedDummyProduct = product;
+    if (product.colors.isNotEmpty) {
+      selectedColor.value = product.colors[0];
+    }
+    if (product.sizes.isNotEmpty) {
+      selectedSize.value = product.sizes[0];
+    }
+    update();
+  }
+
+  setSelectedCategory(String category) {
+    selectedCategory.value = category;
+    update();
+  }
+
+  setSelectedCategoryName(String name) {
+    selectedCategoryName.value = name;
+    update();
+  }
+
+  setSelectedProductModel(ProductModel product) {
+    selectedProductModel = product;
+    // Reset selection first
+    selectedColor.value = "";
+    selectedSize.value = "";
+    
+    if (product.variants.isNotEmpty) {
+       var v = product.variants.first;
+       if (v.color != null) selectedColor.value = v.color!;
+       if (v.size != null) selectedSize.value = v.size!;
+    }
+    update();
+  }
+
+  setSelectedColor(String color) {
+    selectedColor.value = color;
+    update();
+  }
+
+  setSelectedSize(String size) {
+    selectedSize.value = size;
+    update();
   }
 }

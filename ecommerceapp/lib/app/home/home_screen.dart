@@ -8,6 +8,7 @@ import 'package:pet_shop/app/home/tabs/tab_favourite.dart';
 import 'package:pet_shop/app/home/tabs/tab_home.dart';
 import 'package:pet_shop/app/home/tabs/tab_profile.dart';
 import 'package:pet_shop/app/home/tabs/tab_search.dart';
+import 'package:pet_shop/app/lists/category_screen.dart';
 
 import '../../base/BottomBar.dart';
 import '../../base/color_data.dart';
@@ -64,8 +65,8 @@ class _HomeScreen extends State<HomeScreen> {
 
   List<Widget> bottomViewList = [
     TabHome(),
-    // TabCategory(),
-    TabSearch(),
+    CategoryScreen(),
+    // TabSearch(showBack: false),
     TabCart(),
     TabFavourite(),
     TabProfile(),
@@ -90,12 +91,16 @@ class _HomeScreen extends State<HomeScreen> {
             decoration: ShapeDecoration(
                 shadows: const [
                   BoxShadow(
-                      color: Color.fromRGBO(133, 126, 150, 0.12999999523162842),
+                      color: Color.fromRGBO(13, 148, 136, 0.10),
                       offset: Offset(0, -4),
-                      blurRadius: 27)
+                      blurRadius: 24)
                 ],
-                color: getCardColor(context),
+                color: Colors.white,
                 shape: SmoothRectangleBorder(
+                    side: const BorderSide(
+                      color: Color(0xFFE2EAE8), // _kBorder teal
+                      width: 1,
+                    ),
                     borderRadius: SmoothBorderRadius.vertical(
                         top: SmoothRadius(
                             cornerRadius: 40.h, cornerSmoothing: 0.5)))),
@@ -104,25 +109,19 @@ class _HomeScreen extends State<HomeScreen> {
                     controller.changePos(p0);
                   },
                   currentIndex: controller.bottomBarSelectedItem.value,
-                  selectedItemColor: getAccentColor(context),
+                  selectedItemColor: const Color(0xFF0D9488), // _kTeal
                   selectedColorOpacity: 1,
-                  unselectedItemColor: getFontBlackColor(context),
+                  unselectedItemColor: const Color(0xFF6B8680), // _kTextMuted
                   itemShape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.all(Radius.circular(27.h))),
                   itemPadding:
                       EdgeInsets.symmetric(horizontal: 11.w, vertical: 8.h),
                   items: List.generate(allBottomNavList.length, (index) {
                     return BottomBarItem(
-                        // title: getCustomFont(
-                        //     allBottomNavList[index].title,
-                        //     14,
-                        //     Colors.white,
-                        //     1,
-                        //     fontWeight: FontWeight.w700),
                         icon: getSvgImageWithSize(
                             context, allBottomNavList[index].icon, 24.h, 24.h,
                             fit: BoxFit.scaleDown,
-                            color: getFontBlackColor(context)),
+                            color: const Color(0xFF6B8680)),
                         activeIcon: getSvgImageWithSize(context,
                             allBottomNavList[index].activeIcon, 24.h, 24.h,
                             fit: BoxFit.scaleDown, color: Colors.white));

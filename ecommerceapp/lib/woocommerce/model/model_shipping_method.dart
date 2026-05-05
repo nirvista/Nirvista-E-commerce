@@ -2,7 +2,6 @@
 import 'dart:convert';
 
 
-import 'dart:convert';
 
 List<ModelShippingMethod> modelShippingMethodFromJson(String str) => List<ModelShippingMethod>.from(json.decode(str).map((x) => ModelShippingMethod.fromJson(x)));
 
@@ -34,16 +33,16 @@ class ModelShippingMethod {
   Links? links;
 
   factory ModelShippingMethod.fromJson(Map<String, dynamic> json) => ModelShippingMethod(
-    id: json["id"],
-    instanceId: json["instance_id"],
-    title: json["title"],
-    order: json["order"],
+    id: json["id"] is int ? json["id"] : int.tryParse(json["id"]?.toString() ?? ''),
+    instanceId: json["instance_id"] is int ? json["instance_id"] : int.tryParse(json["instance_id"]?.toString() ?? ''),
+    title: json["title"]?.toString(),
+    order: json["order"] is int ? json["order"] : int.tryParse(json["order"]?.toString() ?? ''),
     enabled: json["enabled"],
-    methodId: json["method_id"],
-    methodTitle: json["method_title"],
-    methodDescription: json["method_description"],
-    settings: Settings.fromJson(json["settings"]),
-    links: Links.fromJson(json["_links"]),
+    methodId: json["method_id"]?.toString(),
+    methodTitle: json["method_title"]?.toString(),
+    methodDescription: json["method_description"]?.toString(),
+    settings: json["settings"] != null ? Settings.fromJson(json["settings"]) : null,
+    links: json["_links"] != null ? Links.fromJson(json["_links"]) : null,
   );
 
   Map<String, dynamic> toJson() => {
@@ -55,8 +54,8 @@ class ModelShippingMethod {
     "method_id": methodId,
     "method_title": methodTitle,
     "method_description": methodDescription,
-    "settings": settings!.toJson(),
-    "_links": links!.toJson(),
+    "settings": settings?.toJson(),
+    "_links": links?.toJson(),
   };
 }
 
@@ -72,9 +71,9 @@ class Links {
   List<Collection>? describes;
 
   factory Links.fromJson(Map<String, dynamic> json) => Links(
-    self: List<Collection>.from(json["self"].map((x) => Collection.fromJson(x))),
-    collection: List<Collection>.from(json["collection"].map((x) => Collection.fromJson(x))),
-    describes: List<Collection>.from(json["describes"].map((x) => Collection.fromJson(x))),
+    self: json["self"] != null ? List<Collection>.from(json["self"].map((x) => Collection.fromJson(x))) : [],
+    collection: json["collection"] != null ? List<Collection>.from(json["collection"].map((x) => Collection.fromJson(x))) : [],
+    describes: json["describes"] != null ? List<Collection>.from(json["describes"].map((x) => Collection.fromJson(x))) : [],
   );
 
   Map<String, dynamic> toJson() => {
@@ -92,7 +91,7 @@ class Collection {
   String? href;
 
   factory Collection.fromJson(Map<String, dynamic> json) => Collection(
-    href: json["href"],
+    href: json["href"]?.toString(),
   );
 
   Map<String, dynamic> toJson() => {
@@ -112,15 +111,15 @@ class Settings {
   Cost? cost;
 
   factory Settings.fromJson(Map<String, dynamic> json) => Settings(
-    title: Cost.fromJson(json["title"]),
-    taxStatus: Cost.fromJson(json["tax_status"]),
-    cost: Cost.fromJson(json["cost"]),
+    title: json["title"] != null ? Cost.fromJson(json["title"]) : null,
+    taxStatus: json["tax_status"] != null ? Cost.fromJson(json["tax_status"]) : null,
+    cost: json["cost"] != null ? Cost.fromJson(json["cost"]) : null,
   );
 
   Map<String, dynamic> toJson() => {
-    "title": title!.toJson(),
-    "tax_status": taxStatus!.toJson(),
-    "cost": cost!.toJson(),
+    "title": title?.toJson(),
+    "tax_status": taxStatus?.toJson(),
+    "cost": cost?.toJson(),
   };
 }
 
@@ -148,14 +147,14 @@ class Cost {
   Options? options;
 
   factory Cost.fromJson(Map<String, dynamic> json) => Cost(
-    id: json["id"],
-    label: json["label"],
-    description: json["description"],
-    type: json["type"],
-    value: json["value"],
-    costDefault: json["default"],
-    tip: json["tip"],
-    placeholder: json["placeholder"],
+    id: json["id"]?.toString(),
+    label: json["label"]?.toString(),
+    description: json["description"]?.toString(),
+    type: json["type"]?.toString(),
+    value: json["value"]?.toString(),
+    costDefault: json["default"]?.toString(),
+    tip: json["tip"]?.toString(),
+    placeholder: json["placeholder"]?.toString(),
     options: json["options"] == null ? null : Options.fromJson(json["options"]),
   );
 

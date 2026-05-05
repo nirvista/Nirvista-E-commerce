@@ -24,11 +24,14 @@ import 'package:pet_shop/app/login/verification_screen.dart';
 import 'package:pet_shop/app/order/my_order.dart';
 import 'package:pet_shop/app/order/track_order.dart';
 import 'package:pet_shop/app/payment_mtd/payment_method_screen.dart';
+import 'package:pet_shop/app/profile/customer_care_screen.dart';
 import 'package:pet_shop/app/profile/edit_profile.dart';
 import 'package:pet_shop/app/profile/more_screen.dart';
 import 'package:pet_shop/app/profile/my_favourite.dart';
 import 'package:pet_shop/app/profile/my_profile_screen.dart';
-import 'package:pet_shop/base/payment.dart';
+import 'package:pet_shop/app/vendor/vendor_dashboard_screen.dart';
+import 'package:pet_shop/app/vendor/vendor_profile_screen.dart';
+import 'package:pet_shop/app/vendor/vendor_approval_screen.dart';
 import 'app/cart/order_confirm_screen.dart';
 import 'app/intro/splash_screen.dart';
 import 'app/lists/blog_datail.dart';
@@ -36,10 +39,13 @@ import 'app/lists/coupons_screen.dart';
 import 'app/login/login_screen.dart';
 import 'app/my_address/edit_address_screen.dart';
 import 'app/my_address/my_address_screen.dart';
+import 'app/lists/category_products_page.dart';
+import 'app/vendor/vendor_dashboard_screen.dart';
 import 'base/get/bottom_selection_controller.dart';
 import 'base/get/cart_contr/cart_controller.dart';
 import 'base/get/cart_contr/shipping_add_controller.dart';
 import 'base/get/home_controller.dart';
+import 'package:pet_shop/base/get/wishlist_controller.dart';
 import 'base/get/image_controller.dart';
 import 'base/get/login_data_controller.dart';
 import 'base/get/search_controller.dart';
@@ -49,32 +55,33 @@ import 'base/get/register_data_controller.dart';
 import 'base/get/route_key.dart';
 import 'base/get/storage_controller.dart';
 import 'base/get/store_binding.dart';
+import 'base/get/order_controller.dart';
 import 'base/my_custom_scroll_behavior.dart';
 import 'generated/l10n.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
 Future<void> init() async {
+  // These are fine as lazyPut — loaded on first access
   Get.lazyPut(() => HomeController());
   Get.lazyPut(() => ProductDataController());
   Get.lazyPut(() => CartController());
   Get.lazyPut(() => PaymentController());
-
-  Get.lazyPut(() => BottomItemSelectionController());
   Get.lazyPut(() => StorageController());
   Get.lazyPut(() => LoginDataController());
   Get.lazyPut(() => RegisterDataController());
   Get.lazyPut(() => ShippingAddressController());
   Get.lazyPut(() => SearchControllers());
   Get.lazyPut(() => ImageController());
-
+  Get.lazyPut(() => GlobalOrderController());
 }
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await dotenv.load(fileName: ".env");
+  await GetStorage.init();
   await init();
 
-  await GetStorage.init();
   // Stripe.publishableKey = Payments.stripPublishKey;
-  // Stripe.merchantIdentifier
-  // Stripe.stripeAccountId
   // Stripe.instance.applySettings();
 
   runApp(const MyApp());
@@ -94,6 +101,14 @@ void configLoading(BuildContext context) {
     ..maskColor = Colors.blue.withOpacity(0.5)
     ..userInteractions = true
     ..dismissOnTap = false;
+}
+
+class GlobalNavController extends GetxController {
+  final RxInt currentIndex = 0.obs;
+
+  void changeIndex(int index) {
+    currentIndex.value = index;
+  }
 }
 
 class MyApp extends StatelessWidget {
@@ -116,10 +131,7 @@ class MyApp extends StatelessWidget {
       initialRoute: "/",
       builder: EasyLoading.init(),
       initialBinding: StoreBinding(),
-
       theme: controller.theme,
-
-
       routes: {
         "/": (context) => const SplashScreen(),
         splashRoute: (context) => const SplashScreen(),
@@ -130,7 +142,7 @@ class MyApp extends StatelessWidget {
         myOrderScreenRoute: (context) => const MyOrder(),
         forgotPassScreenRoute: (context) => const ForgotPasswordScreen(),
         resetPassScreenRoute: (context) => const ResetPasswordScreen(),
-        verificationScreenRoute: (context) => VerificationScreen('',false),
+        verificationScreenRoute: (context) => VerificationScreen('', false),
         newArrivalScreenList: (context) => const NewArrivalList(),
         bestSellingScreenList: (context) => const BestSellingList(),
         productDetailScreenRoute: (context) => const ProductDetailScreen(),
@@ -154,9 +166,13 @@ class MyApp extends StatelessWidget {
         myAddressScreenRoute: (context) => const MyAddressScreen(),
         editAddressScreenRoute: (context) => EditAddressScreen(),
         paymentMethodScreenRoute: (context) => const PaymentMethodScreen(),
+        categoryProductsPageRoute: (context) => const CategoryProductsPage(),
+        customerCareScreenRoute: (context) => const CustomerCareScreen(),
+        vendorDashboardRoute: (context) => const VendorDashboardScreen(),
+        vendorProfileRoute: (context) => const VendorProfileScreen(),
+        vendorApprovalRoute: (context) => const VendorApprovalScreen(),
         // stripPaymentScreenRoute: (context) => NoWebhookPaymentScreen(),
       },
-
     );
   }
 }

@@ -2,17 +2,13 @@
 import 'package:get/get.dart';
 import 'package:pet_shop/app/model/model_banner.dart';
 import 'package:pet_shop/app/model/product_review.dart';
-import 'package:pet_shop/csc_picker/csc_picker.dart';
 import 'package:pet_shop/woocommerce/model/cart.dart';
-import 'package:pet_shop/woocommerce/model/model_shipping_zone_country_location.dart';
-import 'package:pet_shop/woocommerce/model/model_shipping_zones.dart';
 import 'package:pet_shop/woocommerce/model/product_category.dart';
 import 'package:pet_shop/woocommerce/model/woo_get_created_order.dart';
 
 import '../../app/model/woo_payment_gateway.dart';
 import '../../woocommerce/model/products.dart';
 
-import '../pref_data.dart';
 
 class ProductDataController extends GetxController {
   var isDataLoading = false.obs;
@@ -30,7 +26,7 @@ class ProductDataController extends GetxController {
   var isFavouriteLoading = false.obs;
 
   List<WooProduct> productList = [];
-  Rx<WooCart?> myCartList = (null).obs;
+  final myCartList = Rxn<WooCart>();
   List<ModelReviewProduct> productReviewList = [];
   List<WooProduct> flashSaleList = [];
 

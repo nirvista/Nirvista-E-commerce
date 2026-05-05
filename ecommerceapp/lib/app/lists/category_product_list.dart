@@ -15,8 +15,8 @@ import '../../base/get/route_key.dart';
 import '../../base/pref_data.dart';
 
 class CategoryProductList extends StatefulWidget {
-  String? id;
-  String? name;
+  final String? id;
+  final String? name;
 
   CategoryProductList(this.id, this.name, {Key? key}) : super(key: key);
 

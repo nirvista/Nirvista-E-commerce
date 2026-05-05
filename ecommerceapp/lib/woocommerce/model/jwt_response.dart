@@ -56,10 +56,10 @@ class WooJWTResponse {
 
   factory WooJWTResponse.fromJson(Map<String, dynamic> json) => WooJWTResponse(
     success: json["success"],
-    statusCode: json["statusCode"],
-    code: json["code"],
-    message: json["message"],
-    data: Data.fromJson(json["data"]),
+    statusCode: json["statusCode"] is int ? json["statusCode"] : int.tryParse(json["statusCode"]?.toString() ?? ''),
+    code: json["code"]?.toString(),
+    message: json["message"]?.toString(),
+    data: json["data"] != null ? Data.fromJson(json["data"]) : null,
   );
 
   Map<String, dynamic> toJson() => {
@@ -67,7 +67,7 @@ class WooJWTResponse {
     "statusCode": statusCode,
     "code": code,
     "message": message,
-    "data": data!.toJson(),
+    "data": data?.toJson(),
   };
 }
 
@@ -91,13 +91,13 @@ class Data {
   String? displayName;
 
   factory Data.fromJson(Map<String, dynamic> json) => Data(
-    token: json["token"],
-    id: json["id"],
-    email: json["email"],
-    nicename: json["nicename"],
-    firstName: json["firstName"],
-    lastName: json["lastName"],
-    displayName: json["displayName"],
+    token: json["token"]?.toString(),
+    id: json["id"] is int ? json["id"] : int.tryParse(json["id"]?.toString() ?? ''),
+    email: json["email"]?.toString(),
+    nicename: json["nicename"]?.toString(),
+    firstName: json["firstName"]?.toString(),
+    lastName: json["lastName"]?.toString(),
+    displayName: json["displayName"]?.toString(),
   );
 
   Map<String, dynamic> toJson() => {

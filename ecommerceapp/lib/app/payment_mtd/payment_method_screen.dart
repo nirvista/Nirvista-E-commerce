@@ -6,6 +6,7 @@ import 'package:pet_shop/base/widget_utils.dart';
 
 import '../../base/color_data.dart';
 import '../../base/data_file.dart';
+import '../../base/get/storage_controller.dart';
 import '../model_ui/model_payment_method.dart';
 
 class PaymentMethodScreen extends StatefulWidget {
@@ -23,6 +24,17 @@ class _PaymentMethodScreen extends State<PaymentMethodScreen> {
   }
 
   RxInt selectedIndex = (-1).obs;
+  StorageController storageController = Get.find<StorageController>();
+
+  @override
+  void initState() {
+    super.initState();
+    if (storageController.selectedPaymentMethod.value == "online") {
+      selectedIndex.value = 0;
+    } else if (storageController.selectedPaymentMethod.value == "cod") {
+      selectedIndex.value = 1;
+    }
+  }
 
   List<ModelPaymentMtd> paymentList = DataFile.getAllPaymentMthList();
   @override
@@ -90,7 +102,7 @@ class _PaymentMethodScreen extends State<PaymentMethodScreen> {
                   },
                   padding: EdgeInsets.zero,
                   shrinkWrap: true,
-                  itemCount: 3,
+                  itemCount: paymentList.length,
                   separatorBuilder: (BuildContext context, int index) {
                     return Container(
                       color: getCardColor(context),
@@ -102,6 +114,11 @@ class _PaymentMethodScreen extends State<PaymentMethodScreen> {
               ),
               ObxValue((p0) => getButtonFigma(context, (selectedIndex.value < 0)?"#DBEFE8".toColor():getAccentColor(context), true,
                   "Save", Colors.white, () {
+                    if (selectedIndex.value == 0) {
+                      storageController.selectedPaymentMethod.value = "online";
+                    } else if (selectedIndex.value == 1) {
+                      storageController.selectedPaymentMethod.value = "cod";
+                    }
                     backClick();
                   }, EdgeInsets.symmetric(horizontal: 20.h, vertical: 20.h)), selectedIndex)
 
