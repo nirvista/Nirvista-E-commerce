@@ -19,6 +19,11 @@ class LoginDataController extends GetxController {
   }
   void loadCurrentUser() async {
     try {
+      if (!getRememberMe()) {
+        print("Remember me is false, logging out on app start.");
+        logout();
+        return;
+      }
       Map<String, dynamic>? userData = getCurrentUserNew();
       if (userData != null) {
         currentUser.value = User.fromJson(userData);
@@ -63,7 +68,8 @@ class LoginDataController extends GetxController {
       currentUser.value = null;
     }
   }
-  void saveUser(User user, {String? accessToken, String? refreshToken}) {
+  void saveUser(User user,
+      {String? accessToken, String? refreshToken, bool rememberMe = false}) {
     currentUser.value = user;
     setCurrentUserNew(user.toJson());
     if (accessToken != null) {
@@ -73,6 +79,7 @@ class LoginDataController extends GetxController {
       setRefreshToken(refreshToken);
     }
     setLoggedIn(true);
+    setRememberMe(rememberMe);
     update();
   }
   void logout() {

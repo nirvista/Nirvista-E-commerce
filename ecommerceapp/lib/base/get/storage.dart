@@ -13,6 +13,7 @@ String keyWishlistProducts = "keyWishlistProducts";
 String keyAccessToken = "keyAccessToken";
 String keyRefreshToken = "keyRefreshToken";
 String keyCurrentUserNew = "keyCurrentUserNew";
+String keyRememberMe = "keyRememberMe";
 
 void setAccessToken(String val) => setData(keyAccessToken, val);
 String? getAccessToken() => getString(keyAccessToken);
@@ -22,6 +23,9 @@ String? getRefreshToken() => getString(keyRefreshToken);
 
 void setCurrentUserNew(Map<String, dynamic>? val) =>
     setData(keyCurrentUserNew, val);
+
+void setRememberMe(bool val) => setData(keyRememberMe, val);
+bool getRememberMe() => getBool(keyRememberMe) ?? false;
 
 void setData(String key, dynamic value) => GetStorage().write(key, value);
 
@@ -78,4 +82,5 @@ void clearUserData() {
   clearKey(keyRefreshToken);
   clearKey(keyCurrentUserNew);
   clearKey(keyLoggedIn);
+  clearKey(keyRememberMe);
 }

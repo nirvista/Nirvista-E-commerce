@@ -24,7 +24,7 @@ class _LoginScreen extends State<LoginScreen> {
 
   final RxBool showPass = false.obs;
   final RxBool isLoading = false.obs;
-  final RxBool agreeTerm = false.obs;
+  final RxBool rememberMe = false.obs;
 
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passController = TextEditingController();
@@ -239,8 +239,8 @@ class _LoginScreen extends State<LoginScreen> {
                           activeColor: getAccentColor(context),
                           shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(5.r)),
-                          onChanged: (v) => agreeTerm.value = v!,
-                          value: agreeTerm.value,
+                          onChanged: (v) => rememberMe.value = v!,
+                          value: rememberMe.value,
                           materialTapTargetSize:
                               MaterialTapTargetSize.shrinkWrap,
                         ),
@@ -481,7 +481,9 @@ class _LoginScreen extends State<LoginScreen> {
         }
 
         loginController.saveUser(loggedInUser,
-            accessToken: accessToken, refreshToken: refreshToken);
+            accessToken: accessToken,
+            refreshToken: refreshToken,
+            rememberMe: rememberMe.value);
 
         _snack("Login successful");
 

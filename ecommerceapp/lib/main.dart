@@ -127,7 +127,7 @@ class MyApp extends StatelessWidget {
         DefaultWidgetsLocalizations.delegate,
         S.delegate,
       ],
-      title: 'Grocery',
+      title: 'Welcome to Nirvista',
       initialRoute: "/",
       builder: EasyLoading.init(),
       initialBinding: StoreBinding(),
