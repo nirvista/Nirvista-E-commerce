@@ -756,8 +756,11 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
     final lowStock  = _inventorySummary['lowStockCount'] ?? 0;
     final revenue   = _salesAnalytics['summary']?['totalRevenue'] ?? '0.00';
 
+    final w = MediaQuery.of(context).size.width;
+    final pad = w < 600 ? 16.0 : 24.0;
+
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.all(pad),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           Expanded(
@@ -1067,11 +1070,11 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
           const SizedBox(height: 14),
           Row(children: [
             Expanded(child: _MiniStatCard(label: 'Pending',    value: '$pending',    color: _kAmber)),
-            const SizedBox(width: 10),
+            const SizedBox(width: 8),
             Expanded(child: _MiniStatCard(label: 'Processing', value: '$processing', color: _kTeal)),
-            const SizedBox(width: 10),
+            const SizedBox(width: 8),
             Expanded(child: _MiniStatCard(label: 'Shipped',    value: '$shipped',    color: const Color(0xFF6366F1))),
-            const SizedBox(width: 10),
+            const SizedBox(width: 8),
             Expanded(child: _MiniStatCard(label: 'Delivered',  value: '$delivered',  color: _kGreen)),
           ]),
           const SizedBox(height: 12),
@@ -1119,8 +1122,11 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
       'this_year': 'This Year', 'last_12_months': 'Last 12 Months',
     };
 
+    final w = MediaQuery.of(context).size.width;
+    final pad = w < 600 ? 16.0 : 24.0;
+
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.all(pad),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           const Expanded(
@@ -2106,6 +2112,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
     final addr    = order['shippingAddress'] as Map<String, dynamic>? ?? {};
     final items   = order['items'] as List? ?? [];
     final orderId = order['id']?.toString() ?? '';
+    final createdAt = order['createdAt']?.toString() ?? '';
 
     showDialog(
       context: context,
@@ -2122,6 +2129,20 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
               child: ListView(
                 padding: const EdgeInsets.all(20),
                 children: [
+                  const Text('ORDER INFO', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: _kTextMuted, letterSpacing: 1)),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(color: _kBg, borderRadius: BorderRadius.circular(12), border: Border.all(color: _kBorder)),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text('Order ID: $orderId', style: const TextStyle(fontWeight: FontWeight.w700, color: _kText)),
+                      if (createdAt.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text('Date: ${createdAt.length > 10 ? createdAt.substring(0, 10).replaceAll('-', '/') : createdAt}', style: const TextStyle(fontSize: 13, color: _kText)),
+                      ]
+                    ]),
+                  ),
+                  const SizedBox(height: 24),
                   const Text('SHIPPING ADDRESS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: _kTextMuted, letterSpacing: 1)),
                   const SizedBox(height: 8),
                   Container(
@@ -2290,18 +2311,18 @@ class _KpiCard extends StatelessWidget {
   final bool compact;
   @override
   Widget build(BuildContext context) => Container(
-    padding: EdgeInsets.all(compact ? 14 : 18),
+    padding: EdgeInsets.all(compact ? 12 : 16),
     decoration: BoxDecoration(
       color: _kCard, borderRadius: BorderRadius.circular(16), border: Border.all(color: _kBorder),
       boxShadow: [BoxShadow(color: data.color.withOpacity(0.06), blurRadius: 12, offset: const Offset(0, 4))],
     ),
     child: Row(children: [
-      Container(width: 48, height: 48, decoration: BoxDecoration(color: data.bgColor, borderRadius: BorderRadius.circular(14)), child: Icon(data.icon, color: data.color, size: 22)),
-      const SizedBox(width: 14),
+      Container(width: 44, height: 44, decoration: BoxDecoration(color: data.bgColor, borderRadius: BorderRadius.circular(14)), child: Icon(data.icon, color: data.color, size: 20)),
+      const SizedBox(width: 12),
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(data.label, style: const TextStyle(color: _kTextMuted, fontSize: 12, fontWeight: FontWeight.w500)),
+        FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Text(data.label, style: const TextStyle(color: _kTextMuted, fontSize: 12, fontWeight: FontWeight.w500))),
         const SizedBox(height: 3),
-        Text(data.value, style: TextStyle(fontSize: compact ? 18 : 20, fontWeight: FontWeight.w800, color: _kText), overflow: TextOverflow.ellipsis),
+        FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Text(data.value, style: TextStyle(fontSize: compact ? 18 : 20, fontWeight: FontWeight.w800, color: _kText))),
       ])),
     ]),
   );
@@ -2313,11 +2334,12 @@ class _MiniStatCard extends StatelessWidget {
   final Color color;
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
+    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
     decoration: BoxDecoration(color: color.withOpacity(0.08), borderRadius: BorderRadius.circular(12), border: Border.all(color: color.withOpacity(0.2))),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(value, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: color)),
-      Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: _kTextMuted)),
+      FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Text(value, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: color))),
+      const SizedBox(height: 2),
+      FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: _kTextMuted))),
     ]),
   );
 }
@@ -2337,9 +2359,9 @@ class _AnalyticsGrid extends StatelessWidget {
           decoration: BoxDecoration(color: _kCard, borderRadius: BorderRadius.circular(14), border: Border.all(color: _kBorder),
               boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 6, offset: const Offset(0, 2))]),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(item.label, style: const TextStyle(color: _kTextMuted, fontSize: 11, fontWeight: FontWeight.w500)),
+            FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Text(item.label, style: const TextStyle(color: _kTextMuted, fontSize: 11, fontWeight: FontWeight.w500))),
             const SizedBox(height: 6),
-            Text(item.value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: _kText)),
+            FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Text(item.value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: _kText))),
           ]),
         )),
     ]);
@@ -2738,35 +2760,39 @@ class _OrderRowCard extends StatelessWidget {
     final items     = order['items'] as List? ?? [];
     double total    = 0;
     for (final i in items) { total += (double.tryParse(i['priceAtPurchase']?.toString() ?? '0') ?? 0) * (i['quantity'] ?? 1); }
-    final createdAt = order['createdAt']?.toString() ?? '';
+    
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(color: _kCard, borderRadius: BorderRadius.circular(14), border: Border.all(color: _kBorder),
           boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 6, offset: const Offset(0, 2))]),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        child: Row(children: [
-          Container(width: 44, height: 44, decoration: BoxDecoration(color: _kTealLight, borderRadius: BorderRadius.circular(12)), child: const Icon(Icons.receipt_long_rounded, color: _kTeal, size: 20)),
-          const SizedBox(width: 14),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('#${orderId.length > 8 ? orderId.substring(0, 8) : orderId}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: _kText)),
-            const SizedBox(height: 3),
-            Row(children: [
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Container(width: 44, height: 44, decoration: BoxDecoration(color: _kTealLight, borderRadius: BorderRadius.circular(12)), child: const Icon(Icons.receipt_long_rounded, color: _kTeal, size: 20)),
+            const SizedBox(width: 14),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('#${orderId.length > 8 ? orderId.substring(0, 8) : orderId}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: _kText)),
+              const SizedBox(height: 3),
               Container(padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3), decoration: BoxDecoration(color: _statusBg(statusText), borderRadius: BorderRadius.circular(6)),
                   child: Text(statusText.toUpperCase(), style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: _statusColor(statusText)))),
-              if (createdAt.isNotEmpty) ...[const SizedBox(width: 8), Text(createdAt.length > 10 ? createdAt.substring(0, 10).replaceAll('-', '/') : createdAt, style: const TextStyle(color: _kTextMuted, fontSize: 11))],
+            ])),
+            Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+              Text('₹${total.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: _kTeal)),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                alignment: WrapAlignment.end,
+                children: [
+                  _OutlineBtn(label: 'Detail', onPressed: onViewDetail, compact: true),
+                  _TealButton(label: 'Fulfill', icon: Icons.local_shipping_rounded, onPressed: onFulfillment, compact: true),
+                ],
+              ),
             ]),
-          ])),
-          Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-            Text('₹${total.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: _kTeal)),
-            const SizedBox(height: 6),
-            Row(children: [
-              _OutlineBtn(label: 'Detail', onPressed: onViewDetail, compact: true),
-              const SizedBox(width: 6),
-              _TealButton(label: 'Fulfill', icon: Icons.local_shipping_rounded, onPressed: onFulfillment, compact: true),
-            ]),
-          ]),
-        ]),
+          ],
+        ),
       ),
     );
   }
