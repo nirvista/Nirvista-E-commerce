@@ -13,7 +13,6 @@ import 'package:pet_shop/base/widget_utils.dart';
 import 'package:pet_shop/services/product_api.dart';
 import 'package:pet_shop/services/brand_api.dart';
 import 'package:pet_shop/services/category_api.dart';
-import 'package:pet_shop/services/enrichment_service.dart';
 import 'package:pet_shop/app/model/api_models.dart';
 
 // ─────────────────────────────────────────────
@@ -224,8 +223,6 @@ class _TabSearchState extends State<TabSearch> {
 
         final List<ProductModel> parsedResults =
             productList.map((e) => ProductModel.fromJson(e as Map<String, dynamic>)).toList();
-
-        await EnrichmentService.enrichProducts(parsedResults);
 
         // Only strip completely empty placeholder entries.
         parsedResults.removeWhere(

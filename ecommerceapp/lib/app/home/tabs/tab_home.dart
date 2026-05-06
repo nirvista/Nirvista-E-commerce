@@ -13,7 +13,6 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:pet_shop/services/product_api.dart';
 import 'package:pet_shop/services/brand_api.dart';
 import 'package:pet_shop/services/category_api.dart';
-import 'package:pet_shop/services/enrichment_service.dart';
 
 import '../../../base/get/bottom_selection_controller.dart';
 import '../../../base/get/home_controller.dart';
@@ -138,10 +137,6 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
 
       // 3. Proactively fetch user address if missing
       shippingController.fetchAddresses();
-
-      // 4. Apply background enrichment to fix potential lightweight API data (images/prices)
-      await _enrichHomeSections();
-
     } catch (e) {
       print("Error refreshing sections: $e");
     } finally {
@@ -149,33 +144,7 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
     }
   }
 
-  Future<void> _enrichHomeSections() async {
-    // Enrich the lists we already have, PLUS the master pool to catch undiscovered deals
-    await Future.wait([
-      EnrichmentService.enrichProducts(bestSellingList),
-      EnrichmentService.enrichProducts(topDealsList),
-      EnrichmentService.enrichProducts(popularPicksList),
-      EnrichmentService.enrichProducts(masterProductPool),
-    ]);
 
-    // Relaxed cleanup: Only hide if the product is BOTH missing variants/price AND missing images.
-    // After cleanup, call refresh() so Obx widgets repaint with the newly enriched image URLs.
-    void cleanup(RxList<ProductModel> list) {
-      list.removeWhere((p) {
-        // Check all possible image sources before hiding
-        final hasImage = p.imageUrl.isNotEmpty ||
-            p.images.isNotEmpty ||
-            p.variants.any((v) => v.images.isNotEmpty);
-        return (p.variants.isEmpty && p.originalPrice <= 0) && !hasImage;
-      });
-      // Force Obx to rebuild so newly enriched imageUrls are painted immediately
-      list.refresh();
-    }
-
-    cleanup(bestSellingList);
-    cleanup(topDealsList);
-    cleanup(popularPicksList);
-  }
 
   Future<void> _updateCategoryProducts(String catId) async {
     if (catId == "for_you") {
@@ -785,21 +754,7 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
               child: FutureBuilder<Map<String, dynamic>>(
                 future: () async {
                   if (selectedBrand.value == 'all') {
-                    // Scrape from top brands to bypass Product API restriction
-                    final bRes = await BrandApiService.getAllBrands();
-                    if (!bRes['success']) return {'success': false};
-                    List<BrandModel> topBrands = (bRes['data'] as List).take(3).map((e) => BrandModel.fromJson(e)).toList();
-                    
-                    final brandScrape = await Future.wait(topBrands.map((b) => BrandApiService.getProductsByBrand(b.id)));
-                    List<dynamic> allProds = [];
-                    for (var r in brandScrape) {
-                      if (r['success']) {
-                        var d = r['data'];
-                        if (d is List) allProds.addAll(d);
-                        else if (d is Map && d['products'] is List) allProds.addAll(d['products']);
-                      }
-                    }
-                    return {'success': true, 'data': allProds};
+                    return ProductApiService.getAllProducts();
                   } else {
                     return BrandApiService.getProductsByBrand(selectedBrand.value);
                   }

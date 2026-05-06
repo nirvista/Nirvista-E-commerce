@@ -12,7 +12,6 @@ import 'package:pet_shop/services/product_api.dart';
 import 'package:pet_shop/services/brand_api.dart';
 import 'package:pet_shop/services/category_api.dart';
 import 'package:pet_shop/app/model/api_models.dart';
-import 'package:pet_shop/services/enrichment_service.dart';
 import 'package:pet_shop/base/get/route_key.dart';
 import 'package:pet_shop/base/constant.dart';
 import 'package:pet_shop/base/get/bottom_selection_controller.dart';
@@ -213,7 +212,6 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
       if (d is Map && d['products'] is List) {
         final List<Map<String, dynamic>> rawList = List<Map<String, dynamic>>.from(d['products']);
         final models = rawList.map((m) => ProductModel.fromJson(m)).toList();
-        await EnrichmentService.enrichProducts(models);
         for (int i = 0; i < models.length; i++) {
           rawList[i]['imageUrls'] = models[i].images;
           rawList[i]['thumbnail'] = models[i].thumbnail;

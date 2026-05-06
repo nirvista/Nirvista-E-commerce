@@ -12,7 +12,6 @@ import '../../app/model/api_models.dart';
 import '../../../services/product_api.dart';
 import '../../../services/category_api.dart';
 import '../../../services/brand_api.dart';
-import '../../../services/enrichment_service.dart';
 import 'package:pet_shop/base/get/wishlist_controller.dart';
 
 class CategoryProductsPage extends StatefulWidget {
@@ -107,9 +106,6 @@ class _CategoryProductsPageState extends State<CategoryProductsPage> {
         productsList = data['products'];
       }
       var prods = productsList.map((e) => ProductModel.fromJson(e)).toList();
-      
-      // Enrich with missing variants using the background enrichment service
-      await EnrichmentService.enrichProducts(prods);
 
       // Strict cleanup: Remove products that have no approved variants available
       prods.removeWhere((p) => p.variants.isEmpty);
