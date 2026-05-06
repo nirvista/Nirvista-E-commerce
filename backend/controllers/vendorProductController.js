@@ -145,10 +145,18 @@ export const createVendorProduct = async (req, res) => {
             return badRequest(res, "title, categoryId, and brandId are required");
         }
 
-        // All variants start as pending approval — admin must approve before going live
-        const preparedVariants = Array.isArray(variants)
-            ? variants.map(v => ({ ...v, approvalStatus: "pending" }))
-            : [];
+        // ✅ FIX: Upload variant images asynchronously before creating the product
+        const preparedVariants = [];
+        if (Array.isArray(variants)) {
+            for (const v of variants) {
+                let uploadedImages = v.images || [];
+                // Upload base64 strings if present
+                if (v.images && Array.isArray(v.images) && v.images.length > 0) {
+                    uploadedImages = await uploadMedia(v.images);
+                }
+                preparedVariants.push({ ...v, images: uploadedImages, approvalStatus: "pending" });
+            }
+        }
 
         const product = await Product.create(
             {
@@ -199,7 +207,6 @@ export const updateVendorProduct = async (req, res) => {
         const { tagIds, variants, listingStatus, ...productData } = req.body;
 
         // Prevent vendor from force-setting to 'active' if variants aren't approved
-        // (they can draft / archive freely; publishing goes through approval flow)
         if (listingStatus) productData.listingStatus = listingStatus;
 
         await product.update(productData);
@@ -212,6 +219,12 @@ export const updateVendorProduct = async (req, res) => {
         // Upsert variants — any change triggers re-approval
         if (Array.isArray(variants)) {
             for (const v of variants) {
+                
+                // ✅ FIX: Upload base64 images to Cloudinary before saving to DB
+                if (v.images && Array.isArray(v.images) && v.images.length > 0) {
+                    v.images = await uploadMedia(v.images);
+                }
+
                 if (v.id) {
                     // Update existing variant → reset to pending approval
                     await ProductVariant.update(

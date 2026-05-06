@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
+import 'dart:convert';
+import 'package:image_picker/image_picker.dart';
 import 'package:pet_shop/base/color_data.dart';
 import 'package:pet_shop/base/widget_utils.dart';
 import '../../services/review_api.dart';
@@ -106,6 +108,7 @@ class ProductReviewCard extends StatelessWidget {
   final String reviewDate;
   final String? reviewHeadline;
   final String? reviewerAvatar;
+  final List<String>? media;
   final bool isVerified;
 
   const ProductReviewCard({
@@ -116,6 +119,7 @@ class ProductReviewCard extends StatelessWidget {
     required this.reviewDate,
     this.reviewHeadline,
     this.reviewerAvatar,
+    this.media,
     this.isVerified = false,
   }) : super(key: key);
 
@@ -132,7 +136,6 @@ class ProductReviewCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header with reviewer info
           Row(
             children: [
               if (reviewerAvatar != null)
@@ -162,11 +165,7 @@ class ProductReviewCard extends StatelessWidget {
                         ),
                         if (isVerified) ...[
                           SizedBox(width: 6.w),
-                          Icon(
-                            Icons.verified,
-                            color: Colors.green,
-                            size: 14.w,
-                          ),
+                          Icon(Icons.verified, color: Colors.green, size: 14.w),
                         ],
                       ],
                     ),
@@ -181,14 +180,11 @@ class ProductReviewCard extends StatelessWidget {
                   ],
                 ),
               ),
-              // Stars at the top right
               Row(
                 children: List.generate(
                   5,
                   (index) => Icon(
-                    index < rating.toInt()
-                        ? Icons.star
-                        : Icons.star_outline,
+                    index < rating.toInt() ? Icons.star : Icons.star_outline,
                     color: ratedColor,
                     size: 14.w,
                   ),
@@ -200,23 +196,42 @@ class ProductReviewCard extends StatelessWidget {
           SizedBox(height: 10.h),
 
           if (reviewHeadline != null && reviewHeadline!.isNotEmpty) ...[
-            getCustomFont(
-              reviewHeadline!,
-              14,
-              getFontColor(context),
-              1,
-              fontWeight: FontWeight.w700,
-            ),
+            getCustomFont(reviewHeadline!, 14, getFontColor(context), 1, fontWeight: FontWeight.w700),
             SizedBox(height: 4.h),
           ],
 
-          // Review text
-          getMultilineCustomFont(
-            reviewText,
-            12,
-            getFontGreyColor(context),
-            fontWeight: FontWeight.w400,
-          ),
+          getMultilineCustomFont(reviewText, 12, getFontGreyColor(context), fontWeight: FontWeight.w400),
+
+          if (media != null && media!.isNotEmpty) ...[
+            SizedBox(height: 12.h),
+            SizedBox(
+              height: 80.h,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                itemCount: media!.length,
+                itemBuilder: (context, index) {
+                  return Padding(
+                    padding: EdgeInsets.only(right: 8.w),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8.w),
+                      child: Image.network(
+                        media![index],
+                        width: 80.w,
+                        height: 80.h,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => Container(
+                          width: 80.w,
+                          height: 80.h,
+                          color: Colors.grey[200],
+                          child: Icon(Icons.broken_image, color: Colors.grey),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -263,49 +278,22 @@ class _DeliveryRatingDialogState extends State<DeliveryRatingDialog> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Center(
-                child: getCustomFont(
-                  "Rate Your Delivery",
-                  18,
-                  getFontColor(context),
-                  1,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
+              Center(child: getCustomFont("Rate Your Delivery", 18, getFontColor(context), 1, fontWeight: FontWeight.w800)),
               SizedBox(height: 20.h),
-
-              Center(
-                child: getCustomFont(
-                  "How would you rate the delivery service?",
-                  14,
-                  getFontGreyColor(context),
-                  2,
-                  fontWeight: FontWeight.w500,
-                  textAlign: TextAlign.center,
-                ),
-              ),
+              Center(child: getCustomFont("How would you rate the delivery service?", 14, getFontGreyColor(context), 2, fontWeight: FontWeight.w500, textAlign: TextAlign.center)),
               SizedBox(height: 24.h),
 
-              // Star rating
               Center(
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: List.generate(5, (index) {
                     return GestureDetector(
                       onTap: () {
-                        setState(() {
-                          _deliveryRating = (index + 1).toDouble();
-                        });
+                        setState(() { _deliveryRating = (index + 1).toDouble(); });
                       },
                       child: Padding(
                         padding: EdgeInsets.symmetric(horizontal: 8.w),
-                        child: Icon(
-                          index < _deliveryRating
-                              ? Icons.star
-                              : Icons.star_outline,
-                          color: ratedColor,
-                          size: 40.w,
-                        ),
+                        child: Icon(index < _deliveryRating ? Icons.star : Icons.star_outline, color: ratedColor, size: 40.w),
                       ),
                     );
                   }),
@@ -317,30 +305,13 @@ class _DeliveryRatingDialogState extends State<DeliveryRatingDialog> {
                   child: Container(
                     margin: EdgeInsets.only(top: 12.h),
                     padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 4.h),
-                    decoration: BoxDecoration(
-                      color: Colors.green.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(20.w),
-                    ),
-                    child: getCustomFont(
-                      "${_deliveryRating.toInt()} Stars",
-                      12,
-                      Colors.green,
-                      1,
-                      fontWeight: FontWeight.w700,
-                    ),
+                    decoration: BoxDecoration(color: Colors.green.withOpacity(0.1), borderRadius: BorderRadius.circular(20.w)),
+                    child: getCustomFont("${_deliveryRating.toInt()} Stars", 12, Colors.green, 1, fontWeight: FontWeight.w700),
                   ),
                 ),
 
               SizedBox(height: 24.h),
-
-              // Feedback text
-              getCustomFont(
-                "Delivery Feedback (Optional)",
-                14,
-                getFontColor(context),
-                1,
-                fontWeight: FontWeight.w600,
-              ),
+              getCustomFont("Delivery Feedback (Optional)", 14, getFontColor(context), 1, fontWeight: FontWeight.w600),
               SizedBox(height: 10.h),
               TextField(
                 controller: _feedbackController,
@@ -348,39 +319,24 @@ class _DeliveryRatingDialogState extends State<DeliveryRatingDialog> {
                 style: TextStyle(color: getFontColor(context), fontSize: 14.sp),
                 decoration: InputDecoration(
                   hintText: "Tell us about your delivery experience...",
-                  hintStyle: TextStyle(
-                    color: getFontGreyColor(context),
-                    fontSize: 13.sp,
-                  ),
-                  filled: true,
-                  fillColor: getGreyCardColor(context),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12.w),
-                    borderSide: BorderSide.none,
-                  ),
+                  hintStyle: TextStyle(color: getFontGreyColor(context), fontSize: 13.sp),
+                  filled: true, fillColor: getGreyCardColor(context),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.w), borderSide: BorderSide.none),
                   contentPadding: EdgeInsets.all(16.w),
                 ),
               ),
-
               SizedBox(height: 24.h),
 
-              // Buttons
               Row(
                 children: [
-                  Expanded(
-                    child: getButtonFigma(context, getCardColor(context), true, "Cancel", getFontColor(context), () {
-                      Navigator.pop(context);
-                    }, EdgeInsets.zero, isBorder: true, borderColor: dividerColor),
-                  ),
+                  Expanded(child: getButtonFigma(context, getCardColor(context), true, "Cancel", getFontColor(context), () { Navigator.pop(context); }, EdgeInsets.zero, isBorder: true, borderColor: dividerColor)),
                   SizedBox(width: 12.w),
-                  Expanded(
-                    child: getButtonFigma(context, accentColor, true, "Submit", Colors.white, () {
-                      if (_deliveryRating > 0) {
-                        widget.onRatingSubmitted(_deliveryRating);
-                        Navigator.pop(context);
-                      }
-                    }, EdgeInsets.zero),
-                  ),
+                  Expanded(child: getButtonFigma(context, accentColor, true, "Submit", Colors.white, () {
+                    if (_deliveryRating > 0) {
+                      widget.onRatingSubmitted(_deliveryRating);
+                      Navigator.pop(context);
+                    }
+                  }, EdgeInsets.zero)),
                 ],
               ),
             ],
@@ -412,7 +368,9 @@ class _ProductRatingDialogState extends State<ProductRatingDialog> {
   double _rating = 0.0;
   final TextEditingController _headlineController = TextEditingController();
   final TextEditingController _commentController = TextEditingController();
+  final List<String> _media = [];
   bool _isSubmitting = false;
+  final ImagePicker _picker = ImagePicker();
 
   @override
   void dispose() {
@@ -446,13 +404,22 @@ class _ProductRatingDialogState extends State<ProductRatingDialog> {
         headline: _headlineController.text.trim(),
         comment: _commentController.text.trim(),
         rating: _rating.toInt(),
+        media: _media,
       );
 
-      if (res['success']) {
-        final review = ReviewModel.fromJson(res['data']['data']);
-        widget.onReviewSubmitted(review);
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Review submitted successfully!"), backgroundColor: Colors.green));
+      // ✅ FIXED: Safely extracting JSON mapping without assuming nested 'data' wrappers.
+      if (res['success'] == true && res['data'] != null) {
+        final payload = res['data'];
+        final reviewJson = payload is Map<String, dynamic> 
+            ? (payload['data'] != null ? payload['data'] : payload) 
+            : null;
+            
+        if (reviewJson != null) {
+          final review = ReviewModel.fromJson(reviewJson);
+          widget.onReviewSubmitted(review);
+          Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Review submitted successfully!"), backgroundColor: Colors.green));
+        }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res['message'] ?? "Error submitting review")));
       }
@@ -478,35 +445,20 @@ class _ProductRatingDialogState extends State<ProductRatingDialog> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Center(
-                child: getCustomFont(
-                  "Rate Product",
-                  18,
-                  getFontColor(context),
-                  1,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
+              Center(child: getCustomFont("Rate Product", 18, getFontColor(context), 1, fontWeight: FontWeight.w800)),
               SizedBox(height: 20.h),
 
-              // Stars
               Center(
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: List.generate(5, (index) {
                     return GestureDetector(
                       onTap: () {
-                        setState(() {
-                          _rating = (index + 1).toDouble();
-                        });
+                        setState(() { _rating = (index + 1).toDouble(); });
                       },
                       child: Padding(
                         padding: EdgeInsets.symmetric(horizontal: 6.w),
-                        child: Icon(
-                          index < _rating ? Icons.star : Icons.star_outline,
-                          color: ratedColor,
-                          size: 36.w,
-                        ),
+                        child: Icon(index < _rating ? Icons.star : Icons.star_outline, color: ratedColor, size: 36.w),
                       ),
                     );
                   }),
@@ -514,7 +466,6 @@ class _ProductRatingDialogState extends State<ProductRatingDialog> {
               ),
               SizedBox(height: 24.h),
 
-              // Headline
               getCustomFont("Headline", 14, getFontColor(context), 1, fontWeight: FontWeight.w600),
               SizedBox(height: 8.h),
               TextField(
@@ -523,15 +474,13 @@ class _ProductRatingDialogState extends State<ProductRatingDialog> {
                 decoration: InputDecoration(
                   hintText: "Summarize your review in a few words",
                   hintStyle: TextStyle(color: getFontGreyColor(context), fontSize: 13.sp),
-                  filled: true,
-                  fillColor: getGreyCardColor(context),
+                  filled: true, fillColor: getGreyCardColor(context),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.w), borderSide: BorderSide.none),
                   contentPadding: EdgeInsets.all(12.w),
                 ),
               ),
               SizedBox(height: 16.h),
 
-              // Comment
               getCustomFont("Comment", 14, getFontColor(context), 1, fontWeight: FontWeight.w600),
               SizedBox(height: 8.h),
               TextField(
@@ -541,31 +490,84 @@ class _ProductRatingDialogState extends State<ProductRatingDialog> {
                 decoration: InputDecoration(
                   hintText: "What did you like or dislike about this product?",
                   hintStyle: TextStyle(color: getFontGreyColor(context), fontSize: 13.sp),
-                  filled: true,
-                  fillColor: getGreyCardColor(context),
+                  filled: true, fillColor: getGreyCardColor(context),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.w), borderSide: BorderSide.none),
                   contentPadding: EdgeInsets.all(16.w),
                 ),
               ),
 
+              SizedBox(height: 20.h),
+              getCustomFont("Add Images", 14, getFontColor(context), 1, fontWeight: FontWeight.w600),
+              SizedBox(height: 10.h),
+              Row(
+                children: [
+                  GestureDetector(
+                    onTap: () async {
+                      final XFile? image = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
+                      if (image != null) {
+                        final bytes = await image.readAsBytes();
+                        setState(() {
+                          _media.add('data:image/jpeg;base64,${base64Encode(bytes)}');
+                        });
+                      }
+                    },
+                    child: Container(
+                      width: 60.w, height: 60.w,
+                      decoration: BoxDecoration(color: getGreyCardColor(context), borderRadius: BorderRadius.circular(12.w), border: Border.all(color: dividerColor)),
+                      child: Icon(Icons.add_a_photo, color: accentColor, size: 24.w),
+                    ),
+                  ),
+                  SizedBox(width: 12.w),
+                  Expanded(
+                    child: SizedBox(
+                      height: 60.w,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: _media.length,
+                        itemBuilder: (context, index) {
+                          return Stack(
+                            children: [
+                              Padding(
+                                padding: EdgeInsets.only(right: 8.w),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(12.w),
+                                  child: Image.memory(
+                                    base64Decode(_media[index].split(',').last),
+                                    width: 60.w, height: 60.w, fit: BoxFit.cover,
+                                  ),
+                                ),
+                              ),
+                              Positioned(
+                                top: 0, right: 8.w,
+                                child: GestureDetector(
+                                  onTap: () {
+                                    setState(() { _media.removeAt(index); });
+                                  },
+                                  child: Container(
+                                    padding: EdgeInsets.all(2.w),
+                                    decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                                    child: Icon(Icons.close, color: Colors.white, size: 12.w),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
               SizedBox(height: 24.h),
 
-              // Buttons
               _isSubmitting
                   ? const Center(child: CircularProgressIndicator())
                   : Row(
                       children: [
-                        Expanded(
-                          child: getButtonFigma(context, getCardColor(context), true, "Cancel", getFontColor(context), () {
-                            Navigator.pop(context);
-                          }, EdgeInsets.zero, isBorder: true, borderColor: dividerColor),
-                        ),
+                        Expanded(child: getButtonFigma(context, getCardColor(context), true, "Cancel", getFontColor(context), () { Navigator.pop(context); }, EdgeInsets.zero, isBorder: true, borderColor: dividerColor)),
                         SizedBox(width: 12.w),
-                        Expanded(
-                          child: getButtonFigma(context, accentColor, true, "Submit", Colors.white, () {
-                            _submitReview();
-                          }, EdgeInsets.zero),
-                        ),
+                        Expanded(child: getButtonFigma(context, accentColor, true, "Submit", Colors.white, () { _submitReview(); }, EdgeInsets.zero)),
                       ],
                     ),
             ],

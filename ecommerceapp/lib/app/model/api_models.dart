@@ -629,8 +629,12 @@ class ReviewModel {
   });
 
   factory ReviewModel.fromJson(Map<String, dynamic> json) {
+    // ✅ FIX: Backend sends a top-level 'userName' field in the formatted response.
+    // Also fall back to nested 'user.name' for raw data.
     String parsedUserName = 'Customer';
-    if (json['user'] != null && json['user']['name'] != null) {
+    if (json['userName'] != null && json['userName'].toString().isNotEmpty) {
+      parsedUserName = json['userName'].toString();
+    } else if (json['user'] != null && json['user']['name'] != null) {
       parsedUserName = json['user']['name'].toString();
     }
 

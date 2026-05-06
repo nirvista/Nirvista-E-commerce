@@ -3,8 +3,8 @@ import User from "../models/userModel.js";
 import Product from "../models/productModel.js";
 import ProductVariant from "../models/variantModel.js";
 import Tag from "../models/tagModel.js";
-import Review from "../models/reviewModel.js"; // Newly added Review Model
-import { created, notFound, serverError, success, badRequest } from "../utils/responseMessages.js"; // Added badRequest
+import Review from "../models/reviewModel.js"; 
+import { created, notFound, serverError, success, badRequest } from "../utils/responseMessages.js"; 
 import { v2 as cloudinary } from 'cloudinary';
 
 cloudinary.config({
@@ -17,13 +17,12 @@ const uploadMedia = async (mediaArray) => {
     if (!mediaArray || !Array.isArray(mediaArray)) return [];
     const uploadedUrls = [];
     for (const file of mediaArray) {
-        // If it's already a web URL, keep it without re-uploading
         if (file.startsWith("http://") || file.startsWith("https://")) {
             uploadedUrls.push(file);
         } else {
             try {
                 const result = await cloudinary.uploader.upload(file, {
-                    resource_type: "auto", // Automatically detects image or video
+                    resource_type: "auto", 
                     folder: "ecommerce_media"
                 });
                 uploadedUrls.push(result.secure_url);
@@ -44,7 +43,7 @@ const variantInclude = {
         "id", "variantName", "price", "size", "color", 
         "discountPrice", "images", "status", "stock", "reservedStock", "availableStock", "approvalStatus"
     ],
-    where: { approvalStatus: 'approved' }, // Only show approved variants to customers
+    where: { approvalStatus: 'approved' }, 
     required: false
 };
 
@@ -80,7 +79,6 @@ function buildFilters(query, isAdmin=false) {
     if (query.color) variantFilter.color = Array.isArray(query.color) ? { [Op.in]: query.color } : query.color;
     if (query.size) variantFilter.size = Array.isArray(query.size) ? { [Op.in]: query.size } : query.size;
 
-    // Always filter for approved variants for customers
     if (!isAdmin) {
         variantFilter.approvalStatus = 'approved';
     }
@@ -110,16 +108,12 @@ export const createProduct = async (req, res) => {
         if (!req.body.vendorId) {
             req.body.vendorId = req.user.id;
         }
-        // All variants start as pending approval
         if (req.body.variants && Array.isArray(req.body.variants)) {
             req.body.variants = await Promise.all(req.body.variants.map(async v => {
                 if (v.images && Array.isArray(v.images)) {
                     v.images = await uploadMedia(v.images);
                 }
-                return {
-                    ...v,
-                    approvalStatus: 'pending'
-                };
+                return { ...v, approvalStatus: 'pending' };
             }));
         }
         const product = await Product.create(req.body, {
@@ -155,20 +149,16 @@ export const addVariant = async (req, res) => {
     }
 };
 
-// --- Vendor: Update a variant (stock/price/availability) ---
+// --- Vendor: Update a variant ---
 export const updateVariant = async (req, res) => {
     try {
         if (req.body.images && Array.isArray(req.body.images)) {
             req.body.images = await uploadMedia(req.body.images);
         }
-        // Any update by vendor sets status to pending
         const [updatedRows] = await ProductVariant.update(
             { ...req.body, approvalStatus: 'pending' },
             {
-                where: {
-                    id: req.params.variantId,
-                    productId: req.params.id
-                }
+                where: { id: req.params.variantId, productId: req.params.id }
             }
         );
         if (updatedRows === 0) return notFound(res, "Variant not found");
@@ -183,7 +173,7 @@ export const updateVariant = async (req, res) => {
 // --- Admin: Approve or reject a variant ---
 export const adminApproveVariant = async (req, res) => {
     try {
-        const { approve } = req.body; // approve: true/false
+        const { approve } = req.body; 
         const variant = await ProductVariant.findByPk(req.params.variantId);
         if (!variant) return notFound(res, "Variant not found");
 
@@ -196,7 +186,7 @@ export const adminApproveVariant = async (req, res) => {
     }
 };
 
-// --- Admin: Approve all pending variants for a product (optional utility) ---
+// --- Admin: Approve all pending variants for a product ---
 export const adminApproveAllVariants = async (req, res) => {
     try {
         const { approve } = req.body;
@@ -210,7 +200,7 @@ export const adminApproveAllVariants = async (req, res) => {
     }
 };
 
-// --- Get a single product by ID (for customers: only approved variants) ---
+// --- Get a single product by ID ---
 export const getProductById = async (req, res) => {
     try {
         const product = await Product.findByPk(req.params.id, {
@@ -223,7 +213,7 @@ export const getProductById = async (req, res) => {
     }
 };
 
-// --- Get all products (for customers: only approved variants) ---
+// --- Get all products ---
 export const getAllProducts = async (req, res) => {
     try {
         const { productFilter, variantFilter } = buildFilters(req.query, false);
@@ -273,10 +263,7 @@ export const updateProduct = async (req, res) => {
         if (updateData.images && Array.isArray(updateData.images)) {
             updateData.images = await uploadMedia(updateData.images);
         }
-        // Returns [affectedCount]
-        const [updatedRows] = await Product.update(updateData, {
-            where: { id }
-        });
+        const [updatedRows] = await Product.update(updateData, { where: { id } });
 
         const product = await Product.findByPk(id);
         if (!product) return notFound(res, "Product not found");
@@ -299,19 +286,16 @@ export const updateProduct = async (req, res) => {
 // --- Delete a product ---
 export const deleteProduct = async (req, res) => {
     try {
-        // Automatically delete variants explicitly to guarantee no orphans
         await ProductVariant.destroy({ where: { productId: req.params.id } });
-
         const deletedProduct = await Product.destroy({ where: { id: req.params.id } });
         if (!deletedProduct) return notFound(res, "Product not found");
-        
         success(res, null, "Product and its variants deleted successfully");
     } catch (error) {
         serverError(res, "Server error");
     }
 };
 
-// --- Search products by keyword (only approved variants) ---
+// --- Search products ---
 export const searchProducts = async (req, res) => {
     try {
         const { search } = req.query;
@@ -322,13 +306,7 @@ export const searchProducts = async (req, res) => {
                     { description: { [Op.iLike]: `%${search}%` } }
                 ]
             },
-            include: [
-                {
-                    ...variantInclude,
-                    where: { approvalStatus: 'approved' }
-                },
-                tagInclude
-            ],
+            include: [{ ...variantInclude, where: { approvalStatus: 'approved' } }, tagInclude],
             limit: 30
         });
         success(res, products, "Search results fetched successfully");
@@ -337,7 +315,7 @@ export const searchProducts = async (req, res) => {
     }
 };
 
-// --- Get New Arrivals (only approved variants) ---
+// --- Get New Arrivals ---
 export const getNewArrivals = async (req, res) => {
     try {
         const products = await Product.findAll({
@@ -351,7 +329,7 @@ export const getNewArrivals = async (req, res) => {
     }
 };
 
-// --- Get Top Rated Products (only approved variants) ---
+// --- Get Top Rated Products ---
 export const getTopRatedProducts = async (req, res) => {
     try {
         const products = await Product.findAll({
@@ -365,7 +343,7 @@ export const getTopRatedProducts = async (req, res) => {
     }
 };
 
-// --- Get Related Products by Category and Brand (only approved variants) ---
+// --- Get Related Products ---
 export const getRelatedProducts = async (req, res) => {
     try {
         const currentProduct = await Product.findByPk(req.params.id);
@@ -404,12 +382,10 @@ export const getRelatedProducts = async (req, res) => {
     }
 };
 
-// --- Get all Product Variants for a Product (admin/vendor: all statuses) ---
+// --- Get all Product Variants ---
 export const getProductVariants = async (req, res) => {
     try {
-        const variants = await ProductVariant.findAll({
-            where: { productId: req.params.id }
-        });
+        const variants = await ProductVariant.findAll({ where: { productId: req.params.id } });
         success(res, variants, "Variants fetched successfully");
     } catch (error) {
         serverError(res, "Error fetching variants");
@@ -420,10 +396,7 @@ export const getProductVariants = async (req, res) => {
 export const deleteVariant = async (req, res) => {
     try {
         const deleted = await ProductVariant.destroy({
-            where: {
-                id: req.params.variantId,
-                productId: req.params.id
-            }
+            where: { id: req.params.variantId, productId: req.params.id }
         });
         if (!deleted) return notFound(res, "Variant not found");
         success(res, null, "Variant deleted successfully");
@@ -432,24 +405,22 @@ export const deleteVariant = async (req, res) => {
     }
 };
 
-// For Admin Dashboard
+// --- Admin: Get All Products ---
 export const getAllProductsAdmin = async (req, res) => {
     try {
         const { productFilter, variantFilter } = buildFilters(req.query, true);
         const sortOrder = getSortOrder(req.query.sort);
 
-        // Dynamically build includes to prevent Sequelize crash bugs
         const includes = [
             {
                 model: User,
                 as: 'vendor',
                 attributes: ['id', 'name', 'email', 'userStatus'],
-                required: false // Admin needs to see products even if the vendor is missing
+                required: false
             }
         ];
 
-        // Only attach 'where' to variants if filters actually exist
-        const variantInclude = {
+        const variantIncludeAdmin = {
             model: ProductVariant,
             as: "variants",
             attributes: [
@@ -460,12 +431,10 @@ export const getAllProductsAdmin = async (req, res) => {
         };
 
         if (Object.keys(variantFilter).length > 0) {
-            variantInclude.where = variantFilter;
+            variantIncludeAdmin.where = variantFilter;
         }
-        
-        includes.push(variantInclude);
+        includes.push(variantIncludeAdmin);
 
-        // Removed tagInclude to prevent Many-To-Many association crashes
         const { count, rows } = await Product.findAndCountAll({
             where: productFilter,
             order: sortOrder,
@@ -480,8 +449,9 @@ export const getAllProductsAdmin = async (req, res) => {
     }
 };
 
+
 // ==========================================
-// NEW: Rating and Review System Controllers
+// Rating and Review System Controllers
 // ==========================================
 
 // --- Customer: Add a Review ---
@@ -489,7 +459,9 @@ export const addReview = async (req, res) => {
     try {
         const { id: productId } = req.params;
         const userId = req.user.id;
-        const { headline, comment, rating, media } = req.body;
+        
+        // ✅ FIXED: Using let to allow media array reassignment
+        let { headline, comment, rating, media } = req.body;
 
         if (!rating || rating < 1 || rating > 5) {
             return badRequest(res, "Rating must be an integer between 1 and 5.");
@@ -498,19 +470,18 @@ export const addReview = async (req, res) => {
         if (media && Array.isArray(media)) {
             media = await uploadMedia(media);
         }
-        // Check if product exists
+        
         const product = await Product.findByPk(productId);
         if (!product) return notFound(res, "Product not found");
 
-        // Create review (Defaults to pending status)
         const review = await Review.create({
             productId,
             userId,
             headline,
             comment,
             rating,
-            media: media || [], // Accepts an array of image/video URLs
-            status: 'pending'   // Requires Admin approval to prevent spam
+            media: media || [],
+            status: 'pending'   
         });
 
         created(res, review, "Review submitted successfully and is pending admin approval.");
@@ -524,7 +495,7 @@ export const addReview = async (req, res) => {
 export const updateReviewStatus = async (req, res) => {
     try {
         const { reviewId } = req.params;
-        const { status } = req.body; // 'approved' or 'rejected'
+        const { status } = req.body;
 
         if (!['approved', 'rejected'].includes(status)) {
             return badRequest(res, "Status must be 'approved' or 'rejected'.");
@@ -536,7 +507,6 @@ export const updateReviewStatus = async (req, res) => {
         review.status = status;
         await review.save();
 
-        // If the review is approved, recalculate the product's average rating
         if (status === 'approved') {
             const approvedReviews = await Review.findAll({
                 where: { productId: review.productId, status: 'approved' }
@@ -545,7 +515,6 @@ export const updateReviewStatus = async (req, res) => {
             const totalRating = approvedReviews.reduce((sum, r) => sum + r.rating, 0);
             const avgRating = approvedReviews.length > 0 ? (totalRating / approvedReviews.length).toFixed(1) : 0;
 
-            // Update the existing rating field in the Product Model
             await Product.update(
                 { rating: avgRating }, 
                 { where: { id: review.productId } }
@@ -569,12 +538,22 @@ export const getProductReviews = async (req, res) => {
             order: [['createdAt', 'DESC']],
             include: [{
                 model: User,
-                as: 'user',
-                attributes: ['name'] 
+                as: 'user',  // ✅ FIX: Must match the alias defined in association.js
+                attributes: ['name']
             }]
         });
 
-        success(res, reviews, "Reviews fetched successfully");
+        // Map userName from the associated user for frontend convenience
+        const formattedReviews = reviews.map(r => {
+            const reviewObj = r.toJSON();
+            const userName = reviewObj.user?.name || "Customer";
+            return {
+                ...reviewObj,
+                userName
+            };
+        });
+
+        success(res, formattedReviews, "Reviews fetched successfully");
     } catch (error) {
         console.error("[getProductReviews] Error:", error);
         serverError(res, "Failed to fetch reviews");
@@ -591,12 +570,21 @@ export const getProductReviewsAdmin = async (req, res) => {
             order: [['createdAt', 'DESC']],
             include: [{
                 model: User,
-                as: 'user',
-                attributes: ['name'] 
+                as: 'user',  // ✅ FIX: Must match the alias defined in association.js
+                attributes: ['name']
             }]
         });
 
-        success(res, reviews, "Reviews fetched successfully");
+        const formattedReviews = reviews.map(r => {
+            const reviewObj = r.toJSON();
+            const userName = reviewObj.user?.name || "Customer";
+            return {
+                ...reviewObj,
+                userName
+            };
+        });
+
+        success(res, formattedReviews, "Reviews fetched successfully");
     } catch (error) {
         console.error("[getProductReviewsAdmin] Error:", error);
         serverError(res, "Failed to fetch reviews");
@@ -608,22 +596,18 @@ export const adminApproveAllReviews = async (req, res) => {
     try {
         const { id: productId } = req.params;
 
-        // Approve all pending reviews for the product
         const [updatedCount] = await Review.update(
             { status: 'approved' },
             { where: { productId, status: 'pending' } }
         );
 
-        // Fetch all approved reviews for the product
         const approvedReviews = await Review.findAll({
             where: { productId, status: 'approved' }
         });
 
-        // Recalculate average rating
         const totalRating = approvedReviews.reduce((sum, r) => sum + r.rating, 0);
         const avgRating = approvedReviews.length > 0 ? (totalRating / approvedReviews.length).toFixed(1) : 0;
 
-        // Update product's rating
         await Product.update(
             { rating: avgRating },
             { where: { id: productId } }

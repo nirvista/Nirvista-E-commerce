@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
 import 'package:pet_shop/base/get/login_data_controller.dart';
 import '../../services/vendor_api.dart';
@@ -43,7 +44,14 @@ const _kTextMuted      = Color(0xFF6B8680);
 // ─────────────────────────────────────────────────────────────────────────────
 //  HELPERS
 // ─────────────────────────────────────────────────────────────────────────────
-String _getVendorStatus(List<dynamic> items) {
+String _getVendorStatus(Map<String, dynamic> order) {
+  final String? oStatus = order['orderStatus']?.toString().toLowerCase();
+  
+  if (oStatus == 'delivered' || oStatus == 'cancelled' || oStatus == 'shipped') {
+    return oStatus!;
+  }
+
+  final items = order['items'] as List? ?? [];
   if (items.isEmpty) return 'pending';
   if (items.any((i) => i['fulfillmentStatus'] == 'cancelled')) return 'cancelled';
   if (items.every((i) => i['fulfillmentStatus'] == 'delivered')) return 'delivered';
@@ -147,7 +155,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
     return _orders.where((o) {
       final items = o['items'] as List? ?? [];
       final id = (o['id'] ?? '').toString().toLowerCase();
-      final status = _getVendorStatus(items).toLowerCase();
+      final status = _getVendorStatus(o as Map<String, dynamic>).toLowerCase();
       final productTitles = items.map((i) => i['product']?['title']?.toString().toLowerCase() ?? '').join(' ');
       return id.contains(q) || status.contains(q) || productTitles.contains(q);
     }).toList();
@@ -802,7 +810,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
           const SizedBox(height: 12),
           ..._orders.take(3).map((o) => _OrderRowCard(
                 order: o,
-                statusText: _getVendorStatus(o['items'] as List? ?? []),
+                statusText: _getVendorStatus(o as Map<String, dynamic>),
                 onFulfillment: () => _showFulfillmentDialog(o),
                 onViewDetail: () => _fetchOrderById(o['id']?.toString() ?? ''),
               )),
@@ -1044,7 +1052,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
     final filtered  = _filteredOrders;
     int pending = 0, processing = 0, shipped = 0, delivered = 0;
     for (final o in _orders) {
-      final s = _getVendorStatus(o['items'] as List? ?? []);
+      final s = _getVendorStatus(o as Map<String, dynamic>);
       if (s == 'pending') pending++;
       else if (s == 'processing') processing++;
       else if (s == 'shipped') shipped++;
@@ -1095,7 +1103,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
                   final items = order['items'] as List? ?? [];
                   return _OrderRowCard(
                     order: order,
-                    statusText: _getVendorStatus(items),
+                    statusText: _getVendorStatus(order as Map<String, dynamic>),
                     onFulfillment: () => _showFulfillmentDialog(order),
                     onViewDetail: () => _fetchOrderById(order['id']?.toString() ?? ''),
                   );
@@ -1200,7 +1208,6 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
     final priceC    = TextEditingController();
     final discountC = TextEditingController();
     final stockC    = TextEditingController();
-    final urlC      = TextEditingController();
     final materialC = TextEditingController();
 
     String? selectedBrandId;
@@ -1208,7 +1215,6 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
     String? selectedSubCategoryId;
 
     final List<Map<String, dynamic>> variants  = [];
-    final List<String>               imageUrls = [];
 
     showDialog(
       context: context,
@@ -1232,9 +1238,6 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
               final discText  = discountC.text.trim();
               final stockText = stockC.text.trim();
 
-              final autoUrl = urlC.text.trim();
-              if (autoUrl.isNotEmpty && !imageUrls.contains(autoUrl)) imageUrls.add(autoUrl);
-
               if (title.isEmpty) { _snack('Product title is required', true); return; }
               if (selectedBrandId == null || selectedBrandId!.isEmpty) { _snack('Please select a brand', true); return; }
               if (selectedCategoryId == null || selectedCategoryId!.isEmpty) { _snack('Please select a category', true); return; }
@@ -1250,7 +1253,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
                 'price'         : price,
                 'discountPrice' : discountPrice,
                 'stock'         : int.tryParse(stockText) ?? 0,
-                'images'        : List<String>.from(imageUrls),
+                'images'        : [],
                 'color'         : '',
                 'size'          : '',
                 'approvalStatus': 'pending',
@@ -1490,7 +1493,6 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
     final sizeC        = TextEditingController();
     final colorC       = TextEditingController();
     final stockC       = TextEditingController();
-    final urlC         = TextEditingController();
     final List<String> imageUrls = [];
 
     showDialog(
@@ -1499,8 +1501,6 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
         builder: (ctx, setD) => _NirvistaDialog(
           title: 'Add Variant',
           onConfirm: () {
-            final autoUrl = urlC.text.trim();
-            if (autoUrl.isNotEmpty && !imageUrls.contains(autoUrl)) imageUrls.add(autoUrl);
             String sku = skuC.text.trim();
             if (sku.isEmpty) {
               sku = '${variantNameC.text.trim().isNotEmpty ? variantNameC.text.trim() : 'variant'}-${DateTime.now().millisecondsSinceEpoch}';
@@ -1526,7 +1526,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
             _dInput(colorC,       'Color',              Icons.palette_rounded),
             _dInput(stockC,       'Stock',              Icons.inventory_2_rounded,    numeric: true),
             _sectionLabel('Images'),
-            _UrlOnlyImageAdder(urlController: urlC, imageUrls: imageUrls, onChanged: () => setD(() {})),
+            _ImagePickerAdder(imageUrls: imageUrls, onChanged: () => setD(() {})),
           ]),
         ),
       ),
@@ -1541,7 +1541,6 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
     final sizeC        = TextEditingController(text: variant['size']?.toString() ?? '');
     final colorC       = TextEditingController(text: variant['color']?.toString() ?? '');
     final stockC       = TextEditingController(text: variant['stock']?.toString() ?? '');
-    final urlC         = TextEditingController();
     final imageUrls    = List<String>.from((variant['images'] as List? ?? []).map((e) => e.toString()));
 
     showDialog(
@@ -1550,8 +1549,6 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
         builder: (ctx, setD2) => _NirvistaDialog(
           title: 'Edit Variant',
           onConfirm: () {
-            final autoUrl = urlC.text.trim();
-            if (autoUrl.isNotEmpty && !imageUrls.contains(autoUrl)) imageUrls.add(autoUrl);
             Navigator.pop(ctx);
             _updateVariant(productId, variant['id'], {
               'sku': skuC.text.trim(),
@@ -1573,7 +1570,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen>
             _dInput(colorC,       'Color',              Icons.palette_rounded),
             _dInput(stockC,       'Stock',              Icons.inventory_2_rounded,    numeric: true),
             _sectionLabel('Images'),
-            _UrlOnlyImageAdder(urlController: urlC, imageUrls: imageUrls, onChanged: () => setD2(() {})),
+            _ImagePickerAdder(imageUrls: imageUrls, onChanged: () => setD2(() {})),
           ]),
         ),
       ),
@@ -2924,30 +2921,48 @@ class _NirvistaDialog extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 //  URL-ONLY IMAGE ADDER  (no device/gallery picker)
 // ─────────────────────────────────────────────────────────────────────────────
-class _UrlOnlyImageAdder extends StatefulWidget {
-  const _UrlOnlyImageAdder({
-    required this.urlController,
+// ─────────────────────────────────────────────────────────────────────────────
+//  IMAGE PICKER ADDER (Supports Gallery & Cloudinary via base64)
+// ─────────────────────────────────────────────────────────────────────────────
+class _ImagePickerAdder extends StatefulWidget {
+  const _ImagePickerAdder({
     required this.imageUrls,
     required this.onChanged,
   });
-  final TextEditingController urlController;
   final List<String> imageUrls;
   final VoidCallback onChanged;
 
   @override
-  State<_UrlOnlyImageAdder> createState() => _UrlOnlyImageAdderState();
+  State<_ImagePickerAdder> createState() => _ImagePickerAdderState();
 }
 
-class _UrlOnlyImageAdderState extends State<_UrlOnlyImageAdder> {
-  void _addTypedUrl() {
-    final url = widget.urlController.text.trim();
-    if (url.isEmpty) return;
-    if (!widget.imageUrls.contains(url)) {
-      widget.imageUrls.add(url);
-      widget.onChanged();
+class _ImagePickerAdderState extends State<_ImagePickerAdder> {
+  final ImagePicker _picker = ImagePicker();
+  bool _isPicking = false;
+
+  Future<void> _pickImage() async {
+    if (_isPicking) return;
+    setState(() => _isPicking = true);
+    try {
+      final XFile? image = await _picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 70, // Compress for faster upload
+      );
+      
+      if (image != null) {
+        final bytes = await image.readAsBytes();
+        final base64Image = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+        
+        if (!widget.imageUrls.contains(base64Image)) {
+          widget.imageUrls.add(base64Image);
+          widget.onChanged();
+        }
+      }
+    } catch (e) {
+      debugPrint('Error picking image: $e');
+    } finally {
+      if (mounted) setState(() => _isPicking = false);
     }
-    widget.urlController.clear();
-    setState(() {});
   }
 
   void _remove(int index) {
@@ -2969,60 +2984,37 @@ class _UrlOnlyImageAdderState extends State<_UrlOnlyImageAdder> {
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
             Expanded(
-              child: TextField(
-                controller: widget.urlController,
-                style: const TextStyle(fontSize: 13),
-                onChanged: (_) => setState(() {}),
-                onSubmitted: (_) => _addTypedUrl(),
-                decoration: InputDecoration(
-                  hintText: 'Paste image URL…',
-                  hintStyle: const TextStyle(color: _kTextMuted, fontSize: 12),
-                  isDense: true,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: _kBorder)),
-                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: _kBorder)),
-                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: _kTeal, width: 1.5)),
-                  filled: true,
-                  fillColor: Colors.white,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                  suffixIcon: widget.urlController.text.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Icons.clear_rounded, size: 16, color: _kTextMuted),
-                          visualDensity: VisualDensity.compact,
-                          onPressed: () { widget.urlController.clear(); setState(() {}); },
-                        )
-                      : null,
-                ),
-              ),
-            ),
-            const SizedBox(width: 6),
-            // ── Link / Add URL button only ──────────────────────────────
-            Tooltip(
-              message: 'Add URL',
-              child: InkWell(
-                onTap: _addTypedUrl,
-                borderRadius: BorderRadius.circular(8),
-                child: Container(
-                  width: 38, height: 38,
-                  decoration: BoxDecoration(color: _kTealLight, borderRadius: BorderRadius.circular(8)),
-                  child: const Icon(Icons.link_rounded, color: _kTeal, size: 20),
-                ),
-              ),
-            ),
-          ]),
-          if (widget.imageUrls.isEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
               child: Text(
-                'Paste an image URL and tap the link icon to add it.',
-                style: TextStyle(color: _kTeal.withOpacity(0.7), fontSize: 11),
+                'Add Images for the Product',
+                style: TextStyle(color: _kTextMuted, fontSize: 12, fontStyle: FontStyle.italic),
               ),
             ),
+            const SizedBox(width: 8),
+            _isPicking
+                ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: _kTeal))
+                : Tooltip(
+                    message: 'Pick from Gallery',
+                    child: InkWell(
+                      onTap: _pickImage,
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        width: 42, height: 42,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(colors: [_kTeal, _kTealDark]),
+                          borderRadius: BorderRadius.circular(10),
+                          boxShadow: [BoxShadow(color: _kTeal.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 2))],
+                        ),
+                        child: const Icon(Icons.add_photo_alternate_rounded, color: Colors.white, size: 22),
+                      ),
+                    ),
+                  ),
+          ]),
         ]),
       ),
       if (widget.imageUrls.isNotEmpty) ...[
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
         Wrap(
-          spacing: 8, runSpacing: 8,
+          spacing: 10, runSpacing: 10,
           children: widget.imageUrls.asMap().entries.map((entry) {
             final index = entry.key;
             final url   = entry.value;
@@ -3030,21 +3022,26 @@ class _UrlOnlyImageAdderState extends State<_UrlOnlyImageAdder> {
               clipBehavior: Clip.none,
               children: [
                 Container(
-                  width: 80, height: 80,
-                  decoration: BoxDecoration(color: _kTealLight, borderRadius: BorderRadius.circular(10), border: Border.all(color: _kTeal.withOpacity(0.25))),
+                  width: 84, height: 84,
+                  decoration: BoxDecoration(
+                    color: _kBg, 
+                    borderRadius: BorderRadius.circular(12), 
+                    border: Border.all(color: _kTeal.withOpacity(0.2)),
+                    boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4)],
+                  ),
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(12),
                     child: _buildTileImage(url),
                   ),
                 ),
                 Positioned(
-                  top: -6, right: -6,
+                  top: -8, right: -8,
                   child: GestureDetector(
                     onTap: () => _remove(index),
                     child: Container(
-                      padding: const EdgeInsets.all(3),
-                      decoration: const BoxDecoration(color: _kRed, shape: BoxShape.circle),
-                      child: const Icon(Icons.close_rounded, size: 12, color: Colors.white),
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(color: _kRed, shape: BoxShape.circle, boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 4)]),
+                      child: const Icon(Icons.close_rounded, size: 14, color: Colors.white),
                     ),
                   ),
                 ),
@@ -3052,32 +3049,25 @@ class _UrlOnlyImageAdderState extends State<_UrlOnlyImageAdder> {
             );
           }).toList(),
         ),
-        const SizedBox(height: 4),
-        Text('${widget.imageUrls.length} image(s) added',
-            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _kTealDark)),
+        const SizedBox(height: 6),
+        Text('${widget.imageUrls.length} image(s) selected',
+            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _kTealDark)),
       ],
     ]);
   }
 
   Widget _buildTileImage(String url) {
-    if (url.startsWith('http') || url.startsWith('https')) {
+    if (url.startsWith('data:image')) {
+      // Base64 preview
+      try {
+        final base64Str = url.split(',').last;
+        return Image.memory(base64Decode(base64Str), width: 84, height: 84, fit: BoxFit.cover);
+      } catch (e) {
+        return _errorPlaceholder();
+      }
+    } else if (url.startsWith('http')) {
       return Image.network(
-        url, width: 80, height: 80, fit: BoxFit.cover,
-        loadingBuilder: (_, child, progress) {
-          if (progress == null) return child;
-          return Center(
-            child: SizedBox(
-              width: 20, height: 20,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                value: progress.expectedTotalBytes != null
-                    ? progress.cumulativeBytesLoaded / progress.expectedTotalBytes!
-                    : null,
-                color: _kTeal,
-              ),
-            ),
-          );
-        },
+        url, width: 84, height: 84, fit: BoxFit.cover,
         errorBuilder: (_, __, ___) => _errorPlaceholder(),
       );
     }
@@ -3085,12 +3075,8 @@ class _UrlOnlyImageAdderState extends State<_UrlOnlyImageAdder> {
   }
 
   Widget _errorPlaceholder() => Container(
-    color: _kRedLight.withOpacity(0.5),
-    child: const Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-      Icon(Icons.broken_image_rounded, color: _kRed, size: 24),
-      SizedBox(height: 4),
-      Text('Load Error', style: TextStyle(fontSize: 9, color: _kRed, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
-    ]),
+    color: _kRedLight.withOpacity(0.3),
+    child: const Center(child: Icon(Icons.broken_image_rounded, color: _kRed, size: 24)),
   );
 }
 
@@ -3120,10 +3106,9 @@ class _VariantFormCardState extends State<_VariantFormCard> {
     _discC  = TextEditingController(text: widget.data['discountPrice']?.toString() ?? '');
     _colorC = TextEditingController(text: widget.data['color']?.toString() ?? '');
     _sizeC  = TextEditingController(text: widget.data['size']?.toString() ?? '');
-    _urlC   = TextEditingController();
     if (widget.data['images'] is List) _imageUrls.addAll((widget.data['images'] as List).map((e) => e.toString()));
     else if (widget.data['imageUrls'] is List) _imageUrls.addAll((widget.data['imageUrls'] as List).map((e) => e.toString()));
-    for (final c in [_skuC, _stockC, _priceC, _discC, _colorC, _sizeC, _urlC]) { c.addListener(_sync); }
+    for (final c in [_skuC, _stockC, _priceC, _discC, _colorC, _sizeC]) { c.addListener(_sync); }
   }
 
   void _sync() {
@@ -3135,16 +3120,13 @@ class _VariantFormCardState extends State<_VariantFormCard> {
     widget.data['discountPrice'] = double.tryParse(_discC.text.trim());
     widget.data['color']         = _colorC.text.trim();
     widget.data['size']          = _sizeC.text.trim();
-    final autoUrl = _urlC.text.trim();
-    final combinedImages = List<String>.from(_imageUrls);
-    if (autoUrl.isNotEmpty && !combinedImages.contains(autoUrl)) combinedImages.add(autoUrl);
-    widget.data['images'] = combinedImages;
+    widget.data['images'] = List<String>.from(_imageUrls);
     widget.onChanged();
   }
 
   @override
   void dispose() {
-    for (final c in [_skuC, _stockC, _priceC, _discC, _colorC, _sizeC, _urlC]) c.dispose();
+    for (final c in [_skuC, _stockC, _priceC, _discC, _colorC, _sizeC]) c.dispose();
     super.dispose();
   }
 
@@ -3185,7 +3167,7 @@ class _VariantFormCardState extends State<_VariantFormCard> {
             padding: EdgeInsets.only(bottom: 8, top: 4),
             child: Text('Variant Images', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _kTealDark)),
           )),
-          _UrlOnlyImageAdder(urlController: _urlC, imageUrls: _imageUrls, onChanged: _sync),
+          _ImagePickerAdder(imageUrls: _imageUrls, onChanged: _sync),
         ]),
       ),
     ]),
