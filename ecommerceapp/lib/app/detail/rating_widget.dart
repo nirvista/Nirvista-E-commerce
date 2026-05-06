@@ -8,6 +8,7 @@ import 'package:pet_shop/base/widget_utils.dart';
 import '../../services/review_api.dart';
 import '../../app/model/api_models.dart';
 import '../../base/get/login_data_controller.dart';
+import 'image_viewer.dart';
 
 /// 5-star rating widget for products and deliveries
 class StarRatingWidget extends StatefulWidget {
@@ -212,18 +213,26 @@ class ProductReviewCard extends StatelessWidget {
                 itemBuilder: (context, index) {
                   return Padding(
                     padding: EdgeInsets.only(right: 8.w),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(8.w),
-                      child: Image.network(
-                        media![index],
-                        width: 80.w,
-                        height: 80.h,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) => Container(
+                    child: GestureDetector(
+                      onTap: () {
+                        Get.to(() => FullScreenImageViewer(
+                          images: media!,
+                          initialIndex: index,
+                        ));
+                      },
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8.w),
+                        child: Image.network(
+                          media![index],
                           width: 80.w,
                           height: 80.h,
-                          color: Colors.grey[200],
-                          child: Icon(Icons.broken_image, color: Colors.grey),
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) => Container(
+                            width: 80.w,
+                            height: 80.h,
+                            color: Colors.grey[200],
+                            child: Icon(Icons.broken_image, color: Colors.grey),
+                          ),
                         ),
                       ),
                     ),

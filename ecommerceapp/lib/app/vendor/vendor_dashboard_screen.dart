@@ -2488,16 +2488,13 @@ class _ProductCard extends StatelessWidget {
               Text(product['title']?.toString() ?? product['name']?.toString() ?? 'Unnamed',
                   style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: _kText)),
               const SizedBox(height: 6),
-              Row(children: [_InfoChip(Icons.qr_code_2_rounded, sku.toString()), const SizedBox(width: 14), _InfoChip(Icons.inventory_2_rounded, '$stock units')]),
-              const SizedBox(height: 6),
-              Row(children: [
+              Wrap(spacing: 14, runSpacing: 6, children: [_InfoChip(Icons.qr_code_2_rounded, sku.toString()), _InfoChip(Icons.inventory_2_rounded, '$stock units')]),
+              const SizedBox(height: 8),
+              Wrap(spacing: 8, runSpacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: [
                 Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3), decoration: BoxDecoration(color: _kTealLight, borderRadius: BorderRadius.circular(6)),
                     child: Text('₹$displayPrice', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: _kTealDark))),
-                if (discountPrice != null && (double.tryParse(discountPrice.toString()) ?? 0) > 0) ...[
-                  const SizedBox(width: 6),
+                if (discountPrice != null && (double.tryParse(discountPrice.toString()) ?? 0) > 0)
                   Text('₹$originalPrice', style: const TextStyle(fontSize: 11, color: Color(0xFF757575), decoration: TextDecoration.lineThrough, decorationColor: Color(0xFF555555), decorationThickness: 1.5)),
-                ],
-                const SizedBox(width: 8),
                 if (variants.isNotEmpty)
                   Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(color: _kBg, borderRadius: BorderRadius.circular(6), border: Border.all(color: _kBorder)),
@@ -2690,13 +2687,13 @@ class _InventoryCard extends StatelessWidget {
           child: Row(children: [
             // Stock counts summary
             Expanded(
-              child: Row(children: [
+              child: Wrap(spacing: 12, runSpacing: 8, children: [
                 _StockPill('Total', totalStock, _kTeal),
-                const SizedBox(width: 8),
                 _StockPill('Available', available, statusColor),
-                if (reserved > 0) ...[const SizedBox(width: 8), _StockPill('Reserved', reserved, _kAmber)],
+                if (reserved > 0) _StockPill('Reserved', reserved, _kAmber),
               ]),
             ),
+            const SizedBox(width: 8),
             _TealButton(label: 'Adjust Stock', icon: Icons.edit_rounded, onPressed: onAdjust, compact: true),
           ]),
         ),

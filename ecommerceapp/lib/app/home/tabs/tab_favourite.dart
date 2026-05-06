@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:pet_shop/base/color_data.dart';
@@ -33,7 +34,10 @@ class TabFavourite extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: getScaffoldColor(context),
-      body: SafeArea(
+      body: AnnotatedRegion<SystemUiOverlayStyle>(
+        value: SystemUiOverlayStyle.light.copyWith(
+          statusBarColor: Colors.transparent,
+        ),
         child: Obx(() {
           final isLoading = wishlistController.isLoading.value;
           final hasError = wishlistController.hasError.value;
@@ -77,7 +81,7 @@ class TabFavourite extends StatelessWidget {
           end: Alignment.bottomRight,
         ),
       ),
-      padding: EdgeInsets.symmetric(horizontal: margin, vertical: 16.h),
+      padding: EdgeInsets.fromLTRB(margin, 16.h + MediaQuery.of(context).padding.top, margin, 16.h),
       child: Row(
         children: [
           Expanded(

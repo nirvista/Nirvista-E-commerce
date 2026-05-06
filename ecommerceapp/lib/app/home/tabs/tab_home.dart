@@ -1,5 +1,6 @@
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:pet_shop/app/home/tabs/tab_search.dart';
@@ -257,7 +258,10 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
     Constant.setupSize(context);
     double margin = FetchPixels.getDefaultHorSpaceFigma(context);
 
-    return SafeArea(
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light.copyWith(
+        statusBarColor: Colors.transparent,
+      ),
       child: Column(
         children: [
           // Fixed Header
@@ -306,7 +310,7 @@ class _TabHomeState extends State<TabHome> with TickerProviderStateMixin {
           BoxShadow(color: Color(0x1A0D9488), blurRadius: 12, offset: Offset(0, 4))
         ],
       ),
-      padding: EdgeInsets.fromLTRB(margin, 14.h, margin, 14.h),
+      padding: EdgeInsets.fromLTRB(margin, 14.h + MediaQuery.of(context).padding.top, margin, 14.h),
       child: Column(
         children: [
           // — Top row: brand + location + bell —
