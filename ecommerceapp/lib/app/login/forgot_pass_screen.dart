@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:pet_shop/base/get/route_key.dart';
+import '../../services/loginregisterapi.dart';
 
 import '../../base/color_data.dart';
 import '../../base/constant.dart';
@@ -30,6 +31,7 @@ class _ForgotPasswordScreen extends State<ForgotPasswordScreen> {
   // RxBool showPass = false.obs;
 
   TextEditingController emailController = TextEditingController();
+  bool _isLoading = false;
   // TextEditingController passController = TextEditingController();
 
   @override
@@ -78,17 +80,42 @@ class _ForgotPasswordScreen extends State<ForgotPasswordScreen> {
             // getDefaultCountryPickerTextFiled(context, "Phone number",
             //         numberController, getFontColor(context))
             //     .marginSymmetric(horizontal: horSpace),
-            getButtonFigma(
-                context,
-                getAccentColor(context),
-                true,
-                "Submit",
-                Colors.white,
-                () {
-                  Constant.sendToNext(context, resetPassScreenRoute);
+            _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : getButtonFigma(
+                    context,
+                    getAccentColor(context),
+                    true,
+                    "Submit",
+                    Colors.white,
+                    () async {
+                      if (emailController.text.trim().isEmpty) {
+                        Get.snackbar("Error", "Please enter your email",
+                            snackPosition: SnackPosition.BOTTOM,
+                            backgroundColor: Colors.red,
+                            colorText: Colors.white);
+                        return;
+                      }
 
-                },
-                EdgeInsets.symmetric(horizontal: horSpace, vertical: 60.h)),
+                      setState(() => _isLoading = true);
+                      final res = await ApiService.forgotPassword(
+                          email: emailController.text.trim());
+                      setState(() => _isLoading = false);
+
+                      if (res['success']) {
+                        Get.snackbar("Success", res['message'],
+                            snackPosition: SnackPosition.BOTTOM,
+                            backgroundColor: Colors.green,
+                            colorText: Colors.white);
+                        Constant.sendToNext(context, resetPassScreenRoute);
+                      } else {
+                        Get.snackbar("Error", res['message'],
+                            snackPosition: SnackPosition.BOTTOM,
+                            backgroundColor: Colors.red,
+                            colorText: Colors.white);
+                      }
+                    },
+                    EdgeInsets.symmetric(horizontal: horSpace, vertical: 60.h)),
           ],
         ));
   }

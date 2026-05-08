@@ -8,6 +8,7 @@ import '../../base/constant.dart';
 import '../../base/fetch_pixels.dart';
 import '../../base/get/route_key.dart';
 import '../../base/widget_utils.dart';
+import '../../services/loginregisterapi.dart';
 
 
 class ResetPasswordScreen extends StatefulWidget {
@@ -27,9 +28,10 @@ class _ResetPasswordScreen extends State<ResetPasswordScreen> {
   RxBool showPass = false.obs;
 
   // TextEditingController emailController = TextEditingController();
-  TextEditingController passController = TextEditingController();
+  TextEditingController tokenController = TextEditingController();
   TextEditingController newPassController = TextEditingController();
   TextEditingController confirmPassController = TextEditingController();
+  bool _isLoading = false;
 
   @override
   Widget build(BuildContext context) {
@@ -42,30 +44,18 @@ class _ResetPasswordScreen extends State<ResetPasswordScreen> {
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            getCustomFont("Password", 16, getFontColor(context), 1,
+            getCustomFont("Reset Token", 16, getFontColor(context), 1,
                     fontWeight: FontWeight.w400)
                 .marginSymmetric(horizontal: horSpace),
             8.h.verticalSpace,
-
-            ObxValue((p0) {
-              return getPassTextFiled(
-                context,
-                "Enter Password",
-                passController,
-                getFontColor(context),
-                showPass.value,
-                () {
-                  showPass.value = !showPass.value;
-                },
-                validator: (password) {
-                  if (password!.isNotEmpty) {
+            getDefaultTextFiled(context, "Paste token from email", tokenController,
+                getFontColor(context), (value) {}, validator: (token) {
+                  if (token!.isNotEmpty) {
                     return null;
                   } else {
-                    return 'Please enter password';
+                    return 'Please enter the reset token';
                   }
-                },
-              );
-            }, showPass),
+                }),
             20.h.verticalSpace,
             getCustomFont("New password", 16, getFontColor(context), 1,
                     fontWeight: FontWeight.w400)
@@ -139,152 +129,57 @@ class _ResetPasswordScreen extends State<ResetPasswordScreen> {
             // getDefaultCountryPickerTextFiled(context, "Phone number",
             //         numberController, getFontColor(context))
             //     .marginSymmetric(horizontal: horSpace),
-            getButtonFigma(
-                context, getAccentColor(context), true, "Change Password", Colors.white,
-                () {
-                  showGetDialog(context, "unlock.png", "Password Changed",
-                      "Your account has been successfully\nchanged!", "Ok", () {
-                        backClick(context);
-                        Constant.sendToNext(context, loginRoute);
-                      },dialogHeight: 464,imgHeight: 146,imgWidth: 146,fit: BoxFit.fill);
-            }, EdgeInsets.symmetric(horizontal: horSpace, vertical: 60.h)),
+            _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : getButtonFigma(
+                    context, getAccentColor(context), true, "Change Password", Colors.white,
+                    () async {
+                      if (tokenController.text.trim().isEmpty) {
+                        Get.snackbar("Error", "Please enter the reset token",
+                            snackPosition: SnackPosition.BOTTOM,
+                            backgroundColor: Colors.red,
+                            colorText: Colors.white);
+                        return;
+                      }
+                      if (newPassController.text.isEmpty) {
+                        Get.snackbar("Error", "Please enter a new password",
+                            snackPosition: SnackPosition.BOTTOM,
+                            backgroundColor: Colors.red,
+                            colorText: Colors.white);
+                        return;
+                      }
+                      if (newPassController.text != confirmPassController.text) {
+                        Get.snackbar("Error", "Passwords do not match",
+                            snackPosition: SnackPosition.BOTTOM,
+                            backgroundColor: Colors.red,
+                            colorText: Colors.white);
+                        return;
+                      }
+
+                      setState(() => _isLoading = true);
+                      final res = await ApiService.resetPassword(
+                          token: tokenController.text.trim(),
+                          password: newPassController.text);
+                      setState(() => _isLoading = false);
+
+                      if (res['success']) {
+                        showGetDialog(context, "unlock.png", "Password Changed",
+                            res['message'], "Ok", () {
+                              backClick(context);
+                              Constant.sendToNext(context, loginRoute);
+                            },
+                            dialogHeight: 464,
+                            imgHeight: 146,
+                            imgWidth: 146,
+                            fit: BoxFit.fill);
+                      } else {
+                        Get.snackbar("Error", res['message'],
+                            snackPosition: SnackPosition.BOTTOM,
+                            backgroundColor: Colors.red,
+                            colorText: Colors.white);
+                      }
+                    }, EdgeInsets.symmetric(horizontal: horSpace, vertical: 60.h)),
           ],
         ));
   }
 }
-
-// class LoginScreen extends StatefulWidget {
-//   @override
-//   State<StatefulWidget> createState() {
-//     return _LoginScreen();
-//   }
-// }
-//
-// class _LoginScreen extends State<LoginScreen> {
-//   backClick(BuildContext context) {
-//     Constant.backToFinish(context);
-//   }
-//
-//   RxBool showPass = false.obs;
-//
-//   TextEditingController emailController = TextEditingController();
-//   TextEditingController passController = TextEditingController();
-//
-//   @override
-//   Widget build(BuildContext context) {
-//     Constant.setupSize(context);
-//
-//     double horSpace = FetchPixels.getDefaultHorSpaceFigma(context);
-//     return buildTitleDefaultWidget(context, "Login", "Glad to meet you again! ",
-//         () {
-//       backClick(context);
-//     },
-//         Column(
-//           children: [
-//             getDefaultTextFiled(
-//                 context, "Email", emailController, getFontColor(context),(value) {
-//
-//                 }),
-//             20.h.verticalSpace,
-//             ObxValue((p0) {
-//               return getPassTextFiled(context, "Password", passController,
-//                   getFontColor(context), showPass.value, () {
-//                 showPass.value = !showPass.value;
-//               });
-//             }, showPass),
-//             20.h.verticalSpace,
-//             Align(
-//               alignment: Alignment.bottomRight,
-//               child: InkWell(
-//                 onTap: () {
-//                   Constant.sendToNext(context, forgotPassRoute);
-//                 },
-//                 child: getCustomFont(
-//                     "Forgot password ?", 16, getFontColor(context), 1,
-//                     fontWeight: FontWeight.w400, textAlign: TextAlign.end),
-//               ),
-//             ).paddingOnly(right: horSpace),
-//             getButtonFigma(
-//                 context,
-//                 getAccentColor(context),
-//                 true,
-//                 "Log In",
-//                 Colors.white,
-//                 () {},
-//                 EdgeInsets.symmetric(horizontal: horSpace, vertical: 40.h)),
-//             Row(
-//               mainAxisAlignment: MainAxisAlignment.center,
-//               crossAxisAlignment: CrossAxisAlignment.center,
-//               children: [
-//                 Expanded(
-//                   child:
-//                       getDivider(setColor: getCurrentTheme(context).hintColor),
-//                   flex: 1,
-//                 ),
-//                 getCustomFont(" OR Sign in with ", 16, getFontColor(context), 1,
-//                     fontWeight: FontWeight.w400, textAlign: TextAlign.center),
-//                 Expanded(
-//                   child:
-//                       getDivider(setColor: getCurrentTheme(context).hintColor),
-//                   flex: 1,
-//                 )
-//               ],
-//             ).marginSymmetric(horizontal: horSpace),
-//             30.h.verticalSpace,
-//             getButtonFigma(
-//                 context,
-//                 getCardColor(context),
-//                 true,
-//                 "Login with Google",
-//                 getFontColor(context),
-//                 () {},
-//                 EdgeInsets.zero,
-//                 isIcon: true,
-//                 icons: "Google.svg",
-//                 shadow: [
-//                   const BoxShadow(
-//                       color: Color.fromRGBO(130, 164, 131, 0.2199999988079071),
-//                       offset: Offset(0, 7),
-//                       blurRadius: 33)
-//                 ]).marginSymmetric(horizontal: horSpace, vertical: 10.h),
-//             getButtonFigma(
-//                 context,
-//                 getCardColor(context),
-//                 true,
-//                 "Login with Facebook",
-//                 getFontColor(context),
-//                 () {},
-//                 EdgeInsets.zero,
-//                 isIcon: true,
-//                 icons: "Facebook.svg",
-//                 shadow: [
-//                   BoxShadow(
-//                       color: Color.fromRGBO(130, 164, 131, 0.2199999988079071),
-//                       offset: Offset(0, 7),
-//                       blurRadius: 33)
-//                 ]).marginSymmetric(horizontal: horSpace, vertical: 10.h),
-//             80.h.verticalSpace,
-//             Row(
-//               mainAxisAlignment: MainAxisAlignment.center,
-//               crossAxisAlignment: CrossAxisAlignment.center,
-//               children: [
-//                 getCustomFont(
-//                   "Already have an account?",
-//                   16,
-//                   getFontBlackColor(context),
-//                   1,
-//                   fontWeight: FontWeight.w400,
-//                 ),
-//                 getCustomFont(
-//                   " Sign up",
-//                   18,
-//                   getFontBlackColor(context),
-//                   1,
-//                   fontWeight: FontWeight.w700,
-//                 )
-//               ],
-//             )
-//           ],
-//         ));
-//   }
-// }

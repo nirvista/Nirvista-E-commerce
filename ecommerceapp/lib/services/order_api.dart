@@ -212,6 +212,37 @@ class OrderApiService {
     }
   }
 
+  static Future<Map<String, dynamic>> initiatePartialReturn(String accessToken, String orderId, List<Map<String, dynamic>> itemsToReturn) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/orders/$orderId/partial-return'),
+        headers: {
+          'Authorization': 'Bearer $accessToken',
+          'Content-Type': 'application/json',
+          'x-client-type': kIsWeb ? 'web' : 'mobile',
+        },
+        body: jsonEncode({'itemsToReturn': itemsToReturn}),
+      );
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return {
+          'success': true,
+          'message': jsonDecode(response.body)['message'] ?? 'Partial return initiated',
+        };
+      } else {
+        String msg = 'Failed to initiate partial return';
+        try {
+          msg = jsonDecode(response.body)['message'] ?? msg;
+        } catch (_) {}
+        return {
+          'success': false,
+          'message': msg,
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'message': "Connection error: ${e.toString()}"};
+    }
+  }
+
   static Future<void> downloadInvoice(String accessToken, String orderId) async {
     try {
       final response = await http.get(

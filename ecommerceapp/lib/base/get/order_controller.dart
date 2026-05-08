@@ -50,4 +50,34 @@ class GlobalOrderController extends GetxController {
       userOrders.refresh();
     }
   }
+
+  Future<Map<String, dynamic>> initiateReturn(String orderId) async {
+    try {
+      final loginController = Get.find<LoginDataController>();
+      final token = loginController.accessToken ?? '';
+      final res = await OrderApiService.initiateReturn(token, orderId);
+      if (res['success']) {
+        updateOrderStatusLocally(orderId, 'return_requested');
+      }
+      return res;
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  Future<Map<String, dynamic>> initiatePartialReturn(String orderId, List<Map<String, dynamic>> itemsToReturn) async {
+    try {
+      final loginController = Get.find<LoginDataController>();
+      final token = loginController.accessToken ?? '';
+      final res = await OrderApiService.initiatePartialReturn(token, orderId, itemsToReturn);
+      if (res['success']) {
+        updateOrderStatusLocally(orderId, 'return_requested');
+        // Refetching to get updated item-level statuses
+        await fetchOrders();
+      }
+      return res;
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
 }

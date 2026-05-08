@@ -87,9 +87,7 @@ class _TrackOrder extends State<TrackOrder> {
     }
   }
 
-  Future<void> _handleReturnOrder() async {
-    final token = loginController.accessToken ?? '';
-    
+  Future<void> _handleReturnOrder(List<Map<String, dynamic>>? itemsToReturn) async {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -97,15 +95,21 @@ class _TrackOrder extends State<TrackOrder> {
     );
 
     try {
-      final res = await OrderApiService.initiateReturn(token, orderId);
+      Map<String, dynamic> res;
+      if (itemsToReturn == null || itemsToReturn.isEmpty) {
+        // Full return
+        res = await orderController.initiateReturn(orderId);
+      } else {
+        // Partial return
+        res = await orderController.initiatePartialReturn(orderId, itemsToReturn);
+      }
+      
       Navigator.pop(context); // hide loading
 
       if (res['success']) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Return request initiated successfully'), backgroundColor: Colors.green)
         );
-        // Update local status if necessary
-        orderController.updateOrderStatusLocally(orderId, 'return Initiated');
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(res['message'] ?? 'Failed to initiate return'), backgroundColor: Colors.red)
@@ -207,15 +211,29 @@ class _TrackOrder extends State<TrackOrder> {
                       Padding(
                         padding: EdgeInsets.symmetric(horizontal: margin),
                         child: getButtonFigma(context, accentColor, true, "Return Product", Colors.white, () {
-                          showGetDeleteDialog(
-                            context, 
-                            "Are you sure you want to return this product? You can return it within 1 week of delivery.", 
-                            "Return Product", 
-                            () { _handleReturnOrder(); },
-                            withCancelBtn: true,
-                            btnTextCancel: "No, Cancel",
-                            functionCancel: () {}
-                          );
+                          if (displayOrder.items.length > 1) {
+                            // Show selection dialog for multiple items
+                            showDialog(
+                              context: context,
+                              builder: (ctx) => ReturnSelectionDialog(
+                                order: displayOrder,
+                                onConfirm: (items) {
+                                  _handleReturnOrder(items);
+                                },
+                              ),
+                            );
+                          } else {
+                            // Single item: just confirm
+                            showGetDeleteDialog(
+                              context, 
+                              "Are you sure you want to return this product?", 
+                              "Return Product", 
+                              () { _handleReturnOrder(null); },
+                              withCancelBtn: true,
+                              btnTextCancel: "No, Cancel",
+                              functionCancel: () {}
+                            );
+                          }
                         }, EdgeInsets.zero),
                       ),
                     ],
@@ -486,6 +504,11 @@ class _TrackOrder extends State<TrackOrder> {
                             getCustomFont("Qty: ${item.quantity}", 12, getFontGreyColor(context), 1),
                             if (item.variant?.variantName != null) 
                               getCustomFont("Variant: ${item.variant!.variantName}", 12, getFontGreyColor(context), 1),
+                            if (item.returnStatus != 'none')
+                              Padding(
+                                padding: EdgeInsets.only(top: 4.h),
+                                child: getCustomFont("Return: ${item.returnStatus.capitalizeFirst} (${item.returnedQuantity})", 12, Colors.orange, 1, fontWeight: FontWeight.w600),
+                              ),
                           ],
                         ),
                       ),
@@ -568,6 +591,101 @@ class _TrackOrder extends State<TrackOrder> {
           buildTotalRow(context, "Total Paid", "\u20B9${order.totalAmount.toStringAsFixed(0)}"),
         ],
       ),
+    );
+  }
+}
+
+class ReturnSelectionDialog extends StatefulWidget {
+  final OrderModel order;
+  final Function(List<Map<String, dynamic>>) onConfirm;
+
+  const ReturnSelectionDialog({Key? key, required this.order, required this.onConfirm}) : super(key: key);
+
+  @override
+  State<ReturnSelectionDialog> createState() => _ReturnSelectionDialogState();
+}
+
+class _ReturnSelectionDialogState extends State<ReturnSelectionDialog> {
+  final Map<String, int> selectedItems = {}; // orderItemId -> quantity
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.w)),
+      title: getCustomFont("Select Items to Return", 18, getFontColor(context), 1, fontWeight: FontWeight.w700),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: ListView.separated(
+          shrinkWrap: true,
+          itemCount: widget.order.items.length,
+          separatorBuilder: (ctx, i) => const Divider(),
+          itemBuilder: (context, index) {
+            final item = widget.order.items[index];
+            bool isSelected = selectedItems.containsKey(item.id);
+            int qty = selectedItems[item.id] ?? 1;
+
+            return CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              title: getCustomFont(item.product?.title ?? "Product", 14, getFontColor(context), 1, fontWeight: FontWeight.w500),
+              subtitle: getCustomFont("Purchased: ${item.quantity}", 12, getFontGreyColor(context), 1),
+              value: isSelected,
+              activeColor: accentColor,
+              onChanged: (val) {
+                setState(() {
+                  if (val == true) {
+                    selectedItems[item.id] = 1;
+                  } else {
+                    selectedItems.remove(item.id);
+                  }
+                });
+              },
+              secondary: isSelected ? Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  GestureDetector(
+                    onTap: qty > 1 ? () => setState(() => selectedItems[item.id] = qty - 1) : null,
+                    child: Container(
+                      padding: EdgeInsets.all(4.w),
+                      decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: qty > 1 ? accentColor : Colors.grey)),
+                      child: Icon(Icons.remove, size: 16.w, color: qty > 1 ? accentColor : Colors.grey),
+                    ),
+                  ),
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 8.w),
+                    child: getCustomFont(qty.toString(), 14, getFontColor(context), 1, fontWeight: FontWeight.w600),
+                  ),
+                  GestureDetector(
+                    onTap: qty < item.quantity ? () => setState(() => selectedItems[item.id] = qty + 1) : null,
+                    child: Container(
+                      padding: EdgeInsets.all(4.w),
+                      decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: qty < item.quantity ? accentColor : Colors.grey)),
+                      child: Icon(Icons.add, size: 16.w, color: qty < item.quantity ? accentColor : Colors.grey),
+                    ),
+                  ),
+                ],
+              ) : null,
+            );
+          },
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context), 
+          child: getCustomFont("Cancel", 14, getFontGreyColor(context), 1, fontWeight: FontWeight.w600)
+        ),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: accentColor,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.w)),
+          ),
+          onPressed: selectedItems.isEmpty ? null : () {
+            final result = selectedItems.entries.map((e) => {'orderItemId': e.key, 'quantity': e.value}).toList();
+            widget.onConfirm(result);
+            Navigator.pop(context);
+          },
+          child: getCustomFont("Confirm Return", 14, Colors.white, 1, fontWeight: FontWeight.w600),
+        ),
+      ],
     );
   }
 }

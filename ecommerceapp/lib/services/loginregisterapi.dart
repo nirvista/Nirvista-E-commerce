@@ -138,4 +138,52 @@ class ApiService {
       };
     }
   }
+  static Future<Map<String, dynamic>> forgotPassword({required String email}) async {
+    try {
+      final headers = {
+        'Content-Type': 'application/json',
+        'x-client-type': 'mobile',
+      };
+      final payload = {'email': email};
+
+      final response = await _postWithFallback('/api/auth/forgot-password', headers, payload);
+      final decodedResponse = jsonDecode(response.body);
+
+      return {
+        'success': response.statusCode == 200,
+        'message': decodedResponse['message'] ?? 'Action failed',
+      };
+    } catch (e) {
+      return {
+        'success': false,
+        'message': 'Unable to reach server. Please check your connection.',
+      };
+    }
+  }
+
+  static Future<Map<String, dynamic>> resetPassword({
+    required String token,
+    required String password,
+  }) async {
+    try {
+      final headers = {
+        'Content-Type': 'application/json',
+        'x-client-type': 'mobile',
+      };
+      final payload = {'password': password};
+
+      final response = await _postWithFallback('/api/auth/reset-password/$token', headers, payload);
+      final decodedResponse = jsonDecode(response.body);
+
+      return {
+        'success': response.statusCode == 200,
+        'message': decodedResponse['message'] ?? 'Reset failed',
+      };
+    } catch (e) {
+      return {
+        'success': false,
+        'message': 'Unable to reach server. Please check your connection.',
+      };
+    }
+  }
 }
